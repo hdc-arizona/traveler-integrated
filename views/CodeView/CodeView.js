@@ -1,4 +1,4 @@
-import GoldenLayoutView from './common/GoldenLayoutView.js';
+import GoldenLayoutView from '../common/GoldenLayoutView.js';
 
 class CodeView extends GoldenLayoutView {
   setup () {

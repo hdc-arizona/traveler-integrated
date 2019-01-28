@@ -1,8 +1,8 @@
 /* globals d3 */
 import MainModel from './models/MainModel.js';
-import TreeView from './views/TreeView.js';
-import CodeView from './views/CodeView.js';
-import GanttView from './views/GanttView.js';
+import TreeView from './views/TreeView/TreeView.js';
+import CodeView from './views/CodeView/CodeView.js';
+import GanttView from './views/GanttView/GanttView.js';
 import defaultLayout from './config/defaultLayout.js';
 
 class Controller {

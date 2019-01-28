@@ -1,4 +1,4 @@
-import GoldenLayoutView from './common/GoldenLayoutView.js';
+import GoldenLayoutView from '../common/GoldenLayoutView.js';
 
 class TreeView extends GoldenLayoutView {
   setup () {

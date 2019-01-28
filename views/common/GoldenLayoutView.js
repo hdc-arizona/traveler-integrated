@@ -19,6 +19,17 @@ class GoldenLayoutView extends View {
     this.container.on('show', () => this.render());
     this.container.on('resize', () => this.render());
   }
+  set title (newTitle) {
+    if (this.tabElement) {
+      this.tabElement.classed(this._title, false);
+      this.tabElement.classed(newTitle, true);
+    }
+    if (this.d3el) {
+      this.d3el.classed(this._title, false);
+      this.d3el.classed(newTitle, true);
+    }
+    this._title = newTitle;
+  }
   get title () {
     return this._title;
   }
@@ -27,13 +38,14 @@ class GoldenLayoutView extends View {
     return false;
   }
   setup () {
+    this.d3el.classed(this.title, true);
     this.emptyStateDiv = this.d3el.append('div')
       .classed('emptyState', true)
       .style('display', 'none');
     this.content = this.setupContentElement(this.d3el);
   }
   setupTab () {
-    this.tabElement.classed(this.constructor.name, true);
+    this.tabElement.classed(this.title, true);
   }
   drawTab () {
     this.tabElement.select(':scope > .lm_title')
