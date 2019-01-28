@@ -1,0 +1,27 @@
+{
+  "name": "traveler-integrated",
+  "version": "0.1.0",
+  "description": "An integrated visualization system for connecting OTF2 stack traces and aggregate expression trees",
+  "scripts": {
+    "serve": "serve ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alex-r-bigelow/traveler-integrated.git"
+  },
+  "author": "University of Arizona HDC Lab",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/alex-r-bigelow/traveler-integrated/issues"
+  },
+  "homepage": "https://github.com/alex-r-bigelow/traveler-integrated#readme",
+  "dependencies": {
+    "codemirror": "^5.43.0",
+    "d3": "^5.7.0",
+    "golden-layout": "^1.5.9",
+    "jquery": "^3.3.1",
+    "less": "^3.9.0",
+    "serve": "^10.1.1",
+    "uki": "^0.2.5"
+  }
+}
