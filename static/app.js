@@ -1,4 +1,4 @@
-/* globals d3 */
+/* globals GoldenLayout */
 import MainModel from './models/MainModel.js';
 import TreeView from './views/TreeView/TreeView.js';
 import CodeView from './views/CodeView/CodeView.js';
