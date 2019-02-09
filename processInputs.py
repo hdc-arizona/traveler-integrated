@@ -21,7 +21,7 @@ def processInputs(args):
     rangeEnterIndex = sortedlist(key=lambda i: i[0])
     rangeLeaveIndex = sortedlist(key=lambda i: i[0])
     events = shelve.open(os.path.join(args.tempDir, 'eventShelf.db'), flag='n')
-    eventIndex = sortedlist(key=lambda i: i[0])
+    eventsIndex = sortedlist(key=lambda i: i[0])
 
     # Tools for handling region names
     def addRegionChild(parent, child):
@@ -163,7 +163,7 @@ def processInputs(args):
         
         # Add the event
         events[eventId] = currentEvent
-        eventIndex.add((currentEvent['Timestamp'], eventId))
+        # eventsIndex.add((currentEvent['Timestamp'], eventId))
 
         # Log that we've processed another event
         numEvents += 1
@@ -207,8 +207,8 @@ def processInputs(args):
     numRanges = 0
     for eventList in locations.values():
         lastEvent = None
-        for _, eventIndex in eventList:
-            event = events[eventIndex]
+        for _, eventId in eventList:
+            event = events[eventId]
             if event['Event'] == 'ENTER':
                 # Start a range (don't output anything)
                 assert lastEvent is None
@@ -287,5 +287,5 @@ def processInputs(args):
         'rangeEnterIndex': rangeEnterIndex,
         'rangeLeaveIndex': rangeLeaveIndex,
         'events': events,
-        'eventIndex': eventIndex
+        'eventsIndex': eventIndex
     }
