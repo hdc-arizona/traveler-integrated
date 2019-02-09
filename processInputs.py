@@ -3,7 +3,6 @@ import sys
 import os
 import subprocess
 import re
-import json
 import shelve
 from blist import sortedlist
 import newick
@@ -129,11 +128,14 @@ def processInputs(args):
     numEvents = 0
     locations = {}
 
-    def processEvent(currentEvent):
-        nonlocal numEvents
-        if currentEvent is not None:
-            eventId = str(numEvents)
+    def processEvent():
+        nonlocal numEvents, currentEvent
+        if currentEvent is None:
+            return
+        
+        eventId = str(numEvents)
 
+        if 'Region' in currentEvent:
             # Identify the region (and add to its counter)
             regionName = currentEvent['Region'].replace('::eval', '')
             processRegion(regionName, 'otf2 event', parent=None)
@@ -143,31 +145,32 @@ def processInputs(args):
                 regions[regionName]['eventCount'] += 1
 
             # Add to GUID / Parent GUID relationships
-            if 'guids' not in regions[regionName]:
-                regions[regionName]['guids'] = set()
-            regions[regionName]['guids'].add(currentEvent['GUID'])
-            if currentEvent['GUID'] in guids:
-                guids[currentEvent['GUID']]['regions'].add(regionName)
-                assert guids[currentEvent['GUID']]['parent'] == currentEvent['Parent GUID']
-            else:
-                guids[currentEvent['GUID']] = { 'regions': set([regionName]), 'parent': currentEvent['Parent GUID'] }
+            if 'GUID' in currentEvent and 'Parent GUID' in currentEvent:
+                if 'guids' not in regions[regionName]:
+                    regions[regionName]['guids'] = set()
+                regions[regionName]['guids'].add(currentEvent['GUID'])
+                if currentEvent['GUID'] in guids:
+                    guids[currentEvent['GUID']]['regions'].add(regionName)
+                    assert guids[currentEvent['GUID']]['parent'] == currentEvent['Parent GUID']
+                else:
+                    guids[currentEvent['GUID']] = { 'regions': set([regionName]), 'parent': currentEvent['Parent GUID'] }
 
-            # Add enter / leave events to per-location lists
-            if currentEvent['Event'] == 'ENTER' or currentEvent['Event'] == 'LEAVE':
-                if not currentEvent['Location'] in locations:
-                    locations[currentEvent['Location']] = sortedlist(key=lambda i: i[0])
-                locations[currentEvent['Location']].add((currentEvent['Timestamp'], eventId))
-            
-            # Add the event
-            events[eventId] = currentEvent
-            eventIndex.add((currentEvent['Timestamp'], eventId))
+        # Add enter / leave events to per-location lists
+        if currentEvent['Event'] == 'ENTER' or currentEvent['Event'] == 'LEAVE':
+            if not currentEvent['Location'] in locations:
+                locations[currentEvent['Location']] = sortedlist(key=lambda i: i[0])
+            locations[currentEvent['Location']].add((currentEvent['Timestamp'], eventId))
+        
+        # Add the event
+        events[eventId] = currentEvent
+        eventIndex.add((currentEvent['Timestamp'], eventId))
 
-            # Log that we've processed another event
-            numEvents += 1
-            if numEvents % 10000 == 0:
-                log('.', end=''),
-            if numEvents % 100000 == 0:
-                log('processed %i events' % numEvents)
+        # Log that we've processed another event
+        numEvents += 1
+        if numEvents % 10000 == 0:
+            log('.', end=''),
+        if numEvents % 100000 == 0:
+            log('processed %i events' % numEvents)
 
     for line in otfPrint.stdout:
         line = line.decode()
@@ -179,7 +182,7 @@ def processInputs(args):
 
         if eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
-            processEvent(currentEvent)
+            processEvent()
             currentEvent = {}
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = int(eventLineMatch.group(2))
@@ -197,7 +200,7 @@ def processInputs(args):
                 assert attr is not None
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
     # The last event will never have had a chance to be processed:
-    processEvent(currentEvent)
+    processEvent()
     log('finished processing %i events' % numEvents)
 
     # Combine the sorted enter / leave events into ranges

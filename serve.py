@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import argparse
+import json
 from processInputs import processInputs
 from flask import Flask
 
@@ -21,6 +22,20 @@ app = Flask(__name__)
 @app.route('/')
 def main():
     return app.send_static_file('index.html')
+
+@app.route('/coreTree')
+def coreTree():
+    return json.dumps(data['coreTree'])
+
+@app.route('/regions')
+def regions():
+    return json.dumps(data['regions'])
+
+@app.route('/regionLinks')
+def regionLinks():
+    return json.dumps(data['regionLinks'])
+
+# TODO: add endpoints for querying ranges, guids, and maybe individual events
 
 @app.route('/<path:path>')
 def static_proxy(path):
