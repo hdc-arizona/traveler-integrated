@@ -74,20 +74,29 @@ def processInputs(args):
     # Parse the input first (in case we're piping from stdout, wait for it to finish before attempting to parse the OTF2 trace)
     if args.input is not None:
         mode = None
+        count = 0
+        newCount = 0
         for line in args.input:
             if mode is None:
                 if treeModeParser.match(line):
                     mode = 'tree'
+                    log('Parsing tree...')
                 elif dotModeParser.match(line):
                     mode = 'dot'
+                    log('Parsing graph...')
+                    count = 0
                 elif perfModeParser.match(line):
                     mode = 'perf'
+                    log('Parsing performance csv...')
+                    count = 0
             elif mode == 'tree':
                 coreTree = processTree(newick.loads(line)[0])
                 mode = None
+                log('Finished parsing %d regions' % len(regions))
             elif mode == 'dot':
                 dotLine = dotLineParser.match(line)
                 if dotLine is not None:
+                    count += 1
                     assert dotLine[1] in regions
                     processRegion(dotLine[1], 'dot graph', parent=None)
                     assert dotLine[2] in regions
@@ -95,11 +104,15 @@ def processInputs(args):
                     addRegionChild(dotLine[1], dotLine[2])
                 else:
                     mode = None
+                    log('Finished parsing %d relationships' % count)
             elif mode == 'perf':
                 perfLine = perfLineParser.match(line)
                 if perfLine is not None:
                     regionName = perfLine[1]
+                    count += 1
                     # TODO: assert regionName in regions
+                    if regionName not in regions:
+                        newCount += 1
                     processRegion(regionName, 'perf csv', parent=None)
                     regions[regionName]['display_name'] = perfLine[2]
                     regions[regionName]['count'] = int(perfLine[3])
@@ -107,6 +120,7 @@ def processInputs(args):
                     regions[regionName]['eval_direct'] = int(perfLine[5])
                 else:
                     mode = None
+                    log('Finished parsing stats for %d regions (added %d new regions)' % (count, newCount))
             else:
                 # Should never reach this point
                 assert False
@@ -146,15 +160,16 @@ def processInputs(args):
                 regions[regionName]['eventCount'] += 1
 
             # Add to GUID / Parent GUID relationships
-            if 'GUID' in currentEvent and 'Parent GUID' in currentEvent:
+            if args.guids and 'GUID' in currentEvent and 'Parent GUID' in currentEvent:
                 if 'guids' not in regions[regionName]:
                     regions[regionName]['guids'] = set()
                 regions[regionName]['guids'].add(currentEvent['GUID'])
                 if currentEvent['GUID'] in guids:
-                    guids[currentEvent['GUID']]['regions'].add(regionName)
+                    if regionName not in guids[currentEvent['GUID']]['regions']:
+                        guids[currentEvent['GUID']]['regions'].append(regionName)
                     assert guids[currentEvent['GUID']]['parent'] == currentEvent['Parent GUID']
                 else:
-                    guids[currentEvent['GUID']] = { 'regions': set([regionName]), 'parent': currentEvent['Parent GUID'] }
+                    guids[currentEvent['GUID']] = { 'regions': [regionName], 'parent': currentEvent['Parent GUID'] }
 
         # Add enter / leave events to per-location lists
         if currentEvent['Event'] == 'ENTER' or currentEvent['Event'] == 'LEAVE':
@@ -163,8 +178,9 @@ def processInputs(args):
             locations[currentEvent['Location']].add((currentEvent['Timestamp'], eventId))
         
         # Add the event
-        events[eventId] = currentEvent
-        # eventsIndex.add((currentEvent['Timestamp'], eventId))
+        if args.events:
+            events[eventId] = currentEvent
+            eventsIndex.add((currentEvent['Timestamp'], eventId))
 
         # Log that we've processed another event
         numEvents += 1
@@ -173,6 +189,7 @@ def processInputs(args):
         if numEvents % 100000 == 0:
             log('processed %i events' % numEvents)
 
+    log('Parsing events...')
     for line in otfPrint.stdout:
         line = line.decode()
         eventLineMatch = eventLineParser.match(line)
@@ -202,9 +219,11 @@ def processInputs(args):
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
     # The last event will never have had a chance to be processed:
     processEvent()
+    log('')
     log('finished processing %i events' % numEvents)
 
     # Combine the sorted enter / leave events into ranges
+    log('Combining enter / leave events into ranges...')
     numRanges = 0
     for eventList in locations.values():
         lastEvent = None
@@ -220,7 +239,7 @@ def processInputs(args):
                 rangeId = str(numRanges)
                 currentRange = { 'enter': {}, 'leave': {} }
                 for attr, value in event.items():
-                    if value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
+                    if attr != 'Timestamp' and value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
                         currentRange[attr] = value
                     else:
                         currentRange['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
@@ -240,18 +259,22 @@ def processInputs(args):
         # TODO: fibonacci data violates this...
         # assert lastEvent is None
     # Finish the ranges dict
+    log('')
     log('finished processing %i ranges' % numRanges)
 
-    # Create any missing parent-child region relationships based on the GUIDs we've collected,
-    # and make the guid objects JSON-serializable
+    # Create any missing parent-child region relationships based on the GUIDs we've collected
+    log('Creating region relationships based on GUIDs...')
+    count = 0
     for _, details in guids.items():
         if details['parent'] != '0':
             assert details['parent'] in guids
             # TODO: ask what's up with multiple regions per GUID?
             for parentRegion in guids[details['parent']]['regions']:
                 for childRegion in details['regions']:
-                    addRegionChild(parentRegion, childRegion)
-        details['regions'] = list(details['regions'])
+                    if childRegion not in regions[parentRegion]['children']:
+                        count += 1
+                        addRegionChild(parentRegion, childRegion)
+    log('%d additional relationships identified' % count)
 
     # Populate the region links list
     for parent, value in regions.items():
@@ -282,5 +305,5 @@ def processInputs(args):
         'rangeLeaveIndex': rangeLeaveIndex,
         'events': events,
         'eventsIndex': eventsIndex,
-        'locations': locations.keys()
+        'locations': list(locations.keys())
     }

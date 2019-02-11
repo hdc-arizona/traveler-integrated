@@ -14,6 +14,10 @@ parser.add_argument('-t', '--temp_dir', dest='tempDir', default='/tmp',
                     help='A directory for storing temporary files (default: /tmp')
 parser.add_argument('-s', '--debug', dest='debug', action='store_true',
                     help='Collect additional debugging information')
+parser.add_argument('-g', '--guids', dest='guids', action='store_true',
+                    help='Collect GUIDs')
+parser.add_argument('-e', '--events', dest='events', action='store_true',
+                    help='Collect all events, not just ranges')
 
 args = parser.parse_args()
 data = processInputs(args)
@@ -40,6 +44,17 @@ def locations():
     return json.dumps(data['locations'])
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
+@app.route('/ranges')
+def ranges():
+    return json.dumps(dict(data['ranges']))
+
+@app.route('/guids')
+def guids():
+    return json.dumps(dict(data['guids']))
+
+@app.route('/events')
+def events():
+    return json.dumps(dict(data['events']))
 
 @app.route('/<path:path>')
 def static_proxy(path):
