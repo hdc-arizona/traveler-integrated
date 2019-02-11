@@ -2,7 +2,7 @@ export default (superclass) => class extends superclass {
   setupContentElement () {
     return this.d3el.append('svg');
   }
-  getContentBounds (content) {
+  getContentBounds (content = this.content) {
     const bounds = content.node().parentNode.getBoundingClientRect();
     content.attr('width', bounds.width)
       .attr('height', bounds.height);

@@ -4,8 +4,8 @@ import os
 import subprocess
 import re
 import shelve
-from blist import sortedlist
-import newick
+from blist import sortedlist #pylint: disable=import-error
+import newick #pylint: disable=import-error
 
 def log(value, end='\n'):
     sys.stderr.write(value + end)
@@ -22,6 +22,7 @@ def processInputs(args):
     rangeLeaveIndex = sortedlist(key=lambda i: i[0])
     events = shelve.open(os.path.join(args.tempDir, 'eventShelf.db'), flag='n')
     eventsIndex = sortedlist(key=lambda i: i[0])
+    locations = {}
 
     # Tools for handling region names
     def addRegionChild(parent, child):
@@ -70,44 +71,45 @@ def processInputs(args):
     perfModeParser = re.compile(r'primitive_instance,display_name,count,time,eval_direct')
     perfLineParser = re.compile(r'"([^"]*)","([^"]*)",(\d+),(\d+),(-?1)')
 
-    # Parse stdout first (waits for it to finish before attempting to parse the OTF2 trace)
-    mode = None
-    for line in args.input:
-        if mode is None:
-            if treeModeParser.match(line):
-                mode = 'tree'
-            elif dotModeParser.match(line):
-                mode = 'dot'
-            elif perfModeParser.match(line):
-                mode = 'perf'
-        elif mode == 'tree':
-            coreTree = processTree(newick.loads(line)[0])
-            mode = None
-        elif mode == 'dot':
-            dotLine = dotLineParser.match(line)
-            if dotLine is not None:
-                assert dotLine[1] in regions
-                processRegion(dotLine[1], 'dot graph', parent=None)
-                assert dotLine[2] in regions
-                processRegion(dotLine[2], 'dot graph', parent=None)
-                addRegionChild(dotLine[1], dotLine[2])
-            else:
+    # Parse the input first (in case we're piping from stdout, wait for it to finish before attempting to parse the OTF2 trace)
+    if args.input is not None:
+        mode = None
+        for line in args.input:
+            if mode is None:
+                if treeModeParser.match(line):
+                    mode = 'tree'
+                elif dotModeParser.match(line):
+                    mode = 'dot'
+                elif perfModeParser.match(line):
+                    mode = 'perf'
+            elif mode == 'tree':
+                coreTree = processTree(newick.loads(line)[0])
                 mode = None
-        elif mode == 'perf':
-            perfLine = perfLineParser.match(line)
-            if perfLine is not None:
-                regionName = perfLine[1]
-                # TODO: assert regionName in regions
-                processRegion(regionName, 'perf csv', parent=None)
-                regions[regionName]['display_name'] = perfLine[2]
-                regions[regionName]['count'] = int(perfLine[3])
-                regions[regionName]['time'] = int(perfLine[4])
-                regions[regionName]['eval_direct'] = int(perfLine[5])
+            elif mode == 'dot':
+                dotLine = dotLineParser.match(line)
+                if dotLine is not None:
+                    assert dotLine[1] in regions
+                    processRegion(dotLine[1], 'dot graph', parent=None)
+                    assert dotLine[2] in regions
+                    processRegion(dotLine[2], 'dot graph', parent=None)
+                    addRegionChild(dotLine[1], dotLine[2])
+                else:
+                    mode = None
+            elif mode == 'perf':
+                perfLine = perfLineParser.match(line)
+                if perfLine is not None:
+                    regionName = perfLine[1]
+                    # TODO: assert regionName in regions
+                    processRegion(regionName, 'perf csv', parent=None)
+                    regions[regionName]['display_name'] = perfLine[2]
+                    regions[regionName]['count'] = int(perfLine[3])
+                    regions[regionName]['time'] = int(perfLine[4])
+                    regions[regionName]['eval_direct'] = int(perfLine[5])
+                else:
+                    mode = None
             else:
-                mode = None
-        else:
-            # Should never reach this point
-            assert False
+                # Should never reach this point
+                assert False
 
     # Parse the OTF2 trace, output non-ENTER/LEAVE events directly as we encounter them so they don't stick around in memory
     otfPrint = subprocess.Popen(['otf2-print', args.otf2], stdout=subprocess.PIPE)
@@ -126,7 +128,6 @@ def processInputs(args):
 
     currentEvent = None
     numEvents = 0
-    locations = {}
 
     def processEvent():
         nonlocal numEvents, currentEvent
@@ -217,21 +218,13 @@ def processInputs(args):
                 # Finish a range
                 assert lastEvent is not None
                 rangeId = str(numRanges)
-                currentRange = {}
+                currentRange = { 'enter': {}, 'leave': {} }
                 for attr, value in event.items():
-                    # For now, we assume Event, Timestamp, and Region are the only things
-                    # that can change between an ENTER / LEAVE pair
-                    if attr != 'Event' and attr != 'Timestamp' and attr != 'Region':
-                        assert event[attr] == lastEvent[attr] #pylint: disable=unsubscriptable-object
+                    if value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
                         currentRange[attr] = value
-                currentRange['enter'] = {
-                    'Timestamp': lastEvent['Timestamp'], #pylint: disable=unsubscriptable-object
-                    'Region': lastEvent['Region'] #pylint: disable=unsubscriptable-object
-                }
-                currentRange['leave'] = {
-                    'Timestamp': event['Timestamp'],
-                    'Region': event['Region']
-                }
+                    else:
+                        currentRange['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
+                        currentRange['leave'][attr] = value
                 ranges[rangeId] = currentRange
                 rangeEnterIndex.add((currentRange['enter']['Timestamp'], rangeId))
                 rangeLeaveIndex.add((currentRange['leave']['Timestamp'], rangeId))
@@ -244,7 +237,8 @@ def processInputs(args):
                     log('processed %i ranges' % numRanges)
                 lastEvent = None
         # Make sure there are no trailing ENTER events
-        assert lastEvent is None
+        # TODO: fibonacci data violates this...
+        # assert lastEvent is None
     # Finish the ranges dict
     log('finished processing %i ranges' % numRanges)
 
@@ -287,5 +281,6 @@ def processInputs(args):
         'rangeEnterIndex': rangeEnterIndex,
         'rangeLeaveIndex': rangeLeaveIndex,
         'events': events,
-        'eventsIndex': eventIndex
+        'eventsIndex': eventsIndex,
+        'locations': locations.keys()
     }

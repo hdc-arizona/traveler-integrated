@@ -6,7 +6,7 @@ from processInputs import processInputs
 from flask import Flask
 
 parser = argparse.ArgumentParser(description='Collect stdout and/or OTF2 trace data from a phylanx run')
-parser.add_argument('-i', '--input', dest='input', default=sys.stdin, type=argparse.FileType('r'), nargs='?',
+parser.add_argument('-i', '--input', dest='input', type=argparse.FileType('r'), nargs='?',
                     help='stdout from phylanx run as a file; alternatively, you can omit this argument and pipe the phylanx output directly into this script')
 parser.add_argument('-o', '--otf2', dest='otf2',
                     help='The input otf2 trace file (e.g. test_data/OTF2_archive/APEX.otf2)')
@@ -34,6 +34,10 @@ def regions():
 @app.route('/regionLinks')
 def regionLinks():
     return json.dumps(data['regionLinks'])
+
+@app.route('/locations')
+def locations():
+    return json.dumps(data['locations'])
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
 

@@ -1,16 +1,17 @@
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
+import SvgViewMixin from '../common/SvgViewMixin.js';
 
-class GanttView extends GoldenLayoutView {
-  setupContentElement () {
-    const content = this.d3el.append('div')
-      .classed('content', true);
-    this.overview = this.d3el.append('div')
-      .classed('overview', true);
-    return content;
+class GanttView extends SvgViewMixin(GoldenLayoutView) {
+  setup () {
+    super.setup();
+
+    this.content.append('text')
+      .attr('x', 20)
+      .attr('y', 20)
+      .text('TODO: Gantt View');
   }
   draw () {
-    this.content.text('TODO: Main Gantt View');
-    this.overview.text('TODO: Overview');
+    const bounds = this.getContentBounds();
   }
 }
 export default GanttView;
