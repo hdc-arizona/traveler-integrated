@@ -9,7 +9,7 @@ treeModeParser = re.compile(r'Tree information for function:')
 def processTree(regions, regionLinks, node, parent=None, debug=False):
     # Create the hashed region object
     regionName = node.name.strip()
-    assert regions.find_one({'_id': regionName}) is None
+    assert regions.get(regionName, None) is None
     common.processRegion(regions, regionName, 'tree', debug)
     tree = { 'name': regionName, 'children': [] }
 
@@ -57,13 +57,13 @@ def parsePhylanxLog (logFile, regions, regionLinks, debug=False):
         elif mode == 'tree':
             coreTree = processTree(regions, regionLinks, newick.loads(line)[0], debug=debug)
             mode = None
-            log('Finished parsing %d regions from newick tree' % regions.count())
+            log('Finished parsing %d regions from newick tree' % len(regions))
         elif mode == 'dot':
             dotLine = dotLineParser.match(line)
             if dotLine is not None:
                 count += 1
-                assert regions.find_one({'_id': dotLine[1]}) is not None
-                assert regions.find_one({'_id': dotLine[2]}) is not None
+                assert regions.get(dotLine[1], None) is not None
+                assert regions.get(dotLine[2], None) is not None
                 if debug is True:
                     common.processRegion(regions, dotLine[1], 'dot graph', debug=debug)
                     common.processRegion(regions, dotLine[2], 'dot graph', debug=debug)
@@ -76,7 +76,7 @@ def parsePhylanxLog (logFile, regions, regionLinks, debug=False):
             if perfLine is not None:
                 regionName = perfLine[1]
                 count += 1
-                region = regions.find_one({'_id': regionName})
+                region = regions.get(regionName, None)
                 # TODO: something violates this... (what was it, and why does it happen?)
                 # assert region is not None
                 if region is None:
@@ -88,7 +88,7 @@ def parsePhylanxLog (logFile, regions, regionLinks, debug=False):
                 region['count'] = int(perfLine[3])
                 region['time'] = int(perfLine[4])
                 region['eval_direct'] = int(perfLine[5])
-                regions.replace_one({'_id': regionName}, region)
+                regions[regionName] = region
             else:
                 mode = None
                 log('Finished parsing stats for %d regions (added %d new regions)' % (count, newCount))

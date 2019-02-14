@@ -40,10 +40,9 @@ def processEvent(regions, event, ranges=None, guids=None, events=None, debug=Fal
                 region['guids'] = [event['GUID']]
             elif event['GUID'] not in region['guids']:
                 region['guids'].append(event['GUID'])
-            guid = guids.find_one({'_id': event['GUID']})
+            guid = guids.get(event['GUID'], None)
             if guid is None:
                 guid = {
-                    '_id': event['GUID'],
                     'regions': [regionName],
                     'parent': event['Parent GUID']
                 }
@@ -51,9 +50,9 @@ def processEvent(regions, event, ranges=None, guids=None, events=None, debug=Fal
                 if regionName not in guid['regions']:
                     guid['regions'].append(regionName)
                 assert guid['parent'] == event['Parent GUID']
-            guids.replace_one({'_id': event['GUID']}, guid, upsert=True)
+            guids[event['GUID']] = guid
         
-        regions.replace_one({'_id': regionName}, region, upsert=True)
+        regions[regionName] = region
 
     # If we're computing ranges, add enter / leave events to per-location lists
     if ranges is not None and (event['Event'] == 'ENTER' or event['Event'] == 'LEAVE'):
@@ -63,8 +62,7 @@ def processEvent(regions, event, ranges=None, guids=None, events=None, debug=Fal
     
     # Add the event
     if events is not None:
-        event['_id'] = eventId
-        events.insert_one(event)
+        events[eventId] = event
 
     # Log that we've processed another event
     numEvents += 1
@@ -74,7 +72,7 @@ def processEvent(regions, event, ranges=None, guids=None, events=None, debug=Fal
         log('processed %i events' % numEvents)
 
 def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=None, debug=False):
-    log('Parsing events...')
+    log('Parsing events (.=2500 events)')
     currentEvent = None
     for line in otfPipe.stdout:
         line = line.decode()
@@ -109,12 +107,12 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
 
     # Combine the sorted enter / leave events into ranges
     if ranges is not None:
-        log('Combining enter / leave events into ranges...')
+        log('Combining enter / leave events into ranges (.=2500 ranges)')
         numRanges = 0
         for eventList in locations.values():
             lastEvent = None
             for _, eventId in eventList:
-                event = events.find_one({'_id': eventId})
+                event = events.get(eventId, None)
                 assert event is not None
                 if event['Event'] == 'ENTER':
                     # Start a range (don't output anything)
@@ -124,14 +122,14 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
                     # Finish a range
                     assert lastEvent is not None
                     rangeId = str(numRanges)
-                    currentRange = { '_id': rangeId, 'enter': {}, 'leave': {} }
+                    currentRange = { 'enter': {}, 'leave': {} }
                     for attr, value in event.items():
                         if attr != 'Timestamp' and value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
                             currentRange[attr] = value
                         else:
                             currentRange['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
                             currentRange['leave'][attr] = value
-                    ranges.insert_one(currentRange)
+                    ranges[rangeId] = currentRange
 
                     # Log that we've finished the finished range
                     numRanges += 1
@@ -149,15 +147,21 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
 
     # Create any missing parent-child region relationships based on the GUIDs we've collected
     if guids is not None:
-        log('Creating region relationships based on GUIDs...')
+        log('Creating region relationships based on GUIDs (.=2500 relationships observed)')
         count = 0
-        initialLinkCount = regionLinks.count()
-        for guid in guids.find():
+        initialLinkCount = len(regionLinks)
+        for guid in guids.values():
             if guid['parent'] != '0':
-                parentGuid = guids.find_one({'_id': guid['parent']})
+                parentGuid = guids.get(guid['parent'], None)
                 assert parentGuid is not None
                 for parentRegion in parentGuid['regions']:
                     for childRegion in guid['regions']:
                         count += 1
                         common.addRegionChild(regions, regionLinks, parentRegion, childRegion, 'guids', debug=debug)
-        log('%d relationships observed based on GUIDs; %d are new' % (count, regionLinks.count() - initialLinkCount))
+
+                        if count % 2500 == 0:
+                            log('.', end=''),
+                        if count % 100000 == 0:
+                            log('observed %i relationships' % count)
+        log('')
+        log('%d relationships observed based on GUIDs; %d are new' % (count, len(regionLinks) - initialLinkCount))
