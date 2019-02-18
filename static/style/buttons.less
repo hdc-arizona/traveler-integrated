@@ -1,0 +1,135 @@
+@import './fonts.less';
+@import './colors.less';
+@import './measurements.less';
+
+.button {
+  position: relative;
+  min-width: @buttonSize;
+  min-height: @buttonSize;
+
+  &.small {
+    min-width: @smallButtonSize;
+    min-height: @smallButtonSize;
+  }
+  &.tiny {
+    min-width: @tinyButtonSize;
+    min-height: @tinyButtonSize;
+  }
+  width: -webkit-fit-content;
+  height: -webkit-fit-content;
+  width: fit-content;
+  height: fit-content;
+
+  background: @lightBackgroundColor;
+  border-radius: @borderRadius;
+
+  cursor: pointer;
+  user-select: none;
+
+  a {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    left: -1px;
+    top: -1px;
+    border: 1px solid @separatorColor;
+    border-radius: @borderRadius;
+    overflow: hidden;
+
+    background: @interactableGradient;
+
+    img {
+      position: absolute;
+      left: @buttonSize / 2 - @buttonImageSize / 2;
+      top: @buttonSize / 2 - @buttonImageSize / 2;
+      width: @buttonImageSize;
+      height: @buttonImageSize;
+      filter: @textColorImageFilter;
+    }
+  }
+  span {
+    white-space: nowrap;
+    position: relative;
+    top: (@buttonSize - 1em) / 2 + 0.1em;
+    margin: 0px @buttonTextPadding;
+    color: @textColor;
+  }
+  &.small a img {
+    left: @smallButtonSize / 2 - @smallButtonImageSize / 2;
+    top: @smallButtonSize / 2 - @smallButtonImageSize / 2;
+    width: @smallButtonImageSize;
+    height: @smallButtonImageSize;
+  }
+  &.tiny a img {
+    left: @tinyButtonSize / 2 - @tinyButtonImageSize / 2;
+    top: @tinyButtonSize / 2 - @tinyButtonImageSize / 2;
+    width: @tinyButtonImageSize;
+    height: @tinyButtonImageSize;
+  }
+
+  .badge {
+    position: absolute;
+    font-size: 0.65em;
+    font-weight: @headerFontWeight;
+    font-family: @headerFontFamily;
+    right: -0.5em;
+    top: -0.5em;
+    text-align: center;
+    min-width: 0.65em;
+    padding: 0.25em 0.25em 0em 0.25em;
+    background-color: @textColor;
+    color: @darkBackgroundColor;
+    border-radius: @borderRadius;
+    border: 1px solid @shadowColor;
+  }
+  &.small span {
+    /* todo */
+  }
+
+  &:hover {
+    a {
+      border-color: @shadowColor;
+      background: @interactableHoverGradient;
+    }
+  }
+  &:active {
+    a {
+      border-color: @shadowColor;
+      background: @interactableActiveGradient;
+    }
+  }
+
+  &.selected {
+    a {
+      border-color: @shadowColor;
+      background: @selectedButtonGradient;
+      img {
+        filter: @backgroundImageFilter;
+      }
+    }
+    &:hover a {
+      border-color: @shadowColor;
+      background: @selectedButtonHoverGradient;
+    }
+    &:active a {
+      border-color: @shadowColor;
+      background: @selectedButtonActiveGradient;
+    }
+  }
+
+  &.disabled,
+  &.disabled:hover,
+  &.disabled:active {
+    cursor: default;
+    a {
+      border-color: @separatorColor;
+      background: @darkBackgroundColor;
+      img {
+        filter: @separatorImageFilter;
+      }
+    }
+    span {
+      color: @separatorColor;
+    }
+  }
+}

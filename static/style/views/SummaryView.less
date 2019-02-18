@@ -1,0 +1,41 @@
+@import '../colors.less';
+
+.SummaryView {
+  .dataset {
+    position: relative;
+    .name,
+    .timestamp,
+    .viewContainer {
+      width: -moz-fit-content;
+      width: fit-content;
+    }
+    .name {
+      margin-bottom: 0;
+    }
+    .viewContainer {
+      .button {
+        display: inline-block;
+        margin-right: 0.25em;
+      }
+    }
+    .barContainer {
+      position: absolute;
+      right: 0px;
+      top: 3px;
+
+      .bar {
+        height: 1em;
+        background-color: @textColor;
+        &.unknown {
+          box-sizing: border-box;
+          border: 3px dotted @separatorColor;
+          background-color: unset;
+        }
+      }
+      label {
+        display: block;
+        margin-top: 5px;
+      }
+    }
+  }
+}

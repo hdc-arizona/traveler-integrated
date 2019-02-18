@@ -1,5 +1,6 @@
 /* globals GoldenLayout */
 import StateModel from './models/StateModel.js';
+import SummaryView from './views/SummaryView/SummaryView.js';
 import TreeView from './views/TreeView/TreeView.js';
 import CodeView from './views/CodeView/CodeView.js';
 import GanttView from './views/GanttView/GanttView.js';
@@ -9,8 +10,12 @@ import defaultLayout from './config/defaultLayout.js';
 class Controller {
   constructor () {
     this.state = window.state = new StateModel();
+    this.setupLayout();
+  }
+  setupLayout () {
     this.goldenLayout = new GoldenLayout(defaultLayout);
     const viewClassLookup = {
+      SummaryView,
       TreeView,
       CodeView,
       GanttView,
@@ -28,6 +33,14 @@ class Controller {
       // TODO
     });
     this.goldenLayout.init();
+    window.setTimeout(() => {
+      this.renderAllViews();
+    }, 500);
+  }
+  renderAllViews () {
+    for (const view of Object.values(this.views)) {
+      view.render();
+    }
   }
 }
 

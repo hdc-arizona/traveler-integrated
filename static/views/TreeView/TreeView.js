@@ -2,13 +2,21 @@ import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
 
 class TreeView extends SvgViewMixin(GoldenLayoutView) {
+  constructor ({
+    container,
+    resources = {
+      'text': 'views/TreeView/shapeKey.html'
+    }
+  }) {
+    super({ container, resources });
+  }
   setup () {
     super.setup();
-
-    this.content.append('text')
-      .attr('x', 20)
-      .attr('y', 20)
-      .text('TODO: Tree View');
+    this.shapeKey = this.d3el.append('div')
+      .attr('id', 'shapekey')
+      .html(this.resources.text);
+    this.legend = this.d3el.append('div')
+      .attr('id', 'legend');
   }
   draw () {
     const bounds = this.getContentBounds();

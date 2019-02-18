@@ -37,12 +37,19 @@ class GoldenLayoutView extends View {
     // Should be overridden when a view has nothing to show
     return false;
   }
+  get isLoading () {
+    // Should be overridden when a view is loading data
+    return false;
+  }
   setup () {
     this.d3el.classed(this.title, true);
     this.emptyStateDiv = this.d3el.append('div')
       .classed('emptyState', true)
       .style('display', 'none');
     this.content = this.setupContentElement(this.d3el);
+    this.spinner = this.d3el.append('div')
+      .classed('spinner', true)
+      .style('display', 'none');
   }
   setupTab () {
     this.tabElement.classed(this.title, true);
@@ -58,6 +65,7 @@ class GoldenLayoutView extends View {
   }
   draw () {
     this.emptyStateDiv.style('display', this.isEmpty ? null : 'none');
+    this.spinner.style('display', this.isLoading ? null : 'none');
     if (this.tabElement) {
       this.drawTab();
     }

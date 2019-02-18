@@ -2,10 +2,12 @@
 @import './colors.less';
 @import './measurements.less';
 
+@import './buttons.less';
+
 @import './goldenlayout-base.less';
 @import './goldenlayout-light-theme.less';
 
-@import './views/GanttView.less';
+@import './views/SummaryView.less';
 
 html, body {
   padding: 0;
@@ -17,9 +19,13 @@ body {
   font-weight: @bodyFontWeight;
   color: @textColor;
 }
-h1, h2, h3, h4, h5, h6 {
+h1, h2, h3, h4, h5, h6, .lm_header .lm_tab {
   font-family: @headerFontFamily;
   font-weight: @headerFontWeight;
+}
+pre, code {
+  font-family: @fixedFontFamily;
+  font-weight: @fixedFontWeight;
 }
 
 .scrollArea {
@@ -32,9 +38,20 @@ h1, h2, h3, h4, h5, h6 {
   padding: @contentPadding;
 }
 
-img.emptyState {
+.emptyState {
   position: absolute;
-  width: 50%;
-  left: 25%;
-  top: 33%;
+  top: 50%;
+  transform: translateY(-50%);
+  left: @contentPadding;
+  right: @contentPadding;
+  text-align: center;
+}
+
+.spinner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: center / 3em no-repeat url('/img/spinner.gif'), rgba(255,255,255,0.75);
 }

@@ -1,7 +1,7 @@
 import re
+import subprocess
 from blist import sortedlist #pylint: disable=import-error
-from .log import log
-from . import common
+from .common import log, processRegion, addRegionChild
 
 eventLineParser = re.compile(r'^(\S+)\s+(\d+)\s+(\d+)\s+(.*)$')
 attrParsers = {
@@ -18,17 +18,17 @@ addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 numEvents = 0
 locations = {}
 
-def processEvent(regions, event, ranges=None, guids=None, events=None, debug=False):
+def _processEvent(event, regions=None, ranges=None, guids=None, events=None, debug=False):
     global numEvents
-    if event is None:
-        return
-    
+
     eventId = str(numEvents)
+    newR = seenR = newG = seenG = 0
 
     if 'Region' in event:
         # Identify the region (and add to its counter)
         regionName = event['Region'].replace('::eval', '')
-        region = common.processRegion(regions, regionName, 'otf2 event', debug=debug)
+        region, newR = processRegion(regionName, regions, 'otf2 event', debug=debug)
+        seenR = 1 if newR == 0 else 0
         if debug is True:
             if 'eventCount' not in region:
                 region['eventCount'] = 0
@@ -39,27 +39,32 @@ def processEvent(regions, event, ranges=None, guids=None, events=None, debug=Fal
             if 'guids' not in region:
                 region['guids'] = [event['GUID']]
             elif event['GUID'] not in region['guids']:
+                # TODO: using a list instead of a set is expensive... but
+                # storing sets may or may not be supported
                 region['guids'].append(event['GUID'])
             guid = guids.get(event['GUID'], None)
             if guid is None:
+                newG += 1
                 guid = {
                     'regions': [regionName],
                     'parent': event['Parent GUID']
                 }
             else:
+                seenG += 1
                 if regionName not in guid['regions']:
                     guid['regions'].append(regionName)
                 assert guid['parent'] == event['Parent GUID']
             guids[event['GUID']] = guid
-        
+
         regions[regionName] = region
 
     # If we're computing ranges, add enter / leave events to per-location lists
     if ranges is not None and (event['Event'] == 'ENTER' or event['Event'] == 'LEAVE'):
         if not event['Location'] in locations:
+            # TODO: use BPlusTree instead of blist?
             locations[event['Location']] = sortedlist(key=lambda i: i[0])
-        locations[event['Location']].add((event['Timestamp'], eventId))
-    
+        locations[event['Location']].add((event['Timestamp'], event))
+
     # Add the event
     if events is not None:
         events[eventId] = event
@@ -67,13 +72,17 @@ def processEvent(regions, event, ranges=None, guids=None, events=None, debug=Fal
     # Log that we've processed another event
     numEvents += 1
     if numEvents % 2500 == 0:
-        log('.', end=''),
+        log('.', end='')
     if numEvents % 100000 == 0:
         log('processed %i events' % numEvents)
 
-def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=None, debug=False):
+    return (newR, seenR, newG, seenG)
+
+def parseOtf2(otf2Path, regions=None, regionLinks=None, ranges=None, guids=None, events=None, debug=False):
     log('Parsing events (.=2500 events)')
+    newR = seenR = newG = seenG = 0
     currentEvent = None
+    otfPipe = subprocess.Popen(['otf2-print', otf2Path], stdout=subprocess.PIPE)
     for line in otfPipe.stdout:
         line = line.decode()
         eventLineMatch = eventLineParser.match(line)
@@ -84,7 +93,12 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
 
         if eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
-            processEvent(regions, currentEvent, ranges, guids, events, debug)
+            if currentEvent is not None:
+                counts = _processEvent(currentEvent, regions, ranges, guids, events, debug)
+                newR += counts[0]
+                seenR += counts[0]
+                newG += counts[0]
+                seenG += counts[0]
             currentEvent = {}
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = int(eventLineMatch.group(2))
@@ -101,9 +115,16 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
                 assert attr is not None
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
     # The last event will never have had a chance to be processed:
-    processEvent(regions, currentEvent, ranges, guids, events, debug)
+    if currentEvent is not None:
+        counts = _processEvent(currentEvent, regions, ranges, guids, events, debug)
+        newR += counts[0]
+        seenR += counts[0]
+        newG += counts[0]
+        seenG += counts[0]
     log('')
-    log('finished processing %i events' % numEvents)
+    log('Finished processing %i events' % numEvents)
+    log('New regions: %d, References to existing regions: %d' % (newR, seenR))
+    log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
 
     # Combine the sorted enter / leave events into ranges
     if ranges is not None:
@@ -111,8 +132,7 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
         numRanges = 0
         for eventList in locations.values():
             lastEvent = None
-            for _, eventId in eventList:
-                event = events.get(eventId, None)
+            for _, event in eventList:
                 assert event is not None
                 if event['Event'] == 'ENTER':
                     # Start a range (don't output anything)
@@ -122,7 +142,7 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
                     # Finish a range
                     assert lastEvent is not None
                     rangeId = str(numRanges)
-                    currentRange = { 'enter': {}, 'leave': {} }
+                    currentRange = {'enter': {}, 'leave': {}}
                     for attr, value in event.items():
                         if attr != 'Timestamp' and value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
                             currentRange[attr] = value
@@ -134,7 +154,7 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
                     # Log that we've finished the finished range
                     numRanges += 1
                     if numRanges % 2500 == 0:
-                        log('.', end=''),
+                        log('.', end='')
                     if numRanges % 100000 == 0:
                         log('processed %i ranges' % numRanges)
                     lastEvent = None
@@ -143,25 +163,26 @@ def parseOtf2 (otfPipe, regions, regionLinks, ranges=None, guids=None, events=No
             # assert lastEvent is None
         # Finish the ranges dict
         log('')
-        log('finished processing %i ranges' % numRanges)
+        log('Finished processing %i ranges' % numRanges)
 
     # Create any missing parent-child region relationships based on the GUIDs we've collected
     if guids is not None:
-        log('Creating region relationships based on GUIDs (.=2500 relationships observed)')
-        count = 0
-        initialLinkCount = len(regionLinks)
+        log('Creating region links based on GUIDs (.=2500 relationships observed)')
+        newL = seenL = 0
         for guid in guids.values():
             if guid['parent'] != '0':
                 parentGuid = guids.get(guid['parent'], None)
                 assert parentGuid is not None
                 for parentRegion in parentGuid['regions']:
                     for childRegion in guid['regions']:
-                        count += 1
-                        common.addRegionChild(regions, regionLinks, parentRegion, childRegion, 'guids', debug=debug)
+                        l = addRegionChild(parentRegion, childRegion, regions, regionLinks, 'guids', debug)[1]
+                        newL += l
+                        seenL += 1 if newL == 0 else 0
 
-                        if count % 2500 == 0:
-                            log('.', end=''),
-                        if count % 100000 == 0:
-                            log('observed %i relationships' % count)
+                        if newL + seenL % 2500 == 0:
+                            log('.', end='')
+                        if newL + seenL % 100000 == 0:
+                            log('observed %i links' % (newL + seenL))
         log('')
-        log('%d relationships observed based on GUIDs; %d are new' % (count, len(regionLinks) - initialLinkCount))
+        log('Finished scanning GUIDs')
+        log('New links: %d, Observed existing links: %d' % (newL, seenL))
