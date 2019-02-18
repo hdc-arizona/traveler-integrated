@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
             # Handle the tree file
             if tree is not None:
-                coreTree, nr, sr, nl, sl = phylanx.processTree(tree.read(), **kwargs)
+                meta['coreTree'], nr, sr, nl, sl = phylanx.processTree(tree.read(), **kwargs)
                 common.log('Finished parsing newick tree')
                 common.log('New regions: %d, Observed existing regions: %d' % (nr, sr))
                 common.log('New links: %d, Observed existing links: %d' % (nl, sl))

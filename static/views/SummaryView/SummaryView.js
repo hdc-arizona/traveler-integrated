@@ -11,6 +11,11 @@ const VIEW_BUTTONS = [
     'view': 'TreeComparisonView',
     'icon': 'img/compareTrees.svg',
     'enabled': dataset => !!dataset.coreTree
+  },
+  {
+    'view': 'GanttView',
+    'icon': 'img/gantt.svg',
+    'enabled': dataset => !!dataset.ranges
   }
 ];
 
@@ -83,9 +88,6 @@ class SummaryView extends GoldenLayoutView {
 
     datasetsEnter.append('div').classed('viewContainer', true);
     this.drawViewButtons(datasets);
-    datasets.select('.viewContainer').each(function () {
-      barContainerLeftMargin = Math.max(barContainerLeftMargin, this.getBoundingClientRect().width);
-    });
 
     timeScale.range([0, availableWidth - barContainerLeftMargin]);
 
@@ -110,7 +112,7 @@ class SummaryView extends GoldenLayoutView {
     viewButtonsEnter.append('a').append('img');
     viewButtons.select('img').attr('src', d => d.button.icon);
 
-    viewButtons.classed('enabled', d => d.button.enabled(d.dataset));
+    viewButtons.classed('disabled', d => !d.button.enabled(d.dataset));
 
     viewButtons.on('click', d => {
       if (d.button.enabled(d.dataset)) {
