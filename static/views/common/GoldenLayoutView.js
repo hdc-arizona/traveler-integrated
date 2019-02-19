@@ -4,10 +4,12 @@ import { View } from '../../node_modules/uki/dist/uki.esm.js';
 class GoldenLayoutView extends View {
   constructor ({
     container,
+    state,
     resources = {}
   }) {
     super(null, resources);
     this.container = container;
+    this.layoutState = state;
     this._title = this.constructor.name;
     this.container.on('tab', tab => {
       this.tabElement = d3.select(tab.element[0]);

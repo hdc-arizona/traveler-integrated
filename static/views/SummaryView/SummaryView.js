@@ -107,12 +107,20 @@ class SummaryView extends GoldenLayoutView {
       });
 
     availableBarWidth -= buttonSpace;
+    // Require at least 15em of space for the bar (may trigger horizontal scrolling)
+    if (availableBarWidth < 15 * this.emSize) {
+      availableBarWidth = 15 * this.emSize;
+      datasets.style('width', labelSpace + buttonSpace + availableBarWidth);
+    } else {
+      datasets.style('width', null);
+    }
     timeScale.range([0, availableBarWidth]);
 
     const barContainerEnter = datasetsEnter.append('div').classed('barContainer', true);
     barContainerEnter.append('div').classed('bar', true);
     barContainerEnter.append('label');
     datasets.select('.barContainer')
+      .style('left', (labelSpace + buttonSpace + 2 * this.emSize) + 'px')
       .style('width', availableBarWidth + 'px');
     datasets.select('.barContainer .bar')
       .style('width', d => !isNaN(parseFloat(d.time)) ? timeScale(parseFloat(d.time)) + 'px' : timeScale.range()[1] + 'px')
@@ -146,6 +154,7 @@ class SummaryView extends GoldenLayoutView {
     viewButtonsEnter.append('a').append('img');
     viewButtons.select('img').attr('src', d => d.button.icon);
 
+    viewButtons.classed('selected', d => window.controller.viewTypeIsVisible(d.button.view, { label: d.dataset.label }));
     viewButtons.classed('disabled', d => !d.button.enabled(d.dataset));
 
     viewButtons.on('click', d => {
@@ -158,12 +167,15 @@ class SummaryView extends GoldenLayoutView {
             };
             this.render();
           } else {
-            window.controller.openView(d.button.view, this.pairwiseMode.dataset, d.dataset);
+            window.controller.openView(d.button.view, {
+              label: this.pairwiseMode.dataset.label,
+              comparisonLabel: d.dataset.label
+            });
             this.pairwiseMode = null;
             this.render();
           }
         } else {
-          window.controller.openView(d.button.view, d.dataset);
+          window.controller.openView(d.button.view, { label: d.dataset.label });
         }
       }
     });

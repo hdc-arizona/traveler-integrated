@@ -4,11 +4,12 @@ import SvgViewMixin from '../common/SvgViewMixin.js';
 class TreeView extends SvgViewMixin(GoldenLayoutView) {
   constructor ({
     container,
+    state,
     resources = {
       'text': 'views/TreeView/shapeKey.html'
     }
   }) {
-    super({ container, resources });
+    super({ container, state, resources });
   }
   setup () {
     super.setup();
