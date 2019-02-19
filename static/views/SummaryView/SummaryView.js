@@ -99,7 +99,7 @@ class SummaryView extends GoldenLayoutView {
     datasets.select('.barContainer .bar')
       .style('width', d => !isNaN(parseFloat(d.time)) ? timeScale(parseFloat(d.time)) + 'px' : timeScale.range()[1] + 'px')
       .classed('unknown', d => isNaN(parseFloat(d.time)));
-    datasets.select('.barContainer label').text(d => !isNaN(parseFloat(d.time)) ? `Time: ${d.time} seconds` : 'Unknown time');
+    datasets.select('.barContainer label').text(d => !isNaN(parseFloat(d.time)) ? `Inclusive time: ${d.time} seconds` : 'Inclusive time unknown');
   }
   drawViewButtons (datasets) {
     let viewButtons = datasets.select('.viewContainer').selectAll('.button')

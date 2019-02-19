@@ -44,17 +44,18 @@ def _processDotLine(line, regions=None, regionLinks=None, debug=False):
     newL = addRegionChild(dotLine[1], dotLine[2], regions, regionLinks, 'dot graph', debug=debug)
     seenL = 1 if newL == 0 else 0
     return (newR, seenR, newL, seenL)
-def processDotFile(file, regions=None, regionLinks=None, debug=False):
+def processDotFile(path, regions=None, regionLinks=None, debug=False):
     newR = seenR = newL = seenL = 0
-    assert dotModeParser.match(file.readline()) is not None
-    for line in file:
-        temp = _processDotLine(line, regions, regionLinks, debug)
-        if temp is None:
-            break
-        newR += temp[0]
-        seenR += temp[1]
-        newL += temp[2]
-        seenL += temp[3]
+    with open(path, 'r') as file:
+        assert dotModeParser.match(file.readline()) is not None
+        for line in file:
+            temp = _processDotLine(line, regions, regionLinks, debug)
+            if temp is None:
+                break
+            newR += temp[0]
+            seenR += temp[1]
+            newL += temp[2]
+            seenL += temp[3]
     return (newR, seenR, newL, seenL)
 
 # Tools for handling the performance csv
@@ -73,69 +74,74 @@ def _processPerfLine(line, regions=None, debug=False):
     region['time'] = int(perfLine[4])
     region['eval_direct'] = int(perfLine[5])
     regions[regionName] = region
-    return newR
-def processPerfFile(file, regions=None, debug=False):
-    newR = seenR = 0
-    assert perfModeParser.match(file.readline()) is not None
-    for line in file:
-        r = _processPerfLine(line, regions, debug)
-        if r is None:
-            break
-        newR += r
-        seenR += 1 if r == 0 else 0
-    return (newR, seenR)
+    return (newR, float(region['time']))
+def processPerfFile(path, regions=None, debug=False):
+    newR = seenR = totalTime = 0
+    with open(path, 'r') as file:
+        assert perfModeParser.match(file.readline()) is not None
+        for line in file:
+            counts = _processPerfLine(line, regions, debug)
+            if counts is None:
+                break
+            newR += counts[0]
+            seenR += 1 if counts[0] == 0 else 0
+            totalTime += counts[1]
+    return (newR, seenR, totalTime)
 
 # Tools for handling the inclusive time line
 timeParser = re.compile(r'time: ([\d\.]+)')
 
-def parsePhylanxLog(logFile, regions=None, regionLinks=None, debug=False):
+def parsePhylanxLog(path, regions=None, regionLinks=None, debug=False):
     mode = None
     coreTree = None
     time = None
-    newR = seenR = newL = seenL = 0
-    for line in logFile:
-        if mode is None:
-            if treeModeParser.match(line):
-                mode = 'tree'
-                log('Parsing tree...')
-            elif dotModeParser.match(line):
-                mode = 'dot'
-                log('Parsing graph...')
-            elif perfModeParser.match(line):
-                mode = 'perf'
-                log('Parsing performance csv...')
-            elif timeParser.match(line):
-                time = timeParser.match(line)[1]
-        elif mode == 'tree':
-            coreTree, nr, sr, nl, sl = processTree(line, regions, regionLinks, debug)
-            mode = None
-            log('Finished parsing newick tree')
-            log('New regions: %d, Observed existing regions: %d' % (nr, sr))
-            log('New links: %d, Observed existing links: %d' % (nl, sl))
-        elif mode == 'dot':
-            counts = _processDotLine(line, regions, regionLinks, debug)
-            if counts is not None:
-                newR += counts[0]
-                seenR += counts[1]
-                newL += counts[2]
-                seenL += counts[3]
-            else:
+    newR = seenR = newL = seenL = totalTime = 0
+    with open(path, 'r') as logFile:
+        for line in logFile:
+            if mode is None:
+                if treeModeParser.match(line):
+                    mode = 'tree'
+                    log('Parsing tree...')
+                elif dotModeParser.match(line):
+                    mode = 'dot'
+                    log('Parsing graph...')
+                elif perfModeParser.match(line):
+                    mode = 'perf'
+                    log('Parsing performance csv...')
+                elif timeParser.match(line):
+                    time = 1000000000 * float(timeParser.match(line)[1])
+                    log('Total inclusive time from phylanx log (converted to ns): %f' % time)
+            elif mode == 'tree':
+                coreTree, nr, sr, nl, sl = processTree(line, regions, regionLinks, debug)
                 mode = None
-                log('Finished parsing DOT graph')
-                log('New regions: %d, References to existing regions: %d' % (newR, seenR))
-                log('New links: %d, Observed existing links: %d' % (newL, seenL))
-                newR = seenR = newL = seenL = 0
-        elif mode == 'perf':
-            r = _processPerfLine(line, regions, debug)
-            if counts is not None:
-                newR += r
-                seenR += 1 if r == 0 else 0
+                log('Finished parsing newick tree')
+                log('New regions: %d, Observed existing regions: %d' % (nr, sr))
+                log('New links: %d, Observed existing links: %d' % (nl, sl))
+            elif mode == 'dot':
+                counts = _processDotLine(line, regions, regionLinks, debug)
+                if counts is not None:
+                    newR += counts[0]
+                    seenR += counts[1]
+                    newL += counts[2]
+                    seenL += counts[3]
+                else:
+                    mode = None
+                    log('Finished parsing DOT graph')
+                    log('New regions: %d, References to existing regions: %d' % (newR, seenR))
+                    log('New links: %d, Observed existing links: %d' % (newL, seenL))
+                    newR = seenR = newL = seenL = 0
+            elif mode == 'perf':
+                counts = _processPerfLine(line, regions, debug)
+                if counts is not None:
+                    newR += counts[0]
+                    seenR += 1 if counts[0] == 0 else 0
+                else:
+                    mode = None
+                    log('Finished parsing performance CSV')
+                    log('New regions: %d, Observed existing regions: %d' % (newR, seenR))
+                    log('Total inclusive time from performance CSV (ns): %f' % totalTime)
+                    newR = seenR = 0
             else:
-                mode = None
-                log('Finished parsing performance CSV')
-                log('New regions: %d, Observed existing regions: %d' % (newR, seenR))
-                newR = seenR = 0
-        else:
-            # Should never reach this point
-            assert False
+                # Should never reach this point
+                assert False
     return (coreTree, time)

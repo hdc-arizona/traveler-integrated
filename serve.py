@@ -7,7 +7,7 @@ from wrangling import common
 
 parser = argparse.ArgumentParser(description='Serve data bundled by bundle.py')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
-                    help='Where to store data (default: /tmp/traveler-integrated')
+                    help='Directory where the bundled data is stored (default: /tmp/traveler-integrated')
 
 args = parser.parse_args()
 db = common.loadDatabase(args.dbDir)
