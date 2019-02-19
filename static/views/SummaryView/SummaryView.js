@@ -1,32 +1,35 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 
-const VIEW_BUTTONS = [
-  {
-    'view': 'TreeView',
-    'icon': 'img/tree.svg',
-    'enabled': dataset => !!dataset.coreTree
-  },
-  {
-    'view': 'TreeComparisonView',
-    'icon': 'img/compareTrees.svg',
-    'enabled': dataset => !!dataset.coreTree
-  },
-  {
-    'view': 'CodeView',
-    'icon': 'img/code.svg',
-    'enabled': dataset => !!dataset.code
-  },
-  {
-    'view': 'GanttView',
-    'icon': 'img/gantt.svg',
-    'enabled': dataset => !!dataset.ranges
-  }
-];
-
 class SummaryView extends GoldenLayoutView {
   constructor () {
     super(...arguments);
+
+    this.pairwiseMode = null;
+    this.viewButtons = [
+      {
+        'view': 'TreeView',
+        'icon': 'img/tree.svg',
+        'enabled': dataset => !!dataset.coreTree && this.pairwiseMode === null
+      },
+      {
+        'view': 'TreeComparisonView',
+        'icon': 'img/compareTrees.svg',
+        'enabled': dataset => !!dataset.coreTree && (this.pairwiseMode === null ||
+          (this.pairwiseMode.type === 'TreeComparisonView' && this.pairwiseMode.dataset !== dataset)),
+        'pairwise': true
+      },
+      {
+        'view': 'CodeView',
+        'icon': 'img/code.svg',
+        'enabled': dataset => !!dataset.code && this.pairwiseMode === null
+      },
+      {
+        'view': 'GanttView',
+        'icon': 'img/gantt.svg',
+        'enabled': dataset => !!dataset.ranges && this.pairwiseMode === null
+      }
+    ];
 
     (async () => {
       try {
@@ -114,10 +117,26 @@ class SummaryView extends GoldenLayoutView {
       .style('width', d => !isNaN(parseFloat(d.time)) ? timeScale(parseFloat(d.time)) + 'px' : timeScale.range()[1] + 'px')
       .classed('unknown', d => isNaN(parseFloat(d.time)));
     datasets.select('.barContainer label').text(d => !isNaN(parseFloat(d.time)) ? `Inclusive time: ${d.time} seconds` : 'Inclusive time unknown');
+
+    const pairwiseBannerEnter = datasetsEnter.append('div')
+      .classed('pairwiseBanner', true)
+      .style('display', 'none');
+    pairwiseBannerEnter.append('h3')
+      .text('Choose another dataset to compare');
+    const cancelButtonEnter = pairwiseBannerEnter.append('div')
+      .classed('button', true);
+    cancelButtonEnter.append('a');
+    cancelButtonEnter.append('span').text('Cancel');
+    datasets.select('.pairwiseBanner')
+      .style('display', d => this.pairwiseMode && this.pairwiseMode.dataset === d ? null : 'none')
+      .select('.button').on('click', () => {
+        this.pairwiseMode = null;
+        this.render();
+      });
   }
   drawViewButtons (datasets) {
     let viewButtons = datasets.select('.viewContainer').selectAll('.button')
-      .data(dataset => VIEW_BUTTONS.map(button => { return { button, dataset }; }), d => d.button.view);
+      .data(dataset => this.viewButtons.map(button => { return { button, dataset }; }), d => d.button.view);
     viewButtons.exit().remove();
     const viewButtonsEnter = viewButtons.enter().append('div')
       .classed('button', true);
@@ -130,7 +149,21 @@ class SummaryView extends GoldenLayoutView {
 
     viewButtons.on('click', d => {
       if (d.button.enabled(d.dataset)) {
-        window.controller.openView(d.button.view, d.dataset);
+        if (d.button.pairwise) {
+          if (this.pairwiseMode === null) {
+            this.pairwiseMode = {
+              type: d.button.view,
+              dataset: d.dataset
+            };
+            this.render();
+          } else {
+            window.controller.openView(d.button.view, this.pairwiseMode.dataset, d.dataset);
+            this.pairwiseMode = null;
+            this.render();
+          }
+        } else {
+          window.controller.openView(d.button.view, d.dataset);
+        }
       }
     });
   }
