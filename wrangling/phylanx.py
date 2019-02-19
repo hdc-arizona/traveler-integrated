@@ -76,7 +76,7 @@ def _processPerfLine(line, regions=None, debug=False):
     regions[regionName] = region
     return (newR, float(region['time']))
 def processPerfFile(path, regions=None, debug=False):
-    newR = seenR = totalTime = 0
+    newR = seenR = maxTime = 0
     with open(path, 'r') as file:
         assert perfModeParser.match(file.readline()) is not None
         for line in file:
@@ -85,8 +85,8 @@ def processPerfFile(path, regions=None, debug=False):
                 break
             newR += counts[0]
             seenR += 1 if counts[0] == 0 else 0
-            totalTime += counts[1]
-    return (newR, seenR, totalTime)
+            maxTime = max(maxTime, counts[1])
+    return (newR, seenR, maxTime)
 
 # Tools for handling the inclusive time line
 timeParser = re.compile(r'time: ([\d\.]+)')
@@ -95,7 +95,7 @@ def parsePhylanxLog(path, regions=None, regionLinks=None, debug=False):
     mode = None
     coreTree = None
     time = None
-    newR = seenR = newL = seenL = totalTime = 0
+    newR = seenR = newL = seenL = maxTime = 0
     with open(path, 'r') as logFile:
         for line in logFile:
             if mode is None:
@@ -135,11 +135,12 @@ def parsePhylanxLog(path, regions=None, regionLinks=None, debug=False):
                 if counts is not None:
                     newR += counts[0]
                     seenR += 1 if counts[0] == 0 else 0
+                    maxTime = max(maxTime, counts[1])
                 else:
                     mode = None
                     log('Finished parsing performance CSV')
                     log('New regions: %d, Observed existing regions: %d' % (newR, seenR))
-                    log('Total inclusive time from performance CSV (ns): %f' % totalTime)
+                    log('Max inclusive time seen in performance CSV (ns): %f' % maxTime)
                     newR = seenR = 0
             else:
                 # Should never reach this point

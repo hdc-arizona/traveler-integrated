@@ -111,7 +111,7 @@ if __name__ == '__main__':
                 meta['time'] = time
                 common.log('Finished parsing performance CSV')
                 common.log('New regions: %d, Observed existing regions: %d' % (nr, sr))
-                common.log('Total inclusive time from performance CSV (ns): %f' % time)
+                common.log('Max inclusive time seen in performance CSV (ns): %f' % time)
 
             # Everything except for the performance file needs regionLinks as well as regions
             db[label]['regionLinks'] = shelve.open(os.path.join(dbDir, 'regionLinks.shelf'))

@@ -1,5 +1,6 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
+import prettyPrintTime from '../../utils/prettyPrintTime.js';
 
 class SummaryView extends GoldenLayoutView {
   constructor () {
@@ -116,7 +117,7 @@ class SummaryView extends GoldenLayoutView {
     datasets.select('.barContainer .bar')
       .style('width', d => !isNaN(parseFloat(d.time)) ? timeScale(parseFloat(d.time)) + 'px' : timeScale.range()[1] + 'px')
       .classed('unknown', d => isNaN(parseFloat(d.time)));
-    datasets.select('.barContainer label').text(d => !isNaN(parseFloat(d.time)) ? `Inclusive time: ${d.time} seconds` : 'Inclusive time unknown');
+    datasets.select('.barContainer label').text(d => !isNaN(parseFloat(d.time)) ? `Inclusive time: ${prettyPrintTime(d.time)}` : 'Inclusive time unknown');
 
     const pairwiseBannerEnter = datasetsEnter.append('div')
       .classed('pairwiseBanner', true)
