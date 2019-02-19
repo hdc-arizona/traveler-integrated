@@ -13,6 +13,11 @@ const VIEW_BUTTONS = [
     'enabled': dataset => !!dataset.coreTree
   },
   {
+    'view': 'CodeView',
+    'icon': 'img/code.svg',
+    'enabled': dataset => !!dataset.code
+  },
+  {
     'view': 'GanttView',
     'icon': 'img/gantt.svg',
     'enabled': dataset => !!dataset.ranges
@@ -68,34 +73,43 @@ class SummaryView extends GoldenLayoutView {
     datasets = datasets.merge(datasetsEnter);
 
     // Use the space to the right of all the labels / buttons for the bar,
-    // minus 2em of space for padding between them
-    const availableWidth = this.content.node().getBoundingClientRect().width - 2 * this.emSize;
-    let barContainerLeftMargin = 0;
+    // minus 2em of space for padding between each section
+    let availableBarWidth = this.content.node().getBoundingClientRect().width - 4 * this.emSize;
+    let labelSpace = 0;
+    let buttonSpace = 0;
     const timeScale = d3.scaleLinear()
       .domain([0, d3.max(sortedDatasets.map(d => +d.time))]);
 
     datasetsEnter.append('h3').classed('name', true);
     datasets.select('.name').text(d => d.label)
       .each(function () {
-        barContainerLeftMargin = Math.max(barContainerLeftMargin, this.getBoundingClientRect().width);
+        labelSpace = Math.max(labelSpace, this.getBoundingClientRect().width);
       });
 
     datasetsEnter.append('div').classed('timestamp', true);
-    datasets.select('.timestamp').text(d => d.timestamp)
+    datasets.select('.timestamp').text(d => Object.values(d.timestamps)[0] || 'Couldn\'t get timestamp')
       .each(function () {
-        barContainerLeftMargin = Math.max(barContainerLeftMargin, this.getBoundingClientRect().width);
+        labelSpace = Math.max(labelSpace, this.getBoundingClientRect().width);
       });
+
+    availableBarWidth -= labelSpace;
 
     datasetsEnter.append('div').classed('viewContainer', true);
     this.drawViewButtons(datasets);
+    datasets.select('.viewContainer')
+      .style('left', (labelSpace + this.emSize) + 'px')
+      .each(function () {
+        buttonSpace = Math.max(buttonSpace, this.getBoundingClientRect().width);
+      });
 
-    timeScale.range([0, availableWidth - barContainerLeftMargin]);
+    availableBarWidth -= buttonSpace;
+    timeScale.range([0, availableBarWidth]);
 
     const barContainerEnter = datasetsEnter.append('div').classed('barContainer', true);
     barContainerEnter.append('div').classed('bar', true);
     barContainerEnter.append('label');
     datasets.select('.barContainer')
-      .style('width', (availableWidth - barContainerLeftMargin) + 'px');
+      .style('width', availableBarWidth + 'px');
     datasets.select('.barContainer .bar')
       .style('width', d => !isNaN(parseFloat(d.time)) ? timeScale(parseFloat(d.time)) + 'px' : timeScale.range()[1] + 'px')
       .classed('unknown', d => isNaN(parseFloat(d.time)));

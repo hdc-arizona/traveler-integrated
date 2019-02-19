@@ -93,9 +93,10 @@ if __name__ == '__main__':
             meta['label'] = label
 
             # Grab the timestamps from each input file
-            meta['timestamps'] = {}
+            timestamps = {}
             for arg, path in paths.items():
-                meta['timestamps'][arg] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
+                timestamps[arg] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
+            meta['timestamps'] = timestamps
 
             # Regardless of what data we're given, we'll want regions and the debug setting
             db[label]['regions'] = shelve.open(os.path.join(dbDir, 'regions.shelf'))
@@ -159,6 +160,7 @@ if __name__ == '__main__':
             if 'code' in paths:
                 with open(paths['code'], 'r') as file:
                     meta['code'] = file.read()
+                    common.log('Finished adding code file')
 
             # Save all the data
             meta.sync()
