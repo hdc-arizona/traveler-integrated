@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
-from flask import Flask
+from flask import Flask, abort
 # from bplustree import BPlusTree
 from wrangling import common
 
@@ -23,6 +23,18 @@ def datasets():
     for label, data in db.items():
         result[label] = dict(data['meta'])
     return json.dumps(result)
+
+@app.route('/tree/<string:label>')
+def tree(label):
+    if label not in db:
+        abort(404)
+    return json.dumps(db[label]['meta']['coreTree'])
+
+@app.route('/regions/<string:label>')
+def regions(label):
+    if label not in db:
+        abort(404)
+    return json.dumps(dict(db[label]['regions']))
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
 
