@@ -1,5 +1,6 @@
-/* globals GoldenLayout */
+/* globals d3, GoldenLayout */
 import StateModel from './models/StateModel.js';
+import Tooltip from './views/Tooltip/Tooltip.js';
 import SummaryView from './views/SummaryView/SummaryView.js';
 import TreeView from './views/TreeView/TreeView.js';
 import TreeComparisonView from './views/TreeComparisonView/TreeComparisonView.js';
@@ -11,10 +12,11 @@ import defaultLayout from './config/defaultLayout.js';
 class Controller {
   constructor () {
     this.state = window.state = new StateModel();
+    this.tooltip = window.tooltip = new Tooltip();
     this.setupLayout();
   }
   setupLayout () {
-    this.goldenLayout = new GoldenLayout(defaultLayout);
+    this.goldenLayout = new GoldenLayout(defaultLayout, d3.select('#layoutRoot').node());
     const viewClassLookup = {
       SummaryView,
       TreeView,

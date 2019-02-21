@@ -6,7 +6,7 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
   constructor ({
     container,
     state,
-    resources = {}
+    resources
   }) {
     super(null, resources);
     this.container = container;

@@ -12,7 +12,6 @@ html, body {
   margin: 0;
 }
 body {
-  overflow: hidden;
   font-family: @bodyFontFamily;
   font-weight: @bodyFontWeight;
   color: @textColor;
@@ -24,6 +23,15 @@ h1, h2, h3, h4, h5, h6, .lm_header .lm_tab {
 pre, code {
   font-family: @fixedFontFamily;
   font-weight: @fixedFontWeight;
+}
+
+#layoutRoot {
+  overflow: hidden;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
 }
 
 .scrollArea {

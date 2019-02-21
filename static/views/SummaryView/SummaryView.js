@@ -19,24 +19,28 @@ class SummaryView extends GoldenLayoutView {
       {
         'view': 'TreeView',
         'icon': 'img/tree.svg',
-        'enabled': dataset => !!dataset.coreTree && this.pairwiseMode === null
+        'enabled': dataset => !!dataset.coreTree && this.pairwiseMode === null,
+        'tooltip': 'Show Tree View'
       },
       {
         'view': 'TreeComparisonView',
         'icon': 'img/compareTrees.svg',
         'enabled': dataset => !!dataset.coreTree && (this.pairwiseMode === null ||
           (this.pairwiseMode.type === 'TreeComparisonView' && this.pairwiseMode.dataset !== dataset)),
-        'pairwise': true
+        'pairwise': true,
+        'tooltip': 'Compare Trees'
       },
       {
         'view': 'CodeView',
         'icon': 'img/code.svg',
-        'enabled': dataset => !!dataset.code && this.pairwiseMode === null
+        'enabled': dataset => !!dataset.code && this.pairwiseMode === null,
+        'tooltip': 'Show Code View'
       },
       {
         'view': 'GanttView',
         'icon': 'img/gantt.svg',
-        'enabled': dataset => !!dataset.ranges && this.pairwiseMode === null
+        'enabled': dataset => !!dataset.ranges && this.pairwiseMode === null,
+        'tooltip': 'Show Gantt View'
       }
     ];
 
@@ -165,28 +169,36 @@ class SummaryView extends GoldenLayoutView {
     viewButtons.classed('selected', d => window.controller.viewTypeIsVisible(d.button.view, { label: d.dataset.label }));
     viewButtons.classed('disabled', d => !d.button.enabled(d.dataset));
 
-    viewButtons.on('click', d => {
-      if (d.button.enabled(d.dataset)) {
-        if (d.button.pairwise) {
-          if (this.pairwiseMode === null) {
-            this.pairwiseMode = {
-              type: d.button.view,
-              dataset: d.dataset
-            };
-            this.render();
+    viewButtons
+      .on('mouseenter', function (d) {
+        window.tooltip.show({
+          content: d.button.tooltip,
+          targetBounds: this.getBoundingClientRect()
+        });
+      })
+      .on('mouseleave', () => { window.tooltip.hide(); })
+      .on('click', d => {
+        if (d.button.enabled(d.dataset)) {
+          if (d.button.pairwise) {
+            if (this.pairwiseMode === null) {
+              this.pairwiseMode = {
+                type: d.button.view,
+                dataset: d.dataset
+              };
+              this.render();
+            } else {
+              window.controller.openView(d.button.view, {
+                label: this.pairwiseMode.dataset.label,
+                comparisonLabel: d.dataset.label
+              });
+              this.pairwiseMode = null;
+              this.render();
+            }
           } else {
-            window.controller.openView(d.button.view, {
-              label: this.pairwiseMode.dataset.label,
-              comparisonLabel: d.dataset.label
-            });
-            this.pairwiseMode = null;
-            this.render();
+            window.controller.openView(d.button.view, { label: d.dataset.label });
           }
-        } else {
-          window.controller.openView(d.button.view, { label: d.dataset.label });
         }
-      }
-    });
+      });
   }
 }
 export default SummaryView;
