@@ -3,9 +3,17 @@ import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
 
 class SummaryView extends GoldenLayoutView {
-  constructor () {
-    super(...arguments);
-
+  constructor ({
+    container,
+    state
+  }) {
+    super({
+      container,
+      state,
+      resources: [
+        { type: 'less', url: 'views/SummaryView/style.less' }
+      ]
+    });
     this.pairwiseMode = null;
     this.viewButtons = [
       {

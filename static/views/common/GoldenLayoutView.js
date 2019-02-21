@@ -1,7 +1,8 @@
 /* globals d3 */
 import { View } from '../../node_modules/uki/dist/uki.esm.js';
+import IntrospectableMixin from '../../utils/IntrospectableMixin.js';
 
-class GoldenLayoutView extends View {
+class GoldenLayoutView extends IntrospectableMixin(View) {
   constructor ({
     container,
     state,
@@ -10,7 +11,6 @@ class GoldenLayoutView extends View {
     super(null, resources);
     this.container = container;
     this.layoutState = state;
-    this._title = this.constructor.name;
     this.container.on('tab', tab => {
       this.tabElement = d3.select(tab.element[0]);
       this.setupTab();
@@ -21,19 +21,14 @@ class GoldenLayoutView extends View {
     this.container.on('show', () => this.render());
     this.container.on('resize', () => this.render());
   }
-  set title (newTitle) {
-    if (this.tabElement) {
-      this.tabElement.classed(this._title, false);
-      this.tabElement.classed(newTitle, true);
-    }
-    if (this.d3el) {
-      this.d3el.classed(this._title, false);
-      this.d3el.classed(newTitle, true);
-    }
-    this._title = newTitle;
-  }
   get title () {
-    return this._title;
+    if (this.layoutState.label) {
+      if (this.layoutState.comparisonLabel) {
+        return this.layoutState.label + ' / ' + this.layoutState.comparisonLabel;
+      }
+      return this.layoutState.label + ' ' + this.humanReadableType;
+    }
+    return this.humanReadableType;
   }
   get isEmpty () {
     // Should be overridden when a view has nothing to show
@@ -44,7 +39,7 @@ class GoldenLayoutView extends View {
     return false;
   }
   setup () {
-    this.d3el.classed(this.title, true);
+    this.d3el.classed(this.type, true);
     this.emptyStateDiv = this.d3el.append('div')
       .classed('emptyState', true)
       .style('display', 'none');
@@ -54,7 +49,7 @@ class GoldenLayoutView extends View {
       .style('display', 'none');
   }
   setupTab () {
-    this.tabElement.classed(this.title, true);
+    this.tabElement.classed(this.type, true);
   }
   drawTab () {
     this.tabElement.select(':scope > .lm_title')

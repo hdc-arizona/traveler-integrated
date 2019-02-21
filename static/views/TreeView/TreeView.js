@@ -4,22 +4,27 @@ import SvgViewMixin from '../common/SvgViewMixin.js';
 class TreeView extends SvgViewMixin(GoldenLayoutView) {
   constructor ({
     container,
-    state,
-    resources = {
-      'text': 'views/TreeView/shapeKey.html'
-    }
+    state
   }) {
-    super({ container, state, resources });
+    super({
+      container,
+      state,
+      resources: [
+        { type: 'less', url: 'views/TreeView/style.less' },
+        { type: 'text', url: 'views/TreeView/shapeKey.html' }
+      ]
+    });
   }
   setup () {
     super.setup();
     this.shapeKey = this.d3el.append('div')
-      .attr('id', 'shapekey')
-      .html(this.resources.text);
+      .classed('shapeKey', true)
+      .html(this.resources[1]);
     this.legend = this.d3el.append('div')
       .attr('id', 'legend');
   }
   draw () {
+    super.draw();
     const bounds = this.getContentBounds();
   }
 }

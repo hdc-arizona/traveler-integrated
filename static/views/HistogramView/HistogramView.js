@@ -6,11 +6,10 @@ class HistogramView extends SvgViewMixin(GoldenLayoutView) {
     super.setup();
 
     this.content.append('text')
-      .attr('x', 20)
-      .attr('y', 20)
       .text('TODO: Histogram');
   }
   draw () {
+    super.draw();
     const bounds = this.getContentBounds();
   }
 }

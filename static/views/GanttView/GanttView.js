@@ -6,11 +6,10 @@ class GanttView extends SvgViewMixin(GoldenLayoutView) {
     super.setup();
 
     this.content.append('text')
-      .attr('x', 20)
-      .attr('y', 20)
       .text('TODO: Gantt View');
   }
   draw () {
+    super.draw();
     const bounds = this.getContentBounds();
   }
 }
