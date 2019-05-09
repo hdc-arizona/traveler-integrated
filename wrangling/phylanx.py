@@ -71,10 +71,11 @@ def _processPerfLine(line, regions=None, debug=False):
     region, newR = processRegion(regionName, regions, 'perf csv', debug)
     region['display_name'] = perfLine[2]
     region['count'] = int(perfLine[3])
-    region['time'] = int(perfLine[4])
-    region['eval_direct'] = int(perfLine[5])
+    region['time'] = float(perfLine[4])
+    region['eval_direct'] = float(perfLine[5])
+    region['avg_time'] = region['time'] / region['count'] if region['count'] != 0 else region['time']
     regions[regionName] = region
-    return (newR, float(region['time']))
+    return (newR, region['time'])
 def processPerfFile(path, regions=None, debug=False):
     newR = seenR = maxTime = 0
     with open(path, 'r') as file:

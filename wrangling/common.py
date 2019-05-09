@@ -34,6 +34,8 @@ def addRegionChild(parent, child, regions=None, regionLinks=None, source=None, d
     if child not in parentRegion['children']:
         parentRegion['children'].append(child)
         regions[parent] = parentRegion
+        if 'time' in child:
+            regions[parent]['childrenTime'] += child['time']
     if parent not in childRegion['parents']:
         childRegion['parents'].append(parent)
         regions[child] = childRegion
@@ -61,7 +63,7 @@ def processRegion(regionName, regions=None, source=None, debug=False):
             region['sources'].append(source)
             regions[regionName] = region
         return (region, 0)
-    region = {'parents': [], 'children': []}
+    region = {'parents': [], 'children': [], 'childrenTime': 0}
     if debug is True:
         region['sources'] = [source]
     regionChunks = regionName.split('$')
