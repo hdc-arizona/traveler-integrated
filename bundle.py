@@ -49,10 +49,11 @@ if __name__ == '__main__':
         if not inputs[args['label']]:
             raise Exception('At least one of: --input, --tree, --performance, --graph, --otf2, and/or --code is required')
     elif r.groups == 1:
-        # We're in globbing mode; we can expect many files per argument, and --label should be a regular expression that matches
-        # input files to their label
-        # The only (possible) exception is the code file: if only one is provided, use it for all labels (otherwise, expect it to
-        # match the regular expression as well)
+        # We're in globbing mode; we can expect many files per argument, and
+        # --label should be a regular expression that matches input files to
+        # their label The only (possible) exception is the code file: if only
+        # one is provided, use it for all labels (otherwise, expect it to match
+        # the regular expression as well)
         singleCodeFile = args['code'][0] if len(args['code']) == 1 else None
         for arg in ['input', 'tree', 'performance', 'graph', 'otf2', 'code']:
             if arg == 'code' and singleCodeFile is not None:
