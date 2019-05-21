@@ -25,10 +25,13 @@ def index():
     return RedirectResponse(url='/static/index.html')
 
 @app.get('/datasets')
-def datasets():
+def datasets(includeMeta: bool = False):
     result = {}
     for label, data in db.items():
-        result[label] = dict(data['meta'])
+        if includeMeta:
+            result[label] = dict(data['meta'])
+        else:
+            result[label] = {}
     return result
 
 @app.get('/tree/{label}')

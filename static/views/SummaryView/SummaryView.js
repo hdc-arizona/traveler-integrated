@@ -46,7 +46,7 @@ class SummaryView extends GoldenLayoutView {
 
     (async () => {
       try {
-        this.data = await d3.json('/datasets');
+        this.data = await d3.json('/datasets?includeMeta=true');
       } catch (err) {
         this.data = err;
       }
