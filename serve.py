@@ -37,13 +37,13 @@ def datasets(includeMeta: bool = False):
 @app.get('/tree/{label}')
 def tree(label: str):
     if label not in db:
-        raise HTTPException(status_code=404, detail='Tree not found')
+        raise HTTPException(status_code=404, detail='Dataset not found')
     return db[label]['meta']['coreTree']
 
-@app.get('/regions/<label>')
+@app.get('/primitives/<label>')
 def regions(label: str):
     if label not in db:
-        raise HTTPException(status_code=404, detail='Region not found')
+        raise HTTPException(status_code=404, detail='Dataset not found')
     return dict(db[label]['regions'])
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
