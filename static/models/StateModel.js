@@ -1,4 +1,4 @@
-import { Model } from '/node_modules/uki/dist/uki.esm.js';
+import { Model } from '/static/node_modules/uki/dist/uki.esm.js';
 
 class StateModel extends Model {
 }

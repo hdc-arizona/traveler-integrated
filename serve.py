@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
-import json
-from flask import Flask, abort
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from starlette.staticfiles import StaticFiles
+from starlette.responses import RedirectResponse
 # from bplustree import BPlusTree
 from wrangling import common
 
@@ -11,37 +13,37 @@ parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integ
 
 args = parser.parse_args()
 db = common.loadDatabase(args.dbDir)
-app = Flask(__name__)
+app = FastAPI(
+    title=__name__,
+    description='This is a test',
+    version='0.1.0'
+)
+app.mount('/static', StaticFiles(directory='static'), name='static')
 
-@app.route('/')
-def main():
-    return app.send_static_file('index.html')
+@app.get('/')
+def index():
+    return RedirectResponse(url='/static/index.html')
 
-@app.route('/datasets')
+@app.get('/datasets')
 def datasets():
     result = {}
     for label, data in db.items():
         result[label] = dict(data['meta'])
-    return json.dumps(result)
+    return result
 
-@app.route('/tree/<string:label>')
-def tree(label):
+@app.get('/tree/{label}')
+def tree(label: str):
     if label not in db:
-        abort(404)
-    return json.dumps(db[label]['meta']['coreTree'])
+        raise HTTPException(status_code=404, detail='Tree not found')
+    return db[label]['meta']['coreTree']
 
-@app.route('/regions/<string:label>')
-def regions(label):
+@app.get('/regions/<label>')
+def regions(label: str):
     if label not in db:
-        abort(404)
-    return json.dumps(dict(db[label]['regions']))
+        raise HTTPException(status_code=404, detail='Region not found')
+    return dict(db[label]['regions'])
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
 
-@app.route('/<path:path>')
-def static_proxy(path):
-    # send_static_file will guess the correct MIME type
-    return app.send_static_file(path)
-
 if __name__ == '__main__':
-    app.run()
+    uvicorn.run(app)

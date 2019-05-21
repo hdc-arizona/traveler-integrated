@@ -41,3 +41,9 @@ Loading many files at once (using a regular expression to match globbed paths):
   --code data/als_regression/als.physl \
   --label "data/als_regression/(\d*-\d*-\d*).*"
 ```
+
+## Serving
+Running `./serve.py` will launch a web server on port 8000
+
+The web server contains a (work in progress) web interface for viewing trees and
+traces directly, as well as a REST API (with a Swagger interface)
