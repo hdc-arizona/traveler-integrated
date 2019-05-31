@@ -1,7 +1,7 @@
 import re
 import subprocess
 from blist import sortedlist #pylint: disable=import-error
-from .common import log, processRegion, addRegionChild
+from .common import log, processPrimitive, addPrimitiveChild
 
 eventLineParser = re.compile(r'^(\S+)\s+(\d+)\s+(\d+)\s+(.*)$')
 attrParsers = {
@@ -18,45 +18,45 @@ addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 numEvents = 0
 locations = {}
 
-def _processEvent(event, regions=None, ranges=None, guids=None, events=None, debug=False):
+def _processEvent(event, primitives=None, ranges=None, guids=None, events=None, debug=False):
     global numEvents
 
     eventId = str(numEvents)
     newR = seenR = newG = seenG = 0
 
-    if 'Region' in event:
-        # Identify the region (and add to its counter)
-        regionName = event['Region'].replace('::eval', '')
-        region, newR = processRegion(regionName, regions, 'otf2 event', debug=debug)
+    if 'Primitive' in event:
+        # Identify the primitive (and add to its counter)
+        primitiveName = event['Primitive'].replace('::eval', '')
+        primitive, newR = processPrimitive(primitiveName, primitives, 'otf2 event', debug=debug)
         seenR = 1 if newR == 0 else 0
         if debug is True:
-            if 'eventCount' not in region:
-                region['eventCount'] = 0
-            region['eventCount'] += 1
+            if 'eventCount' not in primitive:
+                primitive['eventCount'] = 0
+            primitive['eventCount'] += 1
 
         # Add to GUID / Parent GUID relationships
         if guids is not None and 'GUID' in event and 'Parent GUID' in event:
-            if 'guids' not in region:
-                region['guids'] = [event['GUID']]
-            elif event['GUID'] not in region['guids']:
+            if 'guids' not in primitive:
+                primitive['guids'] = [event['GUID']]
+            elif event['GUID'] not in primitive['guids']:
                 # TODO: using a list instead of a set is expensive... but
                 # storing sets may or may not be supported
-                region['guids'].append(event['GUID'])
+                primitive['guids'].append(event['GUID'])
             guid = guids.get(event['GUID'], None)
             if guid is None:
                 newG += 1
                 guid = {
-                    'regions': [regionName],
+                    'primitives': [primitiveName],
                     'parent': event['Parent GUID']
                 }
             else:
                 seenG += 1
-                if regionName not in guid['regions']:
-                    guid['regions'].append(regionName)
+                if primitiveName not in guid['primitives']:
+                    guid['primitives'].append(primitiveName)
                 assert guid['parent'] == event['Parent GUID']
             guids[event['GUID']] = guid
 
-        regions[regionName] = region
+        primitives[primitiveName] = primitive
 
     # If we're computing ranges, add enter / leave events to per-location lists
     if ranges is not None and (event['Event'] == 'ENTER' or event['Event'] == 'LEAVE'):
@@ -78,7 +78,7 @@ def _processEvent(event, regions=None, ranges=None, guids=None, events=None, deb
 
     return (newR, seenR, newG, seenG)
 
-def parseOtf2(otf2Path, regions=None, regionLinks=None, ranges=None, guids=None, events=None, debug=False):
+def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids=None, events=None, debug=False):
     log('Parsing events (.=2500 events)')
     newR = seenR = newG = seenG = 0
     currentEvent = None
@@ -94,7 +94,7 @@ def parseOtf2(otf2Path, regions=None, regionLinks=None, ranges=None, guids=None,
         if eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
             if currentEvent is not None:
-                counts = _processEvent(currentEvent, regions, ranges, guids, events, debug)
+                counts = _processEvent(currentEvent, primitives, ranges, guids, events, debug)
                 newR += counts[0]
                 seenR += counts[0]
                 newG += counts[0]
@@ -116,14 +116,14 @@ def parseOtf2(otf2Path, regions=None, regionLinks=None, ranges=None, guids=None,
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
     # The last event will never have had a chance to be processed:
     if currentEvent is not None:
-        counts = _processEvent(currentEvent, regions, ranges, guids, events, debug)
+        counts = _processEvent(currentEvent, primitives, ranges, guids, events, debug)
         newR += counts[0]
         seenR += counts[0]
         newG += counts[0]
         seenG += counts[0]
     log('')
     log('Finished processing %i events' % numEvents)
-    log('New regions: %d, References to existing regions: %d' % (newR, seenR))
+    log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
     log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
 
     # Combine the sorted enter / leave events into ranges
@@ -165,17 +165,17 @@ def parseOtf2(otf2Path, regions=None, regionLinks=None, ranges=None, guids=None,
         log('')
         log('Finished processing %i ranges' % numRanges)
 
-    # Create any missing parent-child region relationships based on the GUIDs we've collected
+    # Create any missing parent-child primitive relationships based on the GUIDs we've collected
     if guids is not None:
-        log('Creating region links based on GUIDs (.=2500 relationships observed)')
+        log('Creating primitive links based on GUIDs (.=2500 relationships observed)')
         newL = seenL = 0
         for guid in guids.values():
             if guid['parent'] != '0':
                 parentGuid = guids.get(guid['parent'], None)
                 assert parentGuid is not None
-                for parentRegion in parentGuid['regions']:
-                    for childRegion in guid['regions']:
-                        l = addRegionChild(parentRegion, childRegion, regions, regionLinks, 'guids', debug)[1]
+                for parentPrimitive in parentGuid['primitives']:
+                    for childPrimitive in guid['primitives']:
+                        l = addPrimitiveChild(parentPrimitive, childPrimitive, primitives, primitiveLinks, 'guids', debug)[1]
                         newL += l
                         seenL += 1 if newL == 0 else 0
 

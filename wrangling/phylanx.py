@@ -1,55 +1,55 @@
 import re
 import newick
-from .common import log, processRegion, addRegionChild
+from .common import log, processPrimitive, addPrimitiveChild
 
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')
 
-def _processTree(node, regions=None, regionLinks=None, debug=False):
-    # Create the hashed region object
-    regionName = node.name.strip()
-    newR = processRegion(regionName, regions, 'tree', debug)[1]
+def _processTree(node, primitives=None, primitiveLinks=None, debug=False):
+    # Create the hashed primitive object
+    primitiveName = node.name.strip()
+    newR = processPrimitive(primitiveName, primitives, 'tree', debug)[1]
     seenR = 1 if newR == 0 else 0
-    tree = {'name': regionName, 'children': []}
+    tree = {'name': primitiveName, 'children': []}
     newL = seenL = 0
 
     # Create the tree hierarchy
     if node.descendants:
         for child in node.descendants:
-            childTree, nr, sr, nl, sl = _processTree(child, regions, regionLinks, debug)
+            childTree, nr, sr, nl, sl = _processTree(child, primitives, primitiveLinks, debug)
             tree['children'].append(childTree)
             newR += nr
             seenR += sr
-            l = addRegionChild(regionName, childTree['name'], regions, regionLinks, 'tree', debug)[1]
+            l = addPrimitiveChild(primitiveName, childTree['name'], primitives, primitiveLinks, 'tree', debug)[1]
             newL += nl + l
             seenL += sl + (1 if l == 0 else 0)
     return (tree, newR, seenR, newL, seenL)
-def processTree(newickText, regions=None, regionLinks=None, debug=False):
-    return _processTree(newick.loads(newickText)[0], regions, regionLinks, debug=debug)
+def processTree(newickText, primitives=None, primitiveLinks=None, debug=False):
+    return _processTree(newick.loads(newickText)[0], primitives, primitiveLinks, debug=debug)
 
 # Tools for handling the DOT graph
 dotModeParser = re.compile(r'graph "[^"]*" {')
 dotLineParser = re.compile(r'"([^"]*)" -- "([^"]*)";')
 
-def _processDotLine(line, regions=None, regionLinks=None, debug=False):
+def _processDotLine(line, primitives=None, primitiveLinks=None, debug=False):
     dotLine = dotLineParser.match(line)
     if dotLine is None:
         return None
 
-    newR = processRegion(dotLine[1], regions, 'dot graph', debug)[1]
+    newR = processPrimitive(dotLine[1], primitives, 'dot graph', debug)[1]
     seenR = 1 if newR == 0 else 0
-    r = processRegion(dotLine[2], regions, 'dot graph', debug)[1]
+    r = processPrimitive(dotLine[2], primitives, 'dot graph', debug)[1]
     newR += r
     seenR += 1 if r == 0 else 0
-    newL = addRegionChild(dotLine[1], dotLine[2], regions, regionLinks, 'dot graph', debug=debug)
+    newL = addPrimitiveChild(dotLine[1], dotLine[2], primitives, primitiveLinks, 'dot graph', debug=debug)
     seenL = 1 if newL == 0 else 0
     return (newR, seenR, newL, seenL)
-def processDotFile(path, regions=None, regionLinks=None, debug=False):
+def processDotFile(path, primitives=None, primitiveLinks=None, debug=False):
     newR = seenR = newL = seenL = 0
     with open(path, 'r') as file:
         assert dotModeParser.match(file.readline()) is not None
         for line in file:
-            temp = _processDotLine(line, regions, regionLinks, debug)
+            temp = _processDotLine(line, primitives, primitiveLinks, debug)
             if temp is None:
                 break
             newR += temp[0]
@@ -62,26 +62,26 @@ def processDotFile(path, regions=None, regionLinks=None, debug=False):
 perfModeParser = re.compile(r'primitive_instance,display_name,count,time,eval_direct')
 perfLineParser = re.compile(r'"([^"]*)","([^"]*)",(\d+),(\d+),(-?1)')
 
-def _processPerfLine(line, regions=None, debug=False):
+def _processPerfLine(line, primitives=None, debug=False):
     perfLine = perfLineParser.match(line)
     if perfLine is None:
         return None
 
-    regionName = perfLine[1]
-    region, newR = processRegion(regionName, regions, 'perf csv', debug)
-    region['display_name'] = perfLine[2]
-    region['count'] = int(perfLine[3])
-    region['time'] = float(perfLine[4])
-    region['eval_direct'] = float(perfLine[5])
-    region['avg_time'] = region['time'] / region['count'] if region['count'] != 0 else region['time']
-    regions[regionName] = region
-    return (newR, region['time'])
-def processPerfFile(path, regions=None, debug=False):
+    primitiveName = perfLine[1]
+    primitive, newR = processPrimitive(primitiveName, primitives, 'perf csv', debug)
+    primitive['display_name'] = perfLine[2]
+    primitive['count'] = int(perfLine[3])
+    primitive['time'] = float(perfLine[4])
+    primitive['eval_direct'] = float(perfLine[5])
+    primitive['avg_time'] = primitive['time'] / primitive['count'] if primitive['count'] != 0 else primitive['time']
+    primitives[primitiveName] = primitive
+    return (newR, primitive['time'])
+def processPerfFile(path, primitives=None, debug=False):
     newR = seenR = maxTime = 0
     with open(path, 'r') as file:
         assert perfModeParser.match(file.readline()) is not None
         for line in file:
-            counts = _processPerfLine(line, regions, debug)
+            counts = _processPerfLine(line, primitives, debug)
             if counts is None:
                 break
             newR += counts[0]
@@ -92,7 +92,7 @@ def processPerfFile(path, regions=None, debug=False):
 # Tools for handling the inclusive time line
 timeParser = re.compile(r'time: ([\d\.]+)')
 
-def parsePhylanxLog(path, regions=None, regionLinks=None, debug=False):
+def parsePhylanxLog(path, primitives=None, primitiveLinks=None, debug=False):
     mode = None
     coreTree = None
     time = None
@@ -113,13 +113,13 @@ def parsePhylanxLog(path, regions=None, regionLinks=None, debug=False):
                     time = 1000000000 * float(timeParser.match(line)[1])
                     log('Total inclusive time from phylanx log (converted to ns): %f' % time)
             elif mode == 'tree':
-                coreTree, nr, sr, nl, sl = processTree(line, regions, regionLinks, debug)
+                coreTree, nr, sr, nl, sl = processTree(line, primitives, primitiveLinks, debug)
                 mode = None
                 log('Finished parsing newick tree')
-                log('New regions: %d, Observed existing regions: %d' % (nr, sr))
+                log('New primitives: %d, Observed existing primitives: %d' % (nr, sr))
                 log('New links: %d, Observed existing links: %d' % (nl, sl))
             elif mode == 'dot':
-                counts = _processDotLine(line, regions, regionLinks, debug)
+                counts = _processDotLine(line, primitives, primitiveLinks, debug)
                 if counts is not None:
                     newR += counts[0]
                     seenR += counts[1]
@@ -128,11 +128,11 @@ def parsePhylanxLog(path, regions=None, regionLinks=None, debug=False):
                 else:
                     mode = None
                     log('Finished parsing DOT graph')
-                    log('New regions: %d, References to existing regions: %d' % (newR, seenR))
+                    log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
                     log('New links: %d, Observed existing links: %d' % (newL, seenL))
                     newR = seenR = newL = seenL = 0
             elif mode == 'perf':
-                counts = _processPerfLine(line, regions, debug)
+                counts = _processPerfLine(line, primitives, debug)
                 if counts is not None:
                     newR += counts[0]
                     seenR += 1 if counts[0] == 0 else 0
@@ -140,7 +140,7 @@ def parsePhylanxLog(path, regions=None, regionLinks=None, debug=False):
                 else:
                     mode = None
                     log('Finished parsing performance CSV')
-                    log('New regions: %d, Observed existing regions: %d' % (newR, seenR))
+                    log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
                     log('Max inclusive time seen in performance CSV (ns): %f' % maxTime)
                     newR = seenR = 0
             else:

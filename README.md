@@ -28,9 +28,9 @@ bundled in an integrated visualization system that you can load in the browser.
 A simple example bundling the full phylanx output and an OTF2 trace:
 ```bash
 ./bundle.py \
-  --input data/build-30Jan2019/test_run/output.txt \
-  --otf2 data/build-30Jan2019/test_run/OTF2_archive/APEX.otf2 \
-  --label "2019-01-30 Test Run"
+  --input data/als-30Jan2019/test_run/output.txt \
+  --otf2 data/als-30Jan2019/test_run/OTF2_archive/APEX.otf2 \
+  --label "2019-01-30 ALS Test Run"
 ```
 
 Loading many files at once (using a regular expression to match globbed paths):

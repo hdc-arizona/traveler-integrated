@@ -4,8 +4,9 @@ import re
 import argparse
 import shutil
 import shelve
+import pickle
 from datetime import datetime
-# from bplustree import BPlusTree
+from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 from wrangling import common, otf2, phylanx
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
@@ -99,43 +100,46 @@ if __name__ == '__main__':
                 timestamps[arg] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
             meta['timestamps'] = timestamps
 
-            # Regardless of what data we're given, we'll want regions and the debug setting
-            db[label]['regions'] = shelve.open(os.path.join(dbDir, 'regions.shelf'))
+            # Regardless of what data we're given, we'll want primitives and the debug setting
+            db[label]['primitives'] = shelve.open(os.path.join(dbDir, 'primitives.shelf'))
             kwargs = {
-                'regions': db[label]['regions'],
+                'primitives': db[label]['primitives'],
                 'debug': args['debug']
             }
+
+            # Several things (might) populate or modify coreTree
+            coreTree = None
 
             # Handle the performance file
             if 'performance' in paths:
                 nr, sr, time = phylanx.processPerfFile(paths['performance'], **kwargs)
                 meta['time'] = time
                 common.log('Finished parsing performance CSV')
-                common.log('New regions: %d, Observed existing regions: %d' % (nr, sr))
+                common.log('New primitives: %d, Observed existing primitives: %d' % (nr, sr))
                 common.log('Max inclusive time seen in performance CSV (ns): %f' % time)
 
-            # Everything except for the performance file needs regionLinks as well as regions
-            db[label]['regionLinks'] = shelve.open(os.path.join(dbDir, 'regionLinks.shelf'))
-            kwargs['regionLinks'] = db[label]['regionLinks']
+            # Everything except for the performance file needs primitiveLinks as well as primitives
+            db[label]['primitiveLinks'] = shelve.open(os.path.join(dbDir, 'primitiveLinks.shelf'))
+            kwargs['primitiveLinks'] = db[label]['primitiveLinks']
 
             # Handle stdout from phylanx
             if 'input' in paths:
                 # The full phylanx parser handles all logging internally
-                meta['coreTree'], meta['time'] = phylanx.parsePhylanxLog(paths['input'], **kwargs)
+                coreTree, meta['time'] = phylanx.parsePhylanxLog(paths['input'], **kwargs)
 
             # Handle the tree file
             if 'tree' in paths:
                 with open(paths['tree'], 'r') as file:
-                    meta['coreTree'], nr, sr, nl, sl = phylanx.processTree(file.read(), **kwargs)
+                    coreTree, nr, sr, nl, sl = phylanx.processTree(file.read(), **kwargs)
                     common.log('Finished parsing newick tree')
-                    common.log('New regions: %d, Observed existing regions: %d' % (nr, sr))
+                    common.log('New primitives: %d, Observed existing primitives: %d' % (nr, sr))
                     common.log('New links: %d, Observed existing links: %d' % (nl, sl))
 
             # Handle the dot graph file
             if 'graph' in paths:
                 nr, sr, nl, sl = phylanx.processDotFile(paths['graph'], **kwargs)
                 common.log('Finished parsing DOT graph')
-                common.log('New regions: %d, References to existing regions: %d' % (nr, sr))
+                common.log('New primitives: %d, References to existing primitives: %d' % (nr, sr))
                 common.log('New links: %d, Observed existing links: %d' % (nl, sl))
 
             # Handle otf2
@@ -150,12 +154,27 @@ if __name__ == '__main__':
                     meta['events'] = True
                 # Otf2 parsing handles its logging internally
                 otf2.parseOtf2(paths['otf2'], **kwargs)
+
                 # Save the extra files
                 db[label]['ranges'].sync()
                 if args['guids']:
                     db[label]['guids'].sync()
                 if args['events']:
                     db[label]['events'].sync()
+
+                # Build and save indexes
+                common.log('Indexing ranges')
+                def rangeIterator():
+                    for rangeId, rangeObj in db[label]['ranges'].items():
+                        enter = rangeObj['enter']['Timestamp']
+                        leave = rangeObj['leave']['Timestamp'] + 1
+                        # Need to add one because IntervalTree for zero-length events
+                        # (and because IntervalTree is not inclusive of upper bounds in queries)
+                        yield Interval(enter, leave, rangeId)
+                db[label]['rangeIndex'] = IntervalTree(interval for interval in rangeIterator())
+                with open(os.path.join(dbDir, 'rangeIndex.pickle'), 'wb') as rangeIndexFile:
+                    pickle.dump(db[label]['rangeIndex'], rangeIndexFile)
+                common.log('Finished indexing')
 
             # Handle code
             if 'code' in paths:
@@ -165,8 +184,11 @@ if __name__ == '__main__':
 
             # Save all the data
             meta.sync()
-            db[label]['regions'].sync()
-            db[label]['regionLinks'].sync()
+            db[label]['primitives'].sync()
+            db[label]['primitiveLinks'].sync()
+            if coreTree is not None:
+                with open(os.path.join(dbDir, 'coreTree.pickle'), 'wb') as coreTreeFile:
+                    pickle.dump(coreTree, coreTreeFile)
         except: #pylint: disable=W0702
             common.log('Error encountered; purging corrupted data for: %s' % label)
             if os.path.exists(dbDir):

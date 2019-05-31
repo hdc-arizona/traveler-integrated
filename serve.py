@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import argparse
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from starlette.staticfiles import StaticFiles
-from starlette.responses import RedirectResponse
-# from bplustree import BPlusTree
+import uvicorn #pylint: disable=import-error
+from fastapi import FastAPI, HTTPException #pylint: disable=import-error
+from starlette.staticfiles import StaticFiles #pylint: disable=import-error
+from starlette.responses import RedirectResponse #pylint: disable=import-error
 from wrangling import common
 
 parser = argparse.ArgumentParser(description='Serve data bundled by bundle.py')
@@ -34,17 +33,23 @@ def datasets(includeMeta: bool = False):
             result[label] = {}
     return result
 
+@app.get('/histogram/{label}')
+def histogram(label: str, bins: int = 100):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
+    raise NotImplementedError()
+
 @app.get('/tree/{label}')
 def tree(label: str):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-    return db[label]['meta']['coreTree']
+    return db[label]['coreTree']
 
-@app.get('/primitives/<label>')
-def regions(label: str):
+@app.get('/primitives/{label}')
+def primitives(label: str):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-    return dict(db[label]['regions'])
+    return dict(db[label]['primitives'])
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
 
