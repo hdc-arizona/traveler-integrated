@@ -95,10 +95,12 @@ if __name__ == '__main__':
             meta['label'] = label
 
             # Grab the timestamps from each input file
-            timestamps = {}
+            sourceFiles = {}
             for arg, path in paths.items():
-                timestamps[arg] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
-            meta['timestamps'] = timestamps
+                sourceFiles[arg] = {}
+                sourceFiles[arg]['filename'] = os.path.split(path)[1]
+                sourceFiles[arg]['modified'] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
+            meta['sourceFiles'] = sourceFiles
 
             # Regardless of what data we're given, we'll want primitives and the debug setting
             db[label]['primitives'] = shelve.open(os.path.join(dbDir, 'primitives.shelf'))
@@ -145,15 +147,13 @@ if __name__ == '__main__':
             # Handle otf2
             if 'otf2' in paths:
                 db[label]['ranges'] = kwargs['ranges'] = shelve.open(os.path.join(dbDir, 'ranges.shelf'))
-                meta['ranges'] = True
                 if args['guids']:
                     db[label]['guids'] = kwargs['guids'] = shelve.open(os.path.join(dbDir, 'guids.shelf'))
-                    meta['guids'] = True
                 if args['events']:
                     db[label]['events'] = kwargs['events'] = shelve.open(os.path.join(dbDir, 'events.shelf'))
-                    meta['events'] = True
                 # Otf2 parsing handles its logging internally
-                otf2.parseOtf2(paths['otf2'], **kwargs)
+                stats = otf2.parseOtf2(paths['otf2'], **kwargs)
+                meta['stats'] = stats
 
                 # Save the extra files
                 db[label]['ranges'].sync()

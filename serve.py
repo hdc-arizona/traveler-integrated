@@ -33,16 +33,12 @@ def datasets(includeMeta: bool = False):
             result[label] = {}
     return result
 
-@app.get('/histogram/{label}')
-def histogram(label: str, bins: int = 100):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-    raise NotImplementedError()
-
 @app.get('/tree/{label}')
 def tree(label: str):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
+    if 'coreTree' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not contain tree data')
     return db[label]['coreTree']
 
 @app.get('/primitives/{label}')
@@ -50,6 +46,26 @@ def primitives(label: str):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
     return dict(db[label]['primitives'])
+
+@app.get('/histogram/{label}')
+def histogram(label: str, bins: int = 100):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
+    if 'rangeIndex' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
+    result = []
+    start = db[label]['meta']['stats']['start']
+    end = db[label]['meta']['stats']['end']
+    binSize = (end - start) / bins
+    for binNo in range(bins):
+        lowBound = start + binSize * binNo
+        highBound = start + binSize * (binNo + 1)
+        result.append({
+            'low': lowBound,
+            'high': highBound,
+            'count': len(db[label]['rangeIndex'][lowBound:highBound])
+        })
+    return result
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
 

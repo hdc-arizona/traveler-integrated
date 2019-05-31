@@ -80,6 +80,7 @@ def _processEvent(event, primitives=None, ranges=None, guids=None, events=None, 
 
 def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids=None, events=None, debug=False):
     log('Parsing events (.=2500 events)')
+    stats = {}
     newR = seenR = newG = seenG = 0
     currentEvent = None
     otfPipe = subprocess.Popen(['otf2-print', otf2Path], stdout=subprocess.PIPE)
@@ -103,6 +104,8 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = int(eventLineMatch.group(2))
             currentEvent['Timestamp'] = int(eventLineMatch.group(3))
+            stats['start'] = min(stats.get('start', currentEvent['Timestamp']), currentEvent['Timestamp'])
+            stats['end'] = max(stats.get('end', currentEvent['Timestamp']), currentEvent['Timestamp'])
             attrs = eventLineMatch.group(4)
             for attrMatch in re.finditer(attrParsers[currentEvent['Event']], attrs):
                 currentEvent[attrMatch.group(1)] = attrMatch.group(2)
@@ -186,3 +189,5 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids
         log('')
         log('Finished scanning GUIDs')
         log('New links: %d, Observed existing links: %d' % (newL, seenL))
+
+    return stats
