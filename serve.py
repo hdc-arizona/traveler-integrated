@@ -53,19 +53,7 @@ def histogram(label: str, bins: int = 100):
         raise HTTPException(status_code=404, detail='Dataset not found')
     if 'rangeIndex' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
-    result = []
-    start = db[label]['meta']['stats']['start']
-    end = db[label]['meta']['stats']['end']
-    binSize = (end - start) / bins
-    for binNo in range(bins):
-        lowBound = start + binSize * binNo
-        highBound = start + binSize * (binNo + 1)
-        result.append({
-            'low': lowBound,
-            'high': highBound,
-            'count': len(db[label]['rangeIndex'][lowBound:highBound])
-        })
-    return result
+    return db[label]['rangeIndex'].computeHistogram(bins)
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
 

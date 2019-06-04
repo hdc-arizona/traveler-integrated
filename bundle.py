@@ -6,7 +6,6 @@ import shutil
 import shelve
 import pickle
 from datetime import datetime
-from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 from wrangling import common, otf2, phylanx
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
@@ -163,18 +162,9 @@ if __name__ == '__main__':
                     db[label]['events'].sync()
 
                 # Build and save indexes
-                common.log('Indexing ranges')
-                def rangeIterator():
-                    for rangeId, rangeObj in db[label]['ranges'].items():
-                        enter = rangeObj['enter']['Timestamp']
-                        leave = rangeObj['leave']['Timestamp'] + 1
-                        # Need to add one because IntervalTree for zero-length events
-                        # (and because IntervalTree is not inclusive of upper bounds in queries)
-                        yield Interval(enter, leave, rangeId)
-                db[label]['rangeIndex'] = IntervalTree(interval for interval in rangeIterator())
+                db[label]['rangeIndex'] = otf2.indexRanges(db[label]['ranges'])
                 with open(os.path.join(dbDir, 'rangeIndex.pickle'), 'wb') as rangeIndexFile:
                     pickle.dump(db[label]['rangeIndex'], rangeIndexFile)
-                common.log('Finished indexing')
 
             # Handle code
             if 'code' in paths:

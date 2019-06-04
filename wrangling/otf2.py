@@ -1,6 +1,7 @@
 import re
 import subprocess
 from blist import sortedlist #pylint: disable=import-error
+from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 from .common import log, processPrimitive, addPrimitiveChild
 
 eventLineParser = re.compile(r'^(\S+)\s+(\d+)\s+(\d+)\s+(.*)$')
@@ -191,3 +192,31 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids
         log('New links: %d, Observed existing links: %d' % (newL, seenL))
 
     return stats
+
+def indexRanges(ranges):
+    log('Assembling range index (.=2500 ranges)')
+    count = 0
+    def rangeIterator():
+        nonlocal count
+        for rangeId, rangeObj in ranges.items():
+            enter = rangeObj['enter']['Timestamp']
+            leave = rangeObj['leave']['Timestamp'] + 1
+            # Need to add one because IntervalTree for zero-length events
+            # (and because IntervalTree is not inclusive of upper bounds in queries)
+
+            count += 1
+            if count % 2500 == 0:
+                log('.', end='')
+            if count % 100000 == 0:
+                log('indexed %i ranges' % count)
+
+            yield Interval(enter, leave, rangeId)
+    index = IntervalTree(interval for interval in rangeIterator())
+
+    log('')
+    log('Pre-computing binning statistics')
+    index.freeze()
+
+    log('Finished indexing ranges')
+
+    return index
