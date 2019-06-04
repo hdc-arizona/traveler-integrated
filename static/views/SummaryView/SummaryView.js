@@ -11,7 +11,8 @@ class SummaryView extends GoldenLayoutView {
       container,
       state,
       resources: [
-        { type: 'less', url: 'views/SummaryView/style.less' }
+        { type: 'less', url: 'views/SummaryView/style.less' },
+        { type: 'json', url: '/datasets?includeMeta=true' }
       ]
     });
     this.pairwiseMode = null;
@@ -43,15 +44,6 @@ class SummaryView extends GoldenLayoutView {
         'tooltip': meta => meta.hasRanges ? 'Show Gantt + Histogram Views' : 'No bundled OTF2 traces'
       }
     ];
-
-    (async () => {
-      try {
-        this.data = await d3.json('/datasets?includeMeta=true');
-      } catch (err) {
-        this.data = err;
-      }
-      this.render();
-    })();
   }
   get isLoading () {
     return this.data === undefined;
@@ -62,6 +54,8 @@ class SummaryView extends GoldenLayoutView {
   }
   setup () {
     super.setup();
+
+    this.data = this.resources[1];
   }
   draw () {
     super.draw();
@@ -71,7 +65,7 @@ class SummaryView extends GoldenLayoutView {
     } else if (this.data instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else if (Object.keys(this.data).length === 0) {
-      this.emptyStateDiv.html('<p>No data loaded; try:</p><pre>./serve.py --help</pre>');
+      this.emptyStateDiv.html('<p>No bundled data exists; try:</p><pre>./serve.py --help</pre>');
     }
 
     this.drawDatasets();
