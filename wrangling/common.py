@@ -10,7 +10,7 @@ def log(value, end='\n'):
 required_shelves = ['meta', 'primitives', 'primitiveLinks']
 required_pickles = []
 optional_shelves = ['ranges', 'guids', 'events']
-optional_pickles = ['coreTree', 'rangeIndex']
+optional_pickles = ['coreTree', 'rangeIndex', 'code']
 
 def loadDatabase(dbDir):
     db = {}

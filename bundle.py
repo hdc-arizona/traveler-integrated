@@ -95,11 +95,18 @@ if __name__ == '__main__':
 
             # Grab the timestamps from each input file
             sourceFiles = {}
+            timestamp = None
             for arg, path in paths.items():
                 sourceFiles[arg] = {}
                 sourceFiles[arg]['filename'] = os.path.split(path)[1]
-                sourceFiles[arg]['modified'] = datetime.fromtimestamp(os.path.getmtime(path)).isoformat()
+                modtime = os.path.getmtime(path)
+                sourceFiles[arg]['modified'] = datetime.fromtimestamp(modtime).isoformat()
+                if not timestamp:
+                    timestamp = modtime
+                else:
+                    timestamp += modtime
             meta['sourceFiles'] = sourceFiles
+            meta['timestamp'] = datetime.fromtimestamp(timestamp / len(sourceFiles)).isoformat()
 
             # Regardless of what data we're given, we'll want primitives and the debug setting
             db[label]['primitives'] = shelve.open(os.path.join(dbDir, 'primitives.shelf'))
@@ -146,13 +153,15 @@ if __name__ == '__main__':
             # Handle otf2
             if 'otf2' in paths:
                 db[label]['ranges'] = kwargs['ranges'] = shelve.open(os.path.join(dbDir, 'ranges.shelf'))
+                meta['hasRanges'] = True
                 if args['guids']:
                     db[label]['guids'] = kwargs['guids'] = shelve.open(os.path.join(dbDir, 'guids.shelf'))
+                    meta['hasGuids'] = True
                 if args['events']:
                     db[label]['events'] = kwargs['events'] = shelve.open(os.path.join(dbDir, 'events.shelf'))
+                    meta['hasEvents'] = True
                 # Otf2 parsing handles its logging internally
-                stats = otf2.parseOtf2(paths['otf2'], **kwargs)
-                meta['stats'] = stats
+                otf2.parseOtf2(paths['otf2'], **kwargs)
 
                 # Save the extra files
                 db[label]['ranges'].sync()
@@ -168,8 +177,9 @@ if __name__ == '__main__':
 
             # Handle code
             if 'code' in paths:
-                with open(paths['code'], 'r') as file:
-                    meta['code'] = file.read()
+                with open(paths['code'], 'r') as infile, open(os.path.join(dbDir, 'code.pickle'), 'wb') as outfile:
+                    pickle.dump(infile.read(), outfile)
+                    meta['hasCode'] = True
                     common.log('Finished adding code file')
 
             # Save all the data
@@ -177,6 +187,7 @@ if __name__ == '__main__':
             db[label]['primitives'].sync()
             db[label]['primitiveLinks'].sync()
             if coreTree is not None:
+                meta['hasTree'] = True
                 with open(os.path.join(dbDir, 'coreTree.pickle'), 'wb') as coreTreeFile:
                     pickle.dump(coreTree, coreTreeFile)
         except: #pylint: disable=W0702

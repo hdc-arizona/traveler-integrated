@@ -1,4 +1,4 @@
-/* globals d3, GoldenLayout */
+/* globals d3, less, GoldenLayout */
 import StateModel from './models/StateModel.js';
 import Tooltip from './views/Tooltip/Tooltip.js';
 import SummaryView from './views/SummaryView/SummaryView.js';
@@ -52,10 +52,16 @@ class Controller {
       // and call this.handleViewDestruction(component.instance) on each of them
       this.renderAllViews();
     });
-    this.goldenLayout.init();
-    window.setTimeout(() => {
+    window.addEventListener('resize', () => {
       this.renderAllViews();
-    }, 500);
+    });
+    window.addEventListener('load', async () => {
+      // Don't actually initialize GoldenLayout until LESS has finished
+      // (otherwise we can get panes of size zero, especially in firefox)
+      await less.pageLoadFinished;
+      this.goldenLayout.init();
+      this.renderAllViews();
+    });
   }
   handleViewDestruction (view) {
     let viewLabel = view.constructor.name;
@@ -109,17 +115,19 @@ class Controller {
       return !!this.views[viewName];
     }
   }
-  openView (viewName, stateObj = {}) {
-    const viewLabel = this.computeViewLabel(viewName, stateObj);
-    const view = this.views[viewLabel];
-    if (view) {
-      this.raiseView(view);
-    } else {
-      this.goldenLayout.root.contentItems[0].addChild({
-        type: 'component',
-        componentName: viewName,
-        componentState: stateObj
-      });
+  openViews (viewNames, stateObj = {}) {
+    for (const viewName of viewNames) {
+      const viewLabel = this.computeViewLabel(viewName, stateObj);
+      const view = this.views[viewLabel];
+      if (view) {
+        this.raiseView(view);
+      } else {
+        this.goldenLayout.root.contentItems[0].addChild({
+          type: 'component',
+          componentName: viewName,
+          componentState: stateObj
+        });
+      }
     }
   }
 }
