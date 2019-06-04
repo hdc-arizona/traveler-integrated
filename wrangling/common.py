@@ -22,14 +22,20 @@ def loadDatabase(dbDir):
         db[label] = {}
         labelDir = os.path.join(dbDir, label)
         for stype in required_shelves:
+            log('Loading %s %s...' % (label, stype))
             db[label][stype] = shelve.open(os.path.join(labelDir, stype + '.shelf'))
         for stype in required_pickles:
+            log('Loading %s %s...' % (label, stype))
             db[label][stype] = pickle.load(open(os.path.join(labelDir, stype + '.pickle')))
         for stype in optional_shelves:
+            log('Loading %s %s...' % (label, stype))
             spath = os.path.join(labelDir, stype + '.shelf')
             if os.path.exists(spath):
                 db[label][stype] = shelve.open(spath)
         for stype in optional_pickles:
+            log('Loading %s %s...' % (label, stype))
+            if stype == 'rangeIndex':
+                log('(may take a while if %s is large)' % label)
             spath = os.path.join(labelDir, stype + '.pickle')
             if os.path.exists(spath):
                 db[label][stype] = pickle.load(open(spath, 'rb'))
