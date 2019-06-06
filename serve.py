@@ -48,12 +48,12 @@ def primitives(label: str):
     return dict(db[label]['primitives'])
 
 @app.get('/histogram/{label}')
-def histogram(label: str, bins: int = 100):
+def histogram(label: str, bins: int = 100, begin: float = None, end: float = None):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
     if 'rangeIndex' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
-    return db[label]['rangeIndex'].computeHistogram(bins)
+    return db[label]['rangeIndex'].computeHistogram(bins, begin, end)
 
 # TODO: add endpoints for querying ranges, guids, and maybe individual events
 

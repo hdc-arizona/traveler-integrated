@@ -33,6 +33,14 @@ A simple example bundling the full phylanx output and an OTF2 trace:
   --label "2019-01-30 ALS Test Run"
 ```
 
+Bunding just an OTF2 trace, as well as a source code file:
+```bash
+./bundle.py \
+  --otf2 data/fibonacci-04Apr2018/OTF2_archive/APEX.otf2 \
+  --code data/fibonacci-04Apr2018/fibonacci.py \
+  --label "2019-04-04 Fibonacci"
+```
+
 Loading many files at once (using a regular expression to match globbed paths):
 ```bash
 ./bundle.py \

@@ -18,13 +18,13 @@ class SummaryView extends GoldenLayoutView {
     this.pairwiseMode = null;
     this.viewButtons = [
       {
-        'views': 'TreeView',
+        'views': ['Tree'],
         'icon': 'img/tree.svg',
         'enabled': meta => meta.hasTree && this.pairwiseMode === null,
         'tooltip': meta => meta.hasTree ? 'Show Tree View' : 'No bundled tree data'
       },
       {
-        'views': 'TreeComparisonView',
+        'views': ['TreeComparison'],
         'icon': 'img/compareTrees.svg',
         'enabled': meta => meta.hasTree && (this.pairwiseMode === null ||
           (this.pairwiseMode.type === 'TreeComparisonView' && this.pairwiseMode.metadata !== meta)),
@@ -32,16 +32,16 @@ class SummaryView extends GoldenLayoutView {
         'tooltip': meta => meta.hasTree ? 'Compare Trees' : 'No bundled tree data'
       },
       {
-        'views': 'CodeView',
+        'views': ['Code'],
         'icon': 'img/code.svg',
         'enabled': meta => meta.hasCode && this.pairwiseMode === null,
         'tooltip': meta => meta.hasCode ? 'Show Code View' : 'No bundled code file'
       },
       {
-        'views': ['GanttView', 'HistogramView'],
+        'views': ['Gantt', 'Utilization'],
         'icon': 'img/gantt.svg',
         'enabled': meta => meta.hasRanges && this.pairwiseMode === null,
-        'tooltip': meta => meta.hasRanges ? 'Show Gantt + Histogram Views' : 'No bundled OTF2 traces'
+        'tooltip': meta => meta.hasRanges ? 'Show Gantt + Utilization Views' : 'No bundled OTF2 traces'
       }
     ];
   }

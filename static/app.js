@@ -6,7 +6,7 @@ import TreeView from './views/TreeView/TreeView.js';
 import TreeComparisonView from './views/TreeComparisonView/TreeComparisonView.js';
 import CodeView from './views/CodeView/CodeView.js';
 import GanttView from './views/GanttView/GanttView.js';
-import HistogramView from './views/HistogramView/HistogramView.js';
+import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import defaultLayout from './config/defaultLayout.js';
 
 class Controller {
@@ -23,7 +23,7 @@ class Controller {
       TreeComparisonView,
       CodeView,
       GanttView,
-      HistogramView
+      UtilizationView
     };
     window.views = this.views = {};
     this.visibleViewTypes = {};
@@ -124,7 +124,7 @@ class Controller {
       } else {
         this.goldenLayout.root.contentItems[0].addChild({
           type: 'component',
-          componentName: viewName,
+          componentName: viewName + 'View',
           componentState: stateObj
         });
       }
