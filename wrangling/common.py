@@ -30,7 +30,7 @@ def loadDatabase(dbDir):
         for stype in optional_shelves:
             log('Loading %s %s...' % (label, stype))
             spath = os.path.join(labelDir, stype + '.shelf')
-            if os.path.exists(spath):
+            if os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames
                 db[label][stype] = shelve.open(spath)
         for stype in optional_pickles:
             log('Loading %s %s...' % (label, stype))

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, HTTPException #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
-from starlette.responses import RedirectResponse #pylint: disable=import-error
+from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
 from wrangling import common
 
 parser = argparse.ArgumentParser(description='Serve data bundled by bundle.py')
@@ -55,7 +56,17 @@ def histogram(label: str, bins: int = 100, begin: float = None, end: float = Non
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
     return db[label]['rangeIndex'].computeHistogram(bins, begin, end)
 
-# TODO: add endpoints for querying ranges, guids, and maybe individual events
+@app.get('/ranges/{label}')
+def ranges(label: str, begin: float = None, end: float = None):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
+    if 'rangeIndex' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
+
+    async def rangeGenerator():
+        for r in db[label]['rangeIndex'][begin:end]:
+            yield json.dumps(db[label]['ranges'][r.data])
+    return StreamingResponse(rangeGenerator(), media_type='application/json')
 
 if __name__ == '__main__':
     uvicorn.run(app)
