@@ -63,6 +63,12 @@ def ranges(label: str, begin: float = None, end: float = None):
     if 'rangeIndex' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
 
+    db[label]['rangeIndex'].freeze() # TODO: not sure why this isn't getting pickled in the bundle stage...
+    if begin is None:
+        begin = db[label]['rangeIndex'].top_node.stats['begin']
+    if end is None:
+        end = db[label]['rangeIndex'].top_node.stats['end']
+
     async def rangeGenerator():
         for r in db[label]['rangeIndex'][begin:end]:
             yield json.dumps(db[label]['ranges'][r.data])
