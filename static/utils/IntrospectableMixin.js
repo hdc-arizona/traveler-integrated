@@ -1,9 +1,5 @@
 const IntrospectableMixin = function (superclass) {
   const Introspectable = class extends superclass {
-    constructor () {
-      super(...arguments);
-      this._instanceOfIntrospectableMixin = true;
-    }
     get type () {
       return this.constructor.type;
     }
@@ -32,6 +28,7 @@ const IntrospectableMixin = function (superclass) {
       return this.type.replace(/([a-z])([A-Z])/g, '$1 $2');
     }
   });
+  Introspectable.prototype._instanceOfIntrospectableMixin = true;
   return Introspectable;
 };
 Object.defineProperty(IntrospectableMixin, Symbol.hasInstance, {

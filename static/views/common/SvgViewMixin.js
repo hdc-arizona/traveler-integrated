@@ -1,9 +1,5 @@
 const SvgViewMixin = function (superclass) {
   const SvgView = class extends superclass {
-    constructor () {
-      super(...arguments);
-      this._instanceOfSvgViewMixin = true;
-    }
     setupContentElement () {
       return this.d3el.append('svg');
     }
@@ -14,6 +10,7 @@ const SvgViewMixin = function (superclass) {
       return bounds;
     }
   };
+  SvgView.prototype._instanceOfSvgViewMixin = true;
   return SvgView;
 };
 Object.defineProperty(SvgViewMixin, Symbol.hasInstance, {

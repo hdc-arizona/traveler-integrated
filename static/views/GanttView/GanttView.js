@@ -22,7 +22,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     }, 100);
   }
   get isLoading () {
-    // TODO
+    return true;
   }
   get isEmpty () {
     // TODO
@@ -38,5 +38,4 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     // TODO
   }
 }
-window.GanttView = GanttView;
 export default GanttView;
