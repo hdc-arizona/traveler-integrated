@@ -1,7 +1,7 @@
 /* globals d3, less, GoldenLayout */
-import StateModel from './models/StateModel.js';
 import Tooltip from './views/Tooltip/Tooltip.js';
 import SummaryView from './views/SummaryView/SummaryView.js';
+import SingleLinkedState from './models/SingleLinkedState.js';
 import TreeView from './views/TreeView/TreeView.js';
 import TreeComparisonView from './views/TreeComparisonView/TreeComparisonView.js';
 import CodeView from './views/CodeView/CodeView.js';
@@ -9,50 +9,66 @@ import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import defaultLayout from './config/defaultLayout.js';
 
+const viewClassLookup = {
+  SummaryView,
+  TreeView,
+  TreeComparisonView,
+  CodeView,
+  GanttView,
+  UtilizationView
+};
+
 class Controller {
   constructor () {
-    this.state = window.state = new StateModel();
     this.tooltip = window.tooltip = new Tooltip();
+    (async () => {
+      this.datasets = await d3.json('/datasets?includeMeta=true');
+    })();
     this.setupLayout();
   }
   setupLayout () {
     this.goldenLayout = new GoldenLayout(defaultLayout, d3.select('#layoutRoot').node());
-    const viewClassLookup = {
-      SummaryView,
-      TreeView,
-      TreeComparisonView,
-      CodeView,
-      GanttView,
-      UtilizationView
-    };
-    window.views = this.views = {};
-    this.visibleViewTypes = {};
+    this.views = {};
     for (const [className, ViewClass] of Object.entries(viewClassLookup)) {
       const self = this;
       this.goldenLayout.registerComponent(className, function (container, state) {
-        let viewLabel = className;
-        if (state.label) {
-          viewLabel += '_' + state.label;
-          self.visibleViewTypes[viewLabel] = (self.visibleViewTypes[viewLabel] || 0) + 1;
-          if (state.comparisonLabel) {
-            viewLabel += '_' + state.comparisonLabel;
-            const temp = className + '_' + state.comparisonLabel;
-            self.visibleViewTypes[temp] = (self.visibleViewTypes[temp] || 0) + 1;
-          }
+        if (className === 'SummaryView') {
+          // There's no dataset / linked state associated with the SummaryView
+          const view = new ViewClass({ container, state });
+          self.summaryView = view;
+          return view;
         }
-        self.views[viewLabel] = new ViewClass({ container, state });
-        return self.views[viewLabel];
+
+        // Get a linkedState object from an existing view that this new one
+        // should communicate, or create it if it doesn't exist
+        let linkedState = (self.views[state.label] && self.views[state.label][0].linkedState) ||
+            new SingleLinkedState(state.label, self.datasets[state.label]);
+        // Create the view
+        const view = new ViewClass({ container, state, linkedState });
+        // Store the view
+        self.views[state.label] = self.views[state.label] || [];
+        self.views[state.label].push(view);
+        return view;
       });
     }
     this.goldenLayout.on('windowOpened', () => {
       // TODO: deal with popouts
     });
     this.goldenLayout.on('itemDestroyed', component => {
-      // TODO: iterate over component and/or its children for .instance to not be undefined,
-      // and call this.handleViewDestruction(component.instance) on each of them
+      const recurse = (component) => {
+        if (component.instance) {
+          this.handleViewDestruction(component.instance);
+        } else if (component.contentItems) {
+          for (const childComponent of component.contentItems) {
+            recurse(childComponent);
+          }
+        }
+      };
+      recurse(component);
       this.renderAllViews();
     });
     window.addEventListener('resize', () => {
+      this.goldenLayout.updateSize();
       this.renderAllViews();
     });
     window.addEventListener('load', async () => {
@@ -64,38 +80,22 @@ class Controller {
     });
   }
   handleViewDestruction (view) {
-    let viewLabel = view.constructor.name;
-    if (view.layoutState.label) {
-      viewLabel += '_' + view.layoutState.label;
-      this.visibleViewTypes[viewLabel] -= 1;
-      if (this.visibleViewTypes[viewLabel] === 0) {
-        delete this.visibleViewTypes[viewLabel];
-      }
-      if (view.layoutState.comparisonLabel) {
-        viewLabel += '_' + view.layoutState.comparisonLabel;
-        delete this.views[viewLabel];
-        const temp = view.constructor.name + '_' + view.layoutState.comparisonLabel;
-        this.visibleViewTypes[temp] -= 1;
-        if (this.visibleViewTypes[temp] === 0) {
-          delete this.visibleViewTypes[temp];
-        }
-      }
+    // Free up stuff in our lookups for garbage collection when views are closed
+    const label = view.layoutState.label;
+    this.views[label].splice(this.views[label].indexOf(view), 1);
+    if (this.views[label].length === 0) {
+      delete this.views[label];
     }
   }
   renderAllViews () {
-    for (const view of Object.values(this.views)) {
-      view.render();
+    if (this.summaryView) {
+      this.summaryView.render();
     }
-  }
-  computeViewLabel (className, stateObj) {
-    let viewLabel = className;
-    if (stateObj.label) {
-      viewLabel += '_' + stateObj.label;
+    for (const viewList of Object.values(this.views)) {
+      for (const view of viewList) {
+        view.render();
+      }
     }
-    if (stateObj.comparisonLabel) {
-      viewLabel += '_' + stateObj.comparisonLabel;
-    }
-    return viewLabel;
   }
   raiseView (view) {
     let child = view.container;
@@ -108,23 +108,24 @@ class Controller {
       parent.setActiveContentItem(child);
     }
   }
-  viewTypeIsVisible (viewName, stateObj = {}) {
-    if (stateObj.label) {
-      return !!this.visibleViewTypes[viewName + '_' + stateObj.label];
+  getView (className, label) {
+    if (className === 'SummaryView') {
+      return this.summaryView;
     } else {
-      return !!this.views[viewName];
+      return this.views[label] &&
+        this.views[label].find(view => view.constructor.name === className);
     }
   }
-  openViews (viewNames, stateObj = {}) {
+  openViews (viewNames, stateObj) {
     for (const viewName of viewNames) {
-      const viewLabel = this.computeViewLabel(viewName, stateObj);
-      const view = this.views[viewLabel];
+      const view = this.getView(viewName, stateObj.label);
       if (view) {
         this.raiseView(view);
       } else {
+        // TODO: try to position new views intelligently
         this.goldenLayout.root.contentItems[0].addChild({
           type: 'component',
-          componentName: viewName + 'View',
+          componentName: viewName,
           componentState: stateObj
         });
       }

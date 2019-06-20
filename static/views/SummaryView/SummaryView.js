@@ -3,28 +3,21 @@ import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
 
 class SummaryView extends GoldenLayoutView {
-  constructor ({
-    container,
-    state
-  }) {
-    super({
-      container,
-      state,
-      resources: [
-        { type: 'less', url: 'views/SummaryView/style.less' },
-        { type: 'json', url: '/datasets?includeMeta=true' }
-      ]
-    });
+  constructor (argObj) {
+    argObj.resources = [
+      { type: 'less', url: 'views/SummaryView/style.less' }
+    ];
+    super(argObj);
     this.pairwiseMode = null;
     this.viewButtons = [
       {
-        'views': ['Tree'],
+        'views': ['TreeView'],
         'icon': 'img/tree.svg',
         'enabled': meta => meta.hasTree && this.pairwiseMode === null,
         'tooltip': meta => meta.hasTree ? 'Show Tree View' : 'No bundled tree data'
       },
       {
-        'views': ['TreeComparison'],
+        'views': ['TreeComparisonView'],
         'icon': 'img/compareTrees.svg',
         'enabled': meta => meta.hasTree && (this.pairwiseMode === null ||
           (this.pairwiseMode.type === 'TreeComparisonView' && this.pairwiseMode.metadata !== meta)),
@@ -32,46 +25,42 @@ class SummaryView extends GoldenLayoutView {
         'tooltip': meta => meta.hasTree ? 'Compare Trees' : 'No bundled tree data'
       },
       {
-        'views': ['Code'],
+        'views': ['CodeView'],
         'icon': 'img/code.svg',
         'enabled': meta => meta.hasCode && this.pairwiseMode === null,
         'tooltip': meta => meta.hasCode ? 'Show Code View' : 'No bundled code file'
       },
       {
-        'views': ['Gantt', 'Utilization'],
+        'views': ['GanttView', 'UtilizationView'],
         'icon': 'img/gantt.svg',
-        'enabled': meta => meta.hasRanges && this.pairwiseMode === null,
-        'tooltip': meta => meta.hasRanges ? 'Show Gantt + Utilization Views' : 'No bundled OTF2 traces'
+        'enabled': meta => meta.hasIntervals && this.pairwiseMode === null,
+        'tooltip': meta => meta.hasIntervals ? 'Show Gantt + Utilization Views' : 'No bundled OTF2 traces'
       }
     ];
   }
   get isLoading () {
-    return this.data === undefined;
+    return window.controller.datasets === undefined;
   }
   get isEmpty () {
-    return this.data !== undefined &&
-      (this.data instanceof Error || Object.keys(this.data).length === 0);
-  }
-  setup () {
-    super.setup();
-
-    this.data = this.resources[1];
+    return window.controller.datasets !== undefined &&
+      (window.controller.datasets instanceof Error ||
+       Object.keys(window.controller.datasets).length === 0);
   }
   draw () {
     super.draw();
 
-    if (this.data === undefined) {
+    if (window.controller.datasets === undefined) {
       return;
-    } else if (this.data instanceof Error) {
+    } else if (window.controller.datasets instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
-    } else if (Object.keys(this.data).length === 0) {
+    } else if (Object.keys(window.controller.datasets).length === 0) {
       this.emptyStateDiv.html('<p>No bundled data exists; try:</p><pre>./serve.py --help</pre>');
     }
 
     this.drawDatasets();
   }
   drawDatasets () {
-    const sortedDatasets = Object.values(this.data).sort((a, b) => {
+    const sortedDatasets = Object.values(window.controller.datasets).sort((a, b) => {
       return Date(a.timestamp) - Date(b.timestamp);
     });
 
@@ -160,7 +149,7 @@ class SummaryView extends GoldenLayoutView {
     viewButtonsEnter.append('a').append('img');
     viewButtons.select('img').attr('src', d => d.button.icon);
 
-    viewButtons.classed('selected', d => window.controller.viewTypeIsVisible(d.button.view, { label: d.metadata.label }));
+    viewButtons.classed('selected', d => d.button.views.every(className => window.controller.getView(d.metadata.label, className)));
     viewButtons.classed('disabled', d => !d.button.enabled(d.metadata));
 
     viewButtons
@@ -181,15 +170,20 @@ class SummaryView extends GoldenLayoutView {
               };
               this.render();
             } else {
+              throw new Error('unimplemented');
+              /*
               window.controller.openViews(d.button.views, {
                 label: this.pairwiseMode.metadata.label,
                 comparisonLabel: d.metadata.label
               });
               this.pairwiseMode = null;
               this.render();
+              */
             }
           } else {
-            window.controller.openViews(d.button.views, { label: d.metadata.label });
+            window.controller.openViews(d.button.views, {
+              label: d.metadata.label
+            });
           }
         }
       });

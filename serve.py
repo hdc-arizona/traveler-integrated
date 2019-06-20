@@ -9,7 +9,7 @@ from wrangling import common
 
 parser = argparse.ArgumentParser(description='Serve data bundled by bundle.py')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
-                    help='Directory where the bundled data is stored (default: /tmp/traveler-integrated')
+                    help='Directory where the bundled data is stored (default: /tmp/traveler-integrated)')
 
 args = parser.parse_args()
 db = common.loadDatabase(args.dbDir)
@@ -34,7 +34,7 @@ def datasets(includeMeta: bool = False):
             result[label] = {}
     return result
 
-@app.get('/tree/{label}')
+@app.get('/datasets/{label}/tree')
 def tree(label: str):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
@@ -42,37 +42,37 @@ def tree(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not contain tree data')
     return db[label]['coreTree']
 
-@app.get('/primitives/{label}')
+@app.get('/datasets/{label}/primitives')
 def primitives(label: str):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
     return dict(db[label]['primitives'])
 
-@app.get('/histogram/{label}')
+@app.get('/datasets/{label}/histogram')
 def histogram(label: str, bins: int = 100, begin: float = None, end: float = None):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'rangeIndex' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
-    return db[label]['rangeIndex'].computeHistogram(bins, begin, end)
+    if 'intervalIndex' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
+    return db[label]['intervalIndex'].computeHistogram(bins, begin, end)
 
-@app.get('/ranges/{label}')
-def ranges(label: str, begin: float = None, end: float = None):
+@app.get('/datasets/{label}/intervals')
+def intervals(label: str, begin: float = None, end: float = None):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'rangeIndex' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain indexed range data')
+    if 'intervalIndex' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
-    db[label]['rangeIndex'].freeze() # TODO: not sure why this isn't getting pickled in the bundle stage...
+    db[label]['intervalIndex'].freeze() # TODO: not sure why this isn't getting pickled in the bundle stage...
     if begin is None:
-        begin = db[label]['rangeIndex'].top_node.stats['begin']
+        begin = db[label]['intervalIndex'].top_node.stats['begin']
     if end is None:
-        end = db[label]['rangeIndex'].top_node.stats['end']
+        end = db[label]['intervalIndex'].top_node.stats['end']
 
-    async def rangeGenerator():
-        for r in db[label]['rangeIndex'][begin:end]:
-            yield json.dumps(db[label]['ranges'][r.data])
-    return StreamingResponse(rangeGenerator(), media_type='application/json')
+    async def intervalGenerator():
+        for r in db[label]['intervalIndex'][begin:end]:
+            yield json.dumps(db[label]['intervals'][r.data])
+    return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 if __name__ == '__main__':
     uvicorn.run(app)

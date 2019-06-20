@@ -19,7 +19,7 @@ addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 numEvents = 0
 locations = {}
 
-def _processEvent(event, primitives=None, ranges=None, guids=None, events=None, debug=False):
+def _processEvent(event, primitives=None, intervals=None, guids=None, events=None, debug=False):
     global numEvents
 
     eventId = str(numEvents)
@@ -59,8 +59,8 @@ def _processEvent(event, primitives=None, ranges=None, guids=None, events=None, 
 
         primitives[primitiveName] = primitive
 
-    # If we're computing ranges, add enter / leave events to per-location lists
-    if ranges is not None and (event['Event'] == 'ENTER' or event['Event'] == 'LEAVE'):
+    # If we're computing intervals, add enter / leave events to per-location lists
+    if intervals is not None and (event['Event'] == 'ENTER' or event['Event'] == 'LEAVE'):
         if not event['Location'] in locations:
             # TODO: use BPlusTree instead of blist?
             locations[event['Location']] = sortedlist(key=lambda i: i[0])
@@ -79,7 +79,7 @@ def _processEvent(event, primitives=None, ranges=None, guids=None, events=None, 
 
     return (newR, seenR, newG, seenG)
 
-def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids=None, events=None, debug=False):
+def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, guids=None, events=None, debug=False):
     log('Parsing events (.=2500 events)')
     newR = seenR = newG = seenG = 0
     currentEvent = None
@@ -95,7 +95,7 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids
         if eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
             if currentEvent is not None:
-                counts = _processEvent(currentEvent, primitives, ranges, guids, events, debug)
+                counts = _processEvent(currentEvent, primitives, intervals, guids, events, debug)
                 newR += counts[0]
                 seenR += counts[0]
                 newG += counts[0]
@@ -117,7 +117,7 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
     # The last event will never have had a chance to be processed:
     if currentEvent is not None:
-        counts = _processEvent(currentEvent, primitives, ranges, guids, events, debug)
+        counts = _processEvent(currentEvent, primitives, intervals, guids, events, debug)
         newR += counts[0]
         seenR += counts[0]
         newG += counts[0]
@@ -127,44 +127,44 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids
     log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
     log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
 
-    # Combine the sorted enter / leave events into ranges
-    if ranges is not None:
-        log('Combining enter / leave events into ranges (.=2500 ranges)')
-        numRanges = 0
+    # Combine the sorted enter / leave events into intervals
+    if intervals is not None:
+        log('Combining enter / leave events into intervals (.=2500 intervals)')
+        numIntervals = 0
         for eventList in locations.values():
             lastEvent = None
             for _, event in eventList:
                 assert event is not None
                 if event['Event'] == 'ENTER':
-                    # Start a range (don't output anything)
+                    # Start a interval (don't output anything)
                     assert lastEvent is None
                     lastEvent = event
                 elif event['Event'] == 'LEAVE':
-                    # Finish a range
+                    # Finish a interval
                     assert lastEvent is not None
-                    rangeId = str(numRanges)
-                    currentRange = {'enter': {}, 'leave': {}}
+                    intervalId = str(numIntervals)
+                    currentInterval = {'enter': {}, 'leave': {}}
                     for attr, value in event.items():
                         if attr != 'Timestamp' and value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
-                            currentRange[attr] = value
+                            currentInterval[attr] = value
                         else:
-                            currentRange['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
-                            currentRange['leave'][attr] = value
-                    ranges[rangeId] = currentRange
+                            currentInterval['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
+                            currentInterval['leave'][attr] = value
+                    intervals[intervalId] = currentInterval
 
-                    # Log that we've finished the finished range
-                    numRanges += 1
-                    if numRanges % 2500 == 0:
+                    # Log that we've finished the finished interval
+                    numIntervals += 1
+                    if numIntervals % 2500 == 0:
                         log('.', end='')
-                    if numRanges % 100000 == 0:
-                        log('processed %i ranges' % numRanges)
+                    if numIntervals % 100000 == 0:
+                        log('processed %i intervals' % numIntervals)
                     lastEvent = None
             # Make sure there are no trailing ENTER events
             # TODO: fibonacci data violates this... why?
             # assert lastEvent is None
-        # Finish the ranges dict
+        # Finish the intervals dict
         log('')
-        log('Finished processing %i ranges' % numRanges)
+        log('Finished processing %i intervals' % numIntervals)
 
     # Create any missing parent-child primitive relationships based on the GUIDs we've collected
     if guids is not None:
@@ -188,30 +188,30 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, ranges=None, guids
         log('Finished scanning GUIDs')
         log('New links: %d, Observed existing links: %d' % (newL, seenL))
 
-def indexRanges(ranges):
-    log('Assembling range index (.=2500 ranges)')
+def indexIntervals(intervals):
+    log('Assembling interval index (.=2500 intervals)')
     count = 0
-    def rangeIterator():
+    def intervalIterator():
         nonlocal count
-        for rangeId, rangeObj in ranges.items():
-            enter = rangeObj['enter']['Timestamp']
-            leave = rangeObj['leave']['Timestamp'] + 1
-            # Need to add one because IntervalTree for zero-length events
+        for intervalId, intervalObj in intervals.items():
+            enter = intervalObj['enter']['Timestamp']
+            leave = intervalObj['leave']['Timestamp'] + 1
+            # Need to add one because IntervalTree can't handle zero-length intervals
             # (and because IntervalTree is not inclusive of upper bounds in queries)
 
             count += 1
             if count % 2500 == 0:
                 log('.', end='')
             if count % 100000 == 0:
-                log('indexed %i ranges' % count)
+                log('indexed %i intervals' % count)
 
-            yield Interval(enter, leave, rangeId)
-    index = IntervalTree(interval for interval in rangeIterator())
+            yield Interval(enter, leave, intervalId)
+    index = IntervalTree(interval for interval in intervalIterator())
 
     log('')
     log('Pre-computing binning statistics')
     index.freeze()
 
-    log('Finished indexing ranges')
+    log('Finished indexing intervals')
 
     return index

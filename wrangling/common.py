@@ -9,8 +9,8 @@ def log(value, end='\n'):
 
 required_shelves = ['meta', 'primitives', 'primitiveLinks']
 required_pickles = []
-optional_shelves = ['ranges', 'guids', 'events']
-optional_pickles = ['coreTree', 'rangeIndex', 'code']
+optional_shelves = ['intervals', 'guids', 'events']
+optional_pickles = ['coreTree', 'intervalIndex', 'code']
 
 def loadDatabase(dbDir):
     db = {}
@@ -34,7 +34,7 @@ def loadDatabase(dbDir):
                 db[label][stype] = shelve.open(spath)
         for stype in optional_pickles:
             log('Loading %s %s...' % (label, stype))
-            if stype == 'rangeIndex':
+            if stype == 'intervalIndex':
                 log('(may take a while if %s is large)' % label)
             spath = os.path.join(labelDir, stype + '.pickle')
             if os.path.exists(spath):

@@ -1,29 +1,21 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
+import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
 
-class TreeView extends SvgViewMixin(GoldenLayoutView) {
-  constructor ({
-    container,
-    state
-  }) {
-    super({
-      container,
-      state,
-      resources: [
-        { type: 'less', url: 'views/TreeView/style.less' },
-        { type: 'text', url: 'views/TreeView/shapeKey.html' }
-      ]
-    });
+class TreeView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
+  constructor (argObj) {
+    argObj.resources = [
+      { type: 'less', url: 'views/TreeView/style.less' },
+      { type: 'text', url: 'views/TreeView/shapeKey.html' }
+    ];
+    super(argObj);
 
     (async () => {
       try {
-        [this.tree, this.regions] = await Promise.all([
-          d3.json(`/tree/${state.label}`),
-          d3.json(`/regions/${state.label}`)
-        ]);
+        this.tree = await d3.json(`/datasets/${encodeURIComponent(argObj.state.label)}/tree`);
       } catch (err) {
-        this.tree = this.regions = err;
+        this.tree = err;
       }
       this.render();
     })();
@@ -44,7 +36,7 @@ class TreeView extends SvgViewMixin(GoldenLayoutView) {
     } else if (this.tree instanceof Error || this.regions instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     }
-    console.log(this.tree, this.regions);
+    console.log(this.tree);
   }
 }
 export default TreeView;

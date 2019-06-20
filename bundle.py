@@ -30,7 +30,7 @@ parser.add_argument('-s', '--debug', dest='debug', action='store_true',
 parser.add_argument('-u', '--guids', dest='guids', action='store_true',
                     help='Collect GUIDs')
 parser.add_argument('-e', '--events', dest='events', action='store_true',
-                    help='Collect all events, not just ranges')
+                    help='Collect all events, not just intervals')
 
 if __name__ == '__main__':
     args = vars(parser.parse_args())
@@ -152,8 +152,8 @@ if __name__ == '__main__':
 
             # Handle otf2
             if 'otf2' in paths:
-                db[label]['ranges'] = kwargs['ranges'] = shelve.open(os.path.join(dbDir, 'ranges.shelf'))
-                meta['hasRanges'] = True
+                db[label]['intervals'] = kwargs['intervals'] = shelve.open(os.path.join(dbDir, 'intervals.shelf'))
+                meta['hasIntervals'] = True
                 if args['guids']:
                     db[label]['guids'] = kwargs['guids'] = shelve.open(os.path.join(dbDir, 'guids.shelf'))
                     meta['hasGuids'] = True
@@ -163,17 +163,21 @@ if __name__ == '__main__':
                 # Otf2 parsing handles its logging internally
                 otf2.parseOtf2(paths['otf2'], **kwargs)
 
+                # Build and save indexes
+                db[label]['intervalIndex'] = otf2.indexIntervals(db[label]['intervals'])
+                with open(os.path.join(dbDir, 'intervalIndex.pickle'), 'wb') as intervalIndexFile:
+                    pickle.dump(db[label]['intervalIndex'], intervalIndexFile)
+                meta['intervalDomain'] = [
+                    db[label]['intervalIndex'].top_node.stats['begin'],
+                    db[label]['intervalIndex'].top_node.stats['end']
+                ]
+
                 # Save the extra files
-                db[label]['ranges'].sync()
+                db[label]['intervals'].sync()
                 if args['guids']:
                     db[label]['guids'].sync()
                 if args['events']:
                     db[label]['events'].sync()
-
-                # Build and save indexes
-                db[label]['rangeIndex'] = otf2.indexRanges(db[label]['ranges'])
-                with open(os.path.join(dbDir, 'rangeIndex.pickle'), 'wb') as rangeIndexFile:
-                    pickle.dump(db[label]['rangeIndex'], rangeIndexFile)
 
             # Handle code
             if 'code' in paths:
@@ -183,13 +187,13 @@ if __name__ == '__main__':
                     common.log('Finished adding code file')
 
             # Save all the data
-            meta.sync()
             db[label]['primitives'].sync()
             db[label]['primitiveLinks'].sync()
             if coreTree is not None:
                 meta['hasTree'] = True
                 with open(os.path.join(dbDir, 'coreTree.pickle'), 'wb') as coreTreeFile:
                     pickle.dump(coreTree, coreTreeFile)
+            meta.sync()
         except: #pylint: disable=W0702
             common.log('Error encountered; purging corrupted data for: %s' % label)
             if os.path.exists(dbDir):

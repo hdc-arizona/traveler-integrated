@@ -1,19 +1,14 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
+import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
 
-class UtilizationView extends SvgViewMixin(GoldenLayoutView) {
-  constructor ({
-    container,
-    state
-  }) {
-    super({
-      container,
-      state,
-      resources: [
-        { type: 'less', url: 'views/UtilizationView/style.less' }
-      ]
-    });
+class UtilizationView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
+  constructor (argObj) {
+    argObj.resources = [
+      { type: 'less', url: 'views/UtilizationView/style.less' }
+    ];
+    super(argObj);
 
     this.margin = {
       top: 20,
@@ -30,7 +25,7 @@ class UtilizationView extends SvgViewMixin(GoldenLayoutView) {
       this.bins = undefined;
       this.render();
       try {
-        this.bins = await d3.json(`/histogram/${encodeURIComponent(this.layoutState.label)}?bins=${Math.floor(bounds.width)}`);
+        this.bins = await d3.json(`/datasets/${encodeURIComponent(this.layoutState.label)}/histogram?bins=${Math.floor(bounds.width)}`);
       } catch (e) {
         this.bins = e;
         return;
@@ -55,7 +50,7 @@ class UtilizationView extends SvgViewMixin(GoldenLayoutView) {
     }, 100);
   }
   get isLoading () {
-    return this.bins === undefined;
+    return super.isLoading || this.bins === undefined;
   }
   get isEmpty () {
     return this.bins !== undefined && this.bins instanceof Error;
@@ -83,8 +78,6 @@ class UtilizationView extends SvgViewMixin(GoldenLayoutView) {
       .classed('axis', true);
     mini.append('g')
       .classed('overviewBar', true);
-    mini.append('g')
-      .classed('brush', true);
 
     this.container.on('resize', () => {
       // Grab new data whenever the view is resized
