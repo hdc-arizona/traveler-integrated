@@ -70,8 +70,14 @@ def intervals(label: str, begin: float = None, end: float = None):
         end = db[label]['intervalIndex'].top_node.stats['end']
 
     async def intervalGenerator():
+        yield '['
+        firstItem = True
         for r in db[label]['intervalIndex'][begin:end]:
+            if not firstItem:
+                yield ','
             yield json.dumps(db[label]['intervals'][r.data])
+            firstItem = False
+        yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 if __name__ == '__main__':

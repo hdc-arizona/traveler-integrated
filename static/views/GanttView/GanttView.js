@@ -10,8 +10,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     ];
     super(argObj);
 
-    this.oldData = {};
-    this.newData = {};
+    this.stream = null;
   }
   getData () {
     // Debounce...
@@ -19,13 +18,25 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     this._resizeTimeout = window.setTimeout(() => {
       const label = encodeURIComponent(this.layoutState.label);
       const intervalWindow = this.linkedState.intervalWindow;
-      oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
-        .node('!', chunk => { console.log(chunk); });
+      const self = this;
+      const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+        .node('!.*', function (chunk) {
+          if (currentStream !== self.stream) {
+            // A different stream has been started; abort this one
+            this.abort();
+          } else {
+            console.log(chunk);
+          }
+        })
+        .done(() => {
+          this.streaming = null;
+          this.render();
+        });
       this.render();
     }, 100);
   }
   get isLoading () {
-    return super.isLoading;
+    return super.isLoading || this.stream !== null;
   }
   get isEmpty () {
     return false;
