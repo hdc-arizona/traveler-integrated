@@ -1,4 +1,4 @@
-/* globals d3 */
+/* globals oboe */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
@@ -10,27 +10,31 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     ];
     super(argObj);
 
-    this.cache = [];
+    this.oldData = {};
+    this.newData = {};
   }
   getData () {
     // Debounce...
     window.clearTimeout(this._resizeTimeout);
-    this._resizeTimeout = window.setTimeout(async () => {
-      // TODO: get streamed results
-
+    this._resizeTimeout = window.setTimeout(() => {
+      const label = encodeURIComponent(this.layoutState.label);
+      const intervalWindow = this.linkedState.intervalWindow;
+      oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+        .node('!', chunk => { console.log(chunk); });
       this.render();
     }, 100);
   }
   get isLoading () {
-    return true;
+    return super.isLoading;
   }
   get isEmpty () {
-    // TODO
+    return false;
   }
   setup () {
     super.setup();
 
-    // TODO
+    this.linkedState.on('newInterval', () => { this.getData(); });
+    this.getData();
   }
   draw () {
     super.draw();

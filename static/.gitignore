@@ -18,6 +18,12 @@ node_modules/d3/*
 node_modules/d3/dist/*
 !node_modules/d3/dist/d3.min.js
 
+!node_modules/oboe/
+node_modules/oboe/*
+!node_modules/oboe/dist/
+node_modules/oboe/dist/*
+!node_modules/oboe/dist/oboe-browser.min.js
+
 !node_modules/jquery/
 node_modules/jquery/*
 !node_modules/jquery/dist/
