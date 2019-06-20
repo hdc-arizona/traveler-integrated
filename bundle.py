@@ -161,7 +161,7 @@ if __name__ == '__main__':
                     db[label]['events'] = kwargs['events'] = shelve.open(os.path.join(dbDir, 'events.shelf'))
                     meta['hasEvents'] = True
                 # Otf2 parsing handles its logging internally
-                otf2.parseOtf2(paths['otf2'], **kwargs)
+                meta['locationNames'] = otf2.parseOtf2(paths['otf2'], **kwargs)
 
                 # Build and save indexes
                 db[label]['intervalIndex'] = otf2.indexIntervals(db[label]['intervals'])

@@ -188,6 +188,8 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
         log('Finished scanning GUIDs')
         log('New links: %d, Observed existing links: %d' % (newL, seenL))
 
+    return list(locations.keys())
+
 def indexIntervals(intervals):
     log('Assembling interval index (.=2500 intervals)')
     count = 0
