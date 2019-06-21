@@ -32,7 +32,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
             this.abort();
           } else {
             // Store the interval
-            self.newCache.add(new Map(chunk));
+            self.newCache = self.newCache.add(new Map(chunk));
             if (self.newCache.size % 2) {
               // Do an incremental render() every 2 intervals
               self.render();
@@ -90,7 +90,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
       this.emptyStateDiv.html('<p>No data to show</p>');
     }
     // Combine old data with any new data that's streaming in
-    const data = this.newCache ? this.newCache.union(this.cache) : this.cache;
+    const data = (this.newCache ? this.newCache.union(this.cache) : this.cache).toArray();
     // Update the axes (also updates scales)
     this.drawAxes();
     // Update the bars
@@ -104,10 +104,12 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     // Initialize / update the scales
     this.xScale = d3.scaleLinear()
       .domain([this.linkedState.begin, this.linkedState.end])
-      .range([0, bounds.width]);
+      .range([0, bounds.width])
+      .clamp(true);
     this.yScale = d3.scaleBand()
       .domain(this.linkedState.metadata.locationNames)
-      .range([0, bounds.height]);
+      .range([0, bounds.height])
+      .padding(0.4);
 
     // Update the x axis
     const xAxisGroup = this.content.select('.xAxis')
@@ -128,9 +130,9 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
       .classed('tick', true);
     yTicks = yTicks.merge(yTicksEnter);
 
-    yTicks.attr('transform', d => `translate(0,${this.yScale(d) + this.yScale.bandwidth() / 2})`);
+    yTicks.attr('transform', d => `translate(0,${this.yScale(d)})`);
 
-    const lineOffset = -(this.yScale.bandwidth() + this.yScale.paddingInner()) / 2;
+    const lineOffset = -this.yScale.bandwidth() * (1 + this.yScale.paddingInner()) / 2;
     yTicksEnter.append('line');
     yTicks.select('line')
       .attr('x1', 0)
@@ -148,7 +150,19 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
       .attr('transform', `translate(${-this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
   drawBars (data) {
-    // TODO
+    let bars = this.content.select('.bars')
+      .selectAll('.bar').data(data);
+    bars.exit().remove();
+    const barsEnter = bars.enter().append('g')
+      .classed('bar', true);
+    bars = bars.merge(barsEnter);
+
+    bars.attr('transform', d => `translate(${this.xScale(d.get('enter').Timestamp)},${this.yScale(d.get('Location'))})`);
+
+    barsEnter.append('rect')
+      .attr('y', -this.yScale.bandwidth() / 2)
+      .attr('height', this.yScale.bandwidth())
+      .attr('width', d => this.xScale(d.get('leave').Timestamp) - this.xScale(d.get('enter').Timestamp));
   }
   drawLinks (data) {
     // TODO
