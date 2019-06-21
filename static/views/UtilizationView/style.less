@@ -6,9 +6,28 @@
     .mini_background {
       fill: white;
     }
-    .overviewBar rect {
-      stroke: black;
+    .outline {
+      fill: none;
       stroke-width: 1px;
+      stroke: #333333;
+    }
+    .area {
+      stroke: none;
+      fill: #333333;
+      opacity: 0.25;
+    }
+    .brush {
+      cursor: ew-resize;
+
+      .hoverTarget {
+        fill: transparent;
+      }
+      .leftHandle .hoverTarget {
+        cursor: w-resize;
+      }
+      .rightHandle .hoverTarget {
+        cursor: e-resize;
+      }
     }
   }
 }

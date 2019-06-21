@@ -19,17 +19,21 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
       const label = encodeURIComponent(this.layoutState.label);
       const intervalWindow = this.linkedState.intervalWindow;
       const self = this;
+      console.log('starting stream');
+      let count = 0;
       const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
         .node('!.*', function (chunk) {
           if (currentStream !== self.stream) {
             // A different stream has been started; abort this one
             this.abort();
           } else {
-            console.log(chunk);
+            // TODO: store + render chunk
+            count++;
           }
         })
         .done(() => {
-          this.streaming = null;
+          this.stream = null;
+          console.log('finished stream', count);
           this.render();
         });
       this.render();
@@ -44,7 +48,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
   setup () {
     super.setup();
 
-    this.linkedState.on('newInterval', () => { this.getData(); });
+    this.linkedState.on('newIntervalWindow', () => { this.getData(); });
     this.getData();
   }
   draw () {

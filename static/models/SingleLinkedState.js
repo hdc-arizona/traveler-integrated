@@ -13,18 +13,39 @@ class SingleLinkedState extends Model {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
     })();
   }
-  setIntervalWindow (begin, end) {
+  get begin () {
+    return this.intervalWindow[0];
+  }
+  get end () {
+    return this.intervalWindow[1];
+  }
+  get beginLimit () {
+    return this.metadata.intervalDomain[0];
+  }
+  get endLimit () {
+    return this.metadata.intervalDomain[1];
+  }
+  setIntervalWindow ({
+    begin = this.begin,
+    end = this.end
+  } = {}) {
     if (this.intervalDomain === null) {
       throw new Error("Can't set interval window; no interval data");
     }
-    const oldBegin = this.intervalWindow[0];
-    const oldEnd = this.intervalWindow[1];
+    const oldBegin = this.begin;
+    const oldEnd = this.end;
     // Clamp to where there's actually data
-    begin = Math.max(this.metadata.intervalDomain[0], begin);
-    end = Math.min(this.metadata.intervalDomain[1], end);
+    begin = Math.max(this.beginLimit, begin);
+    end = Math.min(this.endLimit, end);
     this.intervalWindow = [begin, end];
     if (oldBegin !== begin || oldEnd !== end) {
-      this.trigger('newInterval');
+      this.stickyTrigger('newIntervalWindow', { begin, end });
+    }
+  }
+  selectPrimitive (primitive) {
+    if (primitive !== this.selectedPrimitive) {
+      this.selectedPrimitive = primitive;
+      this.stickyTrigger('primitiveSelected', { primitive });
     }
   }
 }

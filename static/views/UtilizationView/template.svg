@@ -1,0 +1,25 @@
+<g class="mini">
+  <rect class="mini_background"></rect>
+  <g class="axis"></g>
+  <g class="overview">
+    <path class="area"></path>
+    <path class="outline"></path>
+  </g>
+  <g class="currentPrimitive" style="display:none">
+    <path class="area"></path>
+    <path class="outline"></path>
+  </g>
+  <g class="brush">
+    <rect class="area"></rect>
+    <line class="top outline"></line>
+    <line class="bottom outline"></line>
+    <g class="leftHandle">
+      <line class="outline"></line>
+      <rect class="hoverTarget"></rect>
+    </g>
+    <g class="rightHandle">
+      <line class="outline"></line>
+      <rect class="hoverTarget"></rect>
+    </g>
+  </g>
+</g>
