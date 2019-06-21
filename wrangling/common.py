@@ -2,6 +2,7 @@ import os
 import shelve
 import pickle
 import sys
+from intervaltree import IntervalTree #pylint: disable=import-error
 
 def log(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
@@ -28,18 +29,19 @@ def loadDatabase(dbDir):
             log('Loading %s %s...' % (label, stype))
             db[label][stype] = pickle.load(open(os.path.join(labelDir, stype + '.pickle')))
         for stype in optional_shelves:
-            log('Loading %s %s...' % (label, stype))
             spath = os.path.join(labelDir, stype + '.shelf')
             if os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames
+                log('Loading %s %s...' % (label, stype))
                 db[label][stype] = shelve.open(spath)
         for stype in optional_pickles:
-            log('Loading %s %s...' % (label, stype))
-            if stype == 'intervalIndex':
-                log('(may take a while if %s is large)' % label)
             spath = os.path.join(labelDir, stype + '.pickle')
             if os.path.exists(spath):
+                log('Loading %s %s...' % (label, stype))
+                if stype == 'intervalIndex':
+                    log('(may take a while if %s is large)' % label)
                 db[label][stype] = pickle.load(open(spath, 'rb'))
-
+                if isinstance(db[label][stype], IntervalTree):
+                    db[label][stype].freeze() # TODO: not sure why this isn't getting pickled in the bundle stage...
     return db
 
 def addPrimitiveChild(parent, child, primitives=None, primitiveLinks=None, source=None, debug=False):

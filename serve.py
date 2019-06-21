@@ -63,7 +63,6 @@ def intervals(label: str, begin: float = None, end: float = None):
     if 'intervalIndex' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
-    db[label]['intervalIndex'].freeze() # TODO: not sure why this isn't getting pickled in the bundle stage...
     if begin is None:
         begin = db[label]['intervalIndex'].top_node.stats['begin']
     if end is None:
