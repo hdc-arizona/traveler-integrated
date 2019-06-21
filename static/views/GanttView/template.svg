@@ -1,0 +1,8 @@
+<g class="chart">
+  <g class="yAxis"></g>
+  <text class="yAxisLabel" text-anchor="middle">Location</text>
+  <g class="xAxis"></g>
+  <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
+  <g class="bars"></g>
+  <g class="links"></g>
+</g>

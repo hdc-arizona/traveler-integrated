@@ -7,6 +7,8 @@ class SingleLinkedState extends Model {
 
     this.label = label;
     this.metadata = metadata;
+    // Sometimes the locations aren't sorted (todo: enable interactive sorting?)
+    this.metadata.locationNames.sort();
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
     this.selectedPrimitive = null;
     (async () => {

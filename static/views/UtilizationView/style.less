@@ -1,33 +1,40 @@
 .UtilizationView {
-  .mini {
-    text {
-      font: 9px sans-serif;
+  text {
+    font: 9px sans-serif;
+  }
+  .outline {
+    fill: none;
+    stroke-width: 1px;
+  }
+  .area {
+    stroke: none;
+    opacity: 0.25;
+  }
+  .overview {
+    .outline { stroke: #999999; }
+    .area { fill: #999999; }
+  }
+  .currentPrimitive {
+    .outline { stroke: black; }
+    .area { fill: black; }
+  }
+  .brush {
+    cursor: grab;
+    &.grabbing {
+      cursor: grabbing;
     }
-    .mini_background {
-      fill: white;
-    }
-    .outline {
-      fill: none;
-      stroke-width: 1px;
-      stroke: #333333;
-    }
-    .area {
-      stroke: none;
-      fill: #333333;
-      opacity: 0.25;
-    }
-    .brush {
-      cursor: ew-resize;
 
-      .hoverTarget {
-        fill: transparent;
-      }
-      .leftHandle .hoverTarget {
-        cursor: w-resize;
-      }
-      .rightHandle .hoverTarget {
-        cursor: e-resize;
-      }
+    .outline { stroke: white; }
+    .area { fill: white; }
+
+    .hoverTarget {
+      fill: transparent;
+    }
+    .leftHandle .hoverTarget {
+      cursor: w-resize;
+    }
+    .rightHandle .hoverTarget {
+      cursor: e-resize;
     }
   }
 }

@@ -1,6 +1,7 @@
-<g class="mini">
-  <rect class="mini_background"></rect>
+<g class="chart">
+  <rect class="background"></rect>
   <g class="axis"></g>
+  <text class="axisLabel" text-anchor="middle">Time in Nanoseconds</text>
   <g class="overview">
     <path class="area"></path>
     <path class="outline"></path>
