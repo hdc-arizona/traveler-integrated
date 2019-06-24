@@ -11,7 +11,7 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
     super(null, resources);
     this.container = container;
     this.layoutState = state;
-    this.hidden = false;
+    this.isHidden = false;
     this.container.on('tab', tab => {
       this.tabElement = d3.select(tab.element[0]);
       this.setupTab();
@@ -20,10 +20,10 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
       this.render(d3.select(this.container.getElement()[0]));
     });
     this.container.on('hide', () => {
-      this.hidden = true;
+      this.isHidden = true;
     });
     this.container.on('show', () => {
-      this.hidden = false;
+      this.isHidden = false;
       this.render();
     });
     this.container.on('resize', () => this.render());

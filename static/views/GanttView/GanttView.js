@@ -86,7 +86,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
   draw () {
     super.draw();
 
-    if (this.hidden) {
+    if (this.isHidden) {
       return;
     } else if (this.isEmpty) {
       this.emptyStateDiv.html('<p>No data to show</p>');

@@ -39,7 +39,7 @@ class SummaryView extends GoldenLayoutView {
     ];
   }
   get isLoading () {
-    return window.controller.datasets === undefined;
+    return super.isLoading || window.controller.datasets === undefined;
   }
   get isEmpty () {
     return window.controller.datasets !== undefined &&
@@ -49,7 +49,7 @@ class SummaryView extends GoldenLayoutView {
   draw () {
     super.draw();
 
-    if (this.hidden || this.isLoading) {
+    if (this.isHidden || this.isLoading) {
       return;
     } else if (window.controller.datasets instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
