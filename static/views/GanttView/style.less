@@ -1,7 +1,10 @@
 @import '../../style/colors.less';
 
 .GanttView {
-  cursor: crosshair;
+  cursor: grab;
+  &.grabbing {
+    cursor: grabbing;
+  }
   text {
     font: 9px sans-serif;
   }

@@ -41,8 +41,10 @@ Color meanings:
 @lightTextColorImageFilter: replace(@lightTextColor, '#(.*)', 'url(#recolorImageTo$1)');
 @invertedTextColor: @OffWhite;
 
+@disabledColor: @LightestGrey;
+@disabledImageFilter: replace(@disabledColor, '#(.*)', 'url(#recolorImageTo$1)');
+
 @separatorColor: @LightGrey;
-@separatorImageFilter: replace(@separatorColor, '#(.*)', 'url(#recolorImageTo$1)');
 
 @shadowColor: @OffBlack;
 @darkShadowColor: darken(@shadowColor, 30%);
