@@ -153,7 +153,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
   }
   drawBars (data) {
     let bars = this.content.select('.bars')
-      .selectAll('.bar').data(data);
+      .selectAll('.bar').data(data, d => d);
     bars.exit().remove();
     const barsEnter = bars.enter().append('g')
       .classed('bar', true);
@@ -162,8 +162,13 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     bars.attr('transform', d => `translate(${this.xScale(d.get('enter').Timestamp)},${this.yScale(d.get('Location'))})`);
 
     barsEnter.append('rect')
-      .attr('height', this.yScale.bandwidth())
-      .attr('width', d => this.xScale(d.get('leave').Timestamp) - this.xScale(d.get('enter').Timestamp));
+      .attr('height', this.yScale.bandwidth());
+    bars.select('rect')
+      .attr('width', d => {
+        const startPos = this.xScale(d.get('enter').Timestamp);
+        const endPos = this.xScale(d.get('leave').Timestamp);
+        return endPos - startPos;
+      });
   }
   drawLinks (data) {
     // TODO
