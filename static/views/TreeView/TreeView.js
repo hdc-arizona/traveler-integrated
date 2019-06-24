@@ -28,14 +28,13 @@ class TreeView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     this.legend = this.d3el.append('div')
       .attr('id', 'legend');
   }
+  get isEmpty () {
+    return true;
+  }
   draw () {
     super.draw();
 
-    if (this.tree === undefined || this.regions === undefined) {
-      return;
-    } else if (this.tree instanceof Error || this.regions instanceof Error) {
-      this.emptyStateDiv.html('<p>Error communicating with the server</p>');
-    }
+    this.emptyStateDiv.html('<p>View under construction</p>');
     console.log(this.tree);
   }
 }

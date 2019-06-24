@@ -97,7 +97,9 @@ class UtilizationView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))
   draw () {
     super.draw();
 
-    if (this.histogram === undefined) {
+    if (this.hidden) {
+      return; // eslint-disable-line no-useless-return
+    } else if (this.histogram === undefined) {
       // Do nothing beyond super.draw() showing the spinner; we're still loading data
     } else if (this.histogram instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');

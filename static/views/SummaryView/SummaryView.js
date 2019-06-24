@@ -49,7 +49,7 @@ class SummaryView extends GoldenLayoutView {
   draw () {
     super.draw();
 
-    if (window.controller.datasets === undefined) {
+    if (this.hidden || this.isLoading) {
       return;
     } else if (window.controller.datasets instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');

@@ -86,7 +86,9 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
   draw () {
     super.draw();
 
-    if (this.isEmpty) {
+    if (this.hidden) {
+      return;
+    } else if (this.isEmpty) {
       this.emptyStateDiv.html('<p>No data to show</p>');
     }
     // Combine old data with any new data that's streaming in

@@ -82,9 +82,11 @@ class Controller {
   handleViewDestruction (view) {
     // Free up stuff in our lookups for garbage collection when views are closed
     const label = view.layoutState.label;
-    this.views[label].splice(this.views[label].indexOf(view), 1);
-    if (this.views[label].length === 0) {
-      delete this.views[label];
+    if (this.views[label]) {
+      this.views[label].splice(this.views[label].indexOf(view), 1);
+      if (this.views[label].length === 0) {
+        delete this.views[label];
+      }
     }
   }
   renderAllViews () {
