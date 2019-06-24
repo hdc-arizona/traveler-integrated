@@ -21,3 +21,5 @@ All of the stuff pertinent to a view should be in its directory, so things
 *should* be relatively self-contained, though you should still do sensible
 things like wrapping your styles in a view-specific selector to keep things from
 interfering with one another (see any of the `.less` files for an example).
+Also, I've tried to keep things like the interface-wide color palette defined in
+a global file (e.g. `style/colors.less`).

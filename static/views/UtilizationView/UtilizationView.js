@@ -109,10 +109,10 @@ class UtilizationView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))
       this.drawPaths(this.content.select('.overview'), this.histogram);
 
       // Update the currently selected primitive paths
-      const currentPrimitive = this.content.select('.currentPrimitive');
-      currentPrimitive.style('display', this.primitiveHistogram ? null : 'none');
+      const selectedPrimitive = this.content.select('.selectedPrimitive');
+      selectedPrimitive.style('display', this.primitiveHistogram ? null : 'none');
       if (this.primitiveHistogram) {
-        this.drawPaths(currentPrimitive, this.primitiveHistogram);
+        this.drawPaths(selectedPrimitive, this.primitiveHistogram);
       }
 
       // Update the brush
@@ -228,9 +228,8 @@ class UtilizationView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))
     let x1Offset = 0;
     let x2Offset = 0;
     if (x2 - x1 < handleWidth) {
-      const offset = (handleWidth - (x2 - x1)) / 2;
-      x1Offset -= offset;
-      x2Offset += offset;
+      x1Offset = -handleWidth / 2;
+      x2Offset = handleWidth / 2;
     }
 
     const brush = this.content.select('.brush');

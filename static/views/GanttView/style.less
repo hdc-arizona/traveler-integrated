@@ -1,3 +1,5 @@
+@import '../../style/colors.less';
+
 .GanttView {
   text {
     font: 9px sans-serif;
@@ -5,6 +7,21 @@
 
   .yAxis line {
     stroke-weight: 1px;
-    stroke: #cccccc;
+    stroke: @separatorColor;
+  }
+
+  .outline {
+    fill: none;
+    stroke-width: 1px;
+    stroke: @overviewColor;
+  }
+  .area {
+    stroke: none;
+    opacity: 0.25;
+    fill: @overviewColor;
+  }
+  .selectedPrimitive {
+    .outline { stroke: @selectedPrimitiveColor; }
+    .area { fill: @selectedPrimitiveColor; }
   }
 }

@@ -1,3 +1,5 @@
+@import '../../style/colors.less';
+
 .UtilizationView {
   text {
     font: 9px sans-serif;
@@ -11,12 +13,12 @@
     opacity: 0.25;
   }
   .overview {
-    .outline { stroke: #999999; }
-    .area { fill: #999999; }
+    .outline { stroke: @overviewColor; }
+    .area { fill: @overviewColor; }
   }
-  .currentPrimitive {
-    .outline { stroke: black; }
-    .area { fill: black; }
+  .selectedPrimitive {
+    .outline { stroke: @selectedPrimitiveColor; }
+    .area { fill: @selectedPrimitiveColor; }
   }
   .brush {
     cursor: grab;
@@ -24,8 +26,8 @@
       cursor: grabbing;
     }
 
-    .outline { stroke: white; }
-    .area { fill: white; }
+    .outline { stroke: @brushColor; }
+    .area { fill: @brushColor; }
 
     .hoverTarget {
       fill: transparent;

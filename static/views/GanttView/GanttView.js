@@ -162,8 +162,11 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     bars.attr('transform', d => `translate(${this.xScale(d.get('enter').Timestamp)},${this.yScale(d.get('Location'))})`);
 
     barsEnter.append('rect')
-      .attr('height', this.yScale.bandwidth());
-    bars.select('rect')
+      .classed('area', true);
+    barsEnter.append('rect')
+      .classed('outline', true);
+    bars.selectAll('rect')
+      .attr('height', this.yScale.bandwidth())
       .attr('width', d => {
         const startPos = this.xScale(d.get('enter').Timestamp);
         const endPos = this.xScale(d.get('leave').Timestamp);

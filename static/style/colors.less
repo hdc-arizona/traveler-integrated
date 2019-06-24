@@ -39,7 +39,6 @@ Color meanings:
 @darkTextColor: black;
 @lightTextColor: @DarkestGrey;
 @lightTextColorImageFilter: replace(@lightTextColor, '#(.*)', 'url(#recolorImageTo$1)');
-
 @invertedTextColor: @OffWhite;
 
 @separatorColor: @LightestGrey;
@@ -55,11 +54,11 @@ Color meanings:
 @lightBackgroundColor: white;
 @darkBackgroundColor: @LightGrey;
 @darkestBackgroundColor: @Grey;
-
 @invertedBackgroundColor: @OffBlack;
 
-@selectionColor: @DarkTeal;
-@selectionColorImageFilter: replace(@selectionColor, '#(.*)', 'url(#recolorImageTo$1)');
+@overviewColor: @DarkGrey;
+@selectedPrimitiveColor: @OffBlack;
+@brushColor: white;
 
 /*
 Dummy class that exposes colors for assignment to classes in Javascript:

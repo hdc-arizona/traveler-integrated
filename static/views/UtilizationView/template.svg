@@ -6,7 +6,7 @@
     <path class="area"></path>
     <path class="outline"></path>
   </g>
-  <g class="currentPrimitive" style="display:none">
+  <g class="selectedPrimitive" style="display:none">
     <path class="area"></path>
     <path class="outline"></path>
   </g>
