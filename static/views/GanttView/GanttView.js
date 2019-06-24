@@ -109,7 +109,8 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     this.yScale = d3.scaleBand()
       .domain(this.linkedState.metadata.locationNames)
       .range([0, bounds.height])
-      .padding(0.4);
+      .paddingInner(0.2)
+      .paddingOuter(0.1);
 
     // Update the x axis
     const xAxisGroup = this.content.select('.xAxis')
@@ -130,9 +131,9 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
       .classed('tick', true);
     yTicks = yTicks.merge(yTicksEnter);
 
-    yTicks.attr('transform', d => `translate(0,${this.yScale(d)})`);
+    yTicks.attr('transform', d => `translate(0,${this.yScale(d) + this.yScale.bandwidth() / 2})`);
 
-    const lineOffset = -this.yScale.bandwidth() * (1 + this.yScale.paddingInner()) / 2;
+    const lineOffset = -this.yScale.step() / 2;
     yTicksEnter.append('line');
     yTicks.select('line')
       .attr('x1', 0)
@@ -143,6 +144,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     yTicksEnter.append('text');
     yTicks.select('text')
       .attr('text-anchor', 'end')
+      .attr('y', '0.35em')
       .text(d => d);
 
     // Position the y label
@@ -160,7 +162,6 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
     bars.attr('transform', d => `translate(${this.xScale(d.get('enter').Timestamp)},${this.yScale(d.get('Location'))})`);
 
     barsEnter.append('rect')
-      .attr('y', -this.yScale.bandwidth() / 2)
       .attr('height', this.yScale.bandwidth())
       .attr('width', d => this.xScale(d.get('leave').Timestamp) - this.xScale(d.get('enter').Timestamp));
   }
