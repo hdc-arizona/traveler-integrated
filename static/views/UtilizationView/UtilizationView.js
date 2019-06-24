@@ -2,9 +2,10 @@
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
+import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
-class UtilizationView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
+class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/UtilizationView/style.less' },
@@ -78,7 +79,7 @@ class UtilizationView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))
       top: 20,
       right: 20,
       bottom: 40,
-      left: 50
+      left: 20
     };
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);

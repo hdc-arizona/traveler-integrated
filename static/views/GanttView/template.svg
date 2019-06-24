@@ -1,4 +1,6 @@
 <g class="chart">
+  <rect class="background"></rect>
+  <line class="cursor" style="display:none"></line>
   <g class="yAxis"></g>
   <text class="yAxisLabel" text-anchor="middle">Location</text>
   <g class="xAxis"></g>

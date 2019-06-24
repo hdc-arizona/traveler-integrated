@@ -2,10 +2,11 @@
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
+import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import { Map, Set } from '../../node_modules/immutable/dist/immutable.es.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
-class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
+class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/GanttView/style.less' },
@@ -74,7 +75,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
       top: 20,
       right: 20,
       bottom: 40,
-      left: 50
+      left: 40
     };
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
@@ -169,11 +170,7 @@ class GanttView extends SvgViewMixin(SingleDatasetMixin(GoldenLayoutView)) {
       .classed('outline', true);
     bars.selectAll('rect')
       .attr('height', this.yScale.bandwidth())
-      .attr('width', d => {
-        const startPos = this.xScale(d.get('enter').Timestamp);
-        const endPos = this.xScale(d.get('leave').Timestamp);
-        return endPos - startPos;
-      });
+      .attr('width', d => this.xScale(d.get('leave').Timestamp) - this.xScale(d.get('enter').Timestamp));
   }
   drawLinks (data) {
     // TODO

@@ -10,6 +10,7 @@ class SingleLinkedState extends Model {
     // Sometimes the locations aren't sorted (todo: enable interactive sorting?)
     this.metadata.locationNames.sort();
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
+    this.cursorPosition = null;
     this.selectedPrimitive = null;
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
@@ -49,6 +50,10 @@ class SingleLinkedState extends Model {
       this.selectedPrimitive = primitive;
       this.stickyTrigger('primitiveSelected', { primitive });
     }
+  }
+  moveCursor (position) {
+    this.cursorPosition = position;
+    this.trigger('moveCursor');
   }
 }
 
