@@ -13,7 +13,9 @@ const CursoredViewMixin = function (superclass) {
       this.linkedState.on('moveCursor', () => { this.updateCursor(); });
       this.content
         .on('mousemove', () => {
-          this.linkedState.moveCursor(this.xScale.invert(d3.event.offsetX - this.margin.left));
+          if (this.xScale) {
+            this.linkedState.moveCursor(this.xScale.invert(d3.event.offsetX - this.margin.left));
+          }
         }).on('mouseout', () => {
           this.linkedState.moveCursor(null);
         });

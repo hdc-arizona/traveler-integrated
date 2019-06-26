@@ -56,7 +56,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     return this.cache.size === 0 && (this.newCache === null || this.newCache.size === 0);
   }
   getChartBounds () {
-    const bounds = this.getContentBounds();
+    const bounds = this.getAvailableSpace();
     return {
       width: bounds.width - this.margin.left - this.margin.right,
       height: bounds.height - this.margin.top - this.margin.bottom,

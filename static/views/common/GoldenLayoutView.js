@@ -67,6 +67,9 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
     return this.d3el.append('div')
       .classed('scrollArea', true);
   }
+  getAvailableSpace (content = this.content) {
+    return content.node().getBoundingClientRect();
+  }
   draw () {
     this.emptyStateDiv.style('display', this.isEmpty ? null : 'none');
     this.spinner.style('display', this.isLoading ? null : 'none');

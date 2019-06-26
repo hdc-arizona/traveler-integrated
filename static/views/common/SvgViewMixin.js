@@ -3,11 +3,18 @@ const SvgViewMixin = function (superclass) {
     setupContentElement () {
       return this.d3el.append('svg');
     }
-    getContentBounds (content = this.content) {
-      const bounds = content.node().parentNode.getBoundingClientRect();
-      content.attr('width', bounds.width)
+    getAvailableSpace () {
+      // Don't rely on non-dynamic SVG width / height for available space; use
+      // this.d3el instead
+      return super.getAvailableSpace(this.d3el);
+    }
+    draw () {
+      super.draw();
+
+      const bounds = this.getAvailableSpace();
+      this.content
+        .attr('width', bounds.width)
         .attr('height', bounds.height);
-      return bounds;
     }
   };
   SvgView.prototype._instanceOfSvgViewMixin = true;

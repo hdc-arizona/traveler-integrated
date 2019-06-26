@@ -60,7 +60,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
     return this.histogram !== undefined && this.histogram instanceof Error;
   }
   getChartBounds () {
-    const bounds = this.getContentBounds();
+    const bounds = this.getAvailableSpace();
     return {
       width: bounds.width - this.margin.left - this.margin.right,
       height: bounds.height - this.margin.top - this.margin.bottom,
