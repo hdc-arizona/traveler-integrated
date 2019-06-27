@@ -34,11 +34,30 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
       bottom: 0,
       left: 0
     };
-    this.nodeWidth = 100;
+    this.nodeWidth = 120;
     this.nodeHeight = 20;
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
     this.horizontalPadding = 40; // px separation between nodes
     this.nodeShapeRadius = 10;
+
+    // Custom shapes based on these measurements:
+    this.glyphs = {
+      collapsedTriangle: `\
+M${-2 * this.nodeShapeRadius},${-this.nodeShapeRadius}\
+L0,0\
+L${-2 * this.nodeShapeRadius},${this.nodeShapeRadius}\
+Z`,
+      expandedTriangle: `\
+M${-2 * this.nodeShapeRadius},0\
+L0,${-this.nodeShapeRadius}\
+L0,${this.nodeShapeRadius}\
+Z`,
+      circle: `\
+M${this.nodeShapeRadius},${-this.nodeShapeRadius}\
+A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${this.nodeShapeRadius}\
+A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${-this.nodeShapeRadius}\
+Z`
+    };
 
     this.content.html(this.resources[1]);
   }
@@ -54,7 +73,7 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
       this.updateLayout();
 
       const transition = d3.transition()
-        .duration(300);
+        .duration(1000);
 
       // Draw the nodes
       this.drawNodes(transition);
@@ -64,6 +83,10 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
 
       // Draw any hovered links
       this.drawHoveredLinks();
+
+      // Trash any interaction placeholders now that we've used them
+      delete this._expandedParentCoords;
+      delete this._collapsedParent;
     }
   }
   updateLayout () {
@@ -119,36 +142,78 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
 
     // Start new nodes at their parents' old coordinates (or their native
     // coordinates if this is the first draw)
-    nodesEnter.attr('transform', d => `translate(${d.x0 || d.x},${d.y0 || d.y})`);
+    nodesEnter.attr('transform', d => {
+      if (this._expandedParentCoords) {
+        return `translate(${this._expandedParentCoords.x + this.nodeWidth},${this._expandedParentCoords.y})`;
+      } else {
+        return `translate(${d.x},${d.y})`;
+      }
+    }).attr('opacity', 0);
+    // Move old nodes to clicked node's new coordinates, and then remove them
+    nodesExit.transition(transition)
+      .attr('transform', d => {
+        if (this._collapsedParent) {
+          return `translate(${this._collapsedParent.x + this.nodeWidth},${this._collapsedParent.y})`;
+        } else {
+          return `translate(${d.parent.x + this.nodeWidth}, ${d.parent.y})`;
+        }
+      })
+      .attr('opacity', 0)
+      .remove();
     // Move all new + existing nodes to their target coordinates
     nodes.transition(transition)
-      .attr('transform', d => `translate(${d.x},${d.y})`);
-    // Move old nodes to their parents' new coordinates, and then remove them
-    nodesExit.transition(transition)
-      .attr('transform', d => `translate(${d.parent.x}, ${d.parent.y})`)
-      .remove();
+      .attr('transform', d => `translate(${d.x},${d.y})`)
+      .attr('opacity', 1);
 
-    // Node shapes (horizontally left-aligned, vertically center-aligned)
-    const triangle = `\
-M$0,${-this.nodeShapeRadius}\
-L${2 * this.nodeShapeRadius},0\
-L0,${this.nodeShapeRadius}\
-Z`;
-    const circle = `\
-M${this.nodeShapeRadius},${-this.nodeShapeRadius}\
-A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${this.nodeShapeRadius}\
-A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${-this.nodeShapeRadius}\
-Z`;
-    nodesEnter.append('path').classed('area', true);
-    nodesEnter.append('path').classed('outline', true);
-    nodes.selectAll('.area, .outline')
+    // Main glyph (just circles for now)
+    const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);
+    mainGlyphEnter.append('path').classed('area', true);
+    mainGlyphEnter.append('path').classed('outline', true);
+    nodes.select('.mainGlyph').selectAll('.area, .outline')
       .transition(transition)
-      .attr('d', d => d._children ? triangle : circle);
+      .attr('d', this.glyphs.circle);
 
     // Node label
     nodesEnter.append('text')
       .attr('x', 2 * this.nodeShapeRadius)
       .text(d => this.linkedState.getPrimitiveDetails(d.data.name).name);
+
+    // Collapse / expand glyph
+    const expanderGlyphEnter = nodesEnter.append('g').classed('expander', true)
+      .attr('transform', `translate(${this.nodeWidth},0)`);
+    expanderGlyphEnter.append('path').classed('area', true);
+    expanderGlyphEnter.append('path').classed('outline', true);
+    nodes.select('.expander').selectAll('.area, .outline')
+      .on('click', d => {
+        // Hide / show the children
+        if (d._children) {
+          d.children = d._children;
+          delete d._children;
+          // New child animations need to start growing from this old parent
+          // coordinate
+          this._expandedParentCoords = { x: d.x, y: d.y };
+        } else {
+          d._children = d.children;
+          delete d.children;
+          // Old child animations need to end at this parent, but at its new
+          // coordinates (so just keep track of which parent; its coordinates
+          // will get updated later by updateLayout)
+          this._collapsedParent = d;
+        }
+        this.render();
+      }).transition(transition)
+      .attr('d', d => {
+        if (d._children) {
+          // There are hidden children
+          return this.glyphs.collapsedTriangle;
+        } else if (!d.children || d.children.length === 0) {
+          // No children; this is a leaf
+          return null;
+        } else {
+          // All children are showing
+          return this.glyphs.expandedTriangle;
+        }
+      });
   }
   drawLinks (transition) {
     let links = this.content.select('.linkLayer').selectAll('.link')
@@ -157,32 +222,42 @@ Z`;
     const linksExit = links.exit();
     links = links.merge(linksEnter);
 
-    // Some helper functions for computing custom paths
+    // Helper function for computing custom paths:
     const computePath = (source, target) => {
       const curveX = target.x - this.horizontalPadding / 2;
       return `\
 M${source.x + 2 * this.nodeShapeRadius},${source.y}\
-L${source.x + this.nodeWidth},${source.y}\
+L${source.x + this.nodeWidth - 2 * this.nodeShapeRadius},${source.y}\
+M${source.x + this.nodeWidth},${source.y}\
 C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
     };
-    const proxyParentTarget = node => {
-      return {
-        x: node.x0 || node.x,
-        y: node.y0 || node.y
-      };
-    };
-    const parentLinkGenerator = link => {
-      return computePath(link.source, proxyParentTarget(link.target));
-    };
-    const finalLinkGenerator = link => {
-      return computePath(link.source, link.target);
-    };
-    linksEnter.attr('d', parentLinkGenerator);
+    linksEnter
+      .attr('opacity', 0)
+      .attr('d', link => {
+        // Start new links at the end of the old clicked target if it exists, or
+        // the end of the parent if this is the first draw
+        if (this._expandedParentCoords) {
+          return computePath(this._expandedParentCoords, this._expandedParentCoords);
+        } else {
+          return computePath(link.source, {
+            x: link.source.x + this.nodeWidth,
+            y: link.source.y
+          });
+        }
+      });
     linksExit.transition(transition)
-      .attr('d', parentLinkGenerator)
+      .attr('opacity', 0)
+      .attr('d', link => {
+        // End old links at the end of the parent's new coordinates
+        return computePath(this._collapsedParent || link.source, this._collapsedParent || link.source);
+      })
       .remove();
     links.transition(transition)
-      .attr('d', finalLinkGenerator);
+      .attr('opacity', 1)
+      .attr('d', link => {
+        // Animate to the correct locations
+        return computePath(link.source, link.target);
+      });
   }
   drawHoveredLinks () {
     // TODO
