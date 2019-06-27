@@ -38,24 +38,27 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
     this.nodeHeight = 20;
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
     this.horizontalPadding = 40; // px separation between nodes
-    this.nodeShapeRadius = 10;
+    this.mainGlyphRadius = this.nodeHeight / 2;
+    this.expanderRadius = this.mainGlyphRadius / 2;
 
     // Custom shapes based on these measurements:
     this.glyphs = {
       collapsedTriangle: `\
-M${-2 * this.nodeShapeRadius},${-this.nodeShapeRadius}\
-L0,0\
-L${-2 * this.nodeShapeRadius},${this.nodeShapeRadius}\
+M0,0\
+L${2 * this.expanderRadius},${this.expanderRadius}\
+L0,${2 * this.expanderRadius}\
+L${this.expanderRadius},${this.expanderRadius}\
 Z`,
       expandedTriangle: `\
-M${-2 * this.nodeShapeRadius},0\
-L0,${-this.nodeShapeRadius}\
-L0,${this.nodeShapeRadius}\
+M${2 * this.expanderRadius},0\
+L0,${this.expanderRadius}\
+L${2 * this.expanderRadius},${2 * this.expanderRadius}\
+L${this.expanderRadius},${this.expanderRadius}\
 Z`,
       circle: `\
-M${this.nodeShapeRadius},${-this.nodeShapeRadius}\
-A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${this.nodeShapeRadius}\
-A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${-this.nodeShapeRadius}\
+M${this.mainGlyphRadius},${-this.mainGlyphRadius}\
+A${this.mainGlyphRadius},${this.mainGlyphRadius},0,0,0,${this.mainGlyphRadius},${this.mainGlyphRadius}\
+A${this.mainGlyphRadius},${this.mainGlyphRadius},0,0,0,${this.mainGlyphRadius},${-this.mainGlyphRadius}\
 Z`
     };
 
@@ -175,12 +178,13 @@ Z`
 
     // Node label
     nodesEnter.append('text')
-      .attr('x', 2 * this.nodeShapeRadius)
+      .attr('x', 2 * this.mainGlyphRadius)
+      .attr('y', this.mainGlyphRadius)
       .text(d => this.linkedState.getPrimitiveDetails(d.data.name).name);
 
     // Collapse / expand glyph
     const expanderGlyphEnter = nodesEnter.append('g').classed('expander', true)
-      .attr('transform', `translate(${this.nodeWidth},0)`);
+      .attr('transform', `translate(${2 * this.mainGlyphRadius},${-this.mainGlyphRadius})`);
     expanderGlyphEnter.append('path').classed('area', true);
     expanderGlyphEnter.append('path').classed('outline', true);
     nodes.select('.expander').selectAll('.area, .outline')
@@ -226,9 +230,8 @@ Z`
     const computePath = (source, target) => {
       const curveX = target.x - this.horizontalPadding / 2;
       return `\
-M${source.x + 2 * this.nodeShapeRadius},${source.y}\
-L${source.x + this.nodeWidth - 2 * this.nodeShapeRadius},${source.y}\
-M${source.x + this.nodeWidth},${source.y}\
+M${source.x + 2 * this.mainGlyphRadius},${source.y}\
+L${source.x + this.nodeWidth},${source.y}\
 C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
     };
     linksEnter

@@ -18,8 +18,13 @@
       fill: @overviewColor;
     }
 
-    .expander:hover .area {
-      opacity: 0.5;
+    .expander {
+      .area {
+        opacity: 0.1;
+      }
+      &:hover .area {
+        opacity: 0.5;
+      }
     }
   }
   .link {
