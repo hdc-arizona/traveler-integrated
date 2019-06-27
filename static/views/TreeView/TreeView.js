@@ -37,6 +37,7 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
     this.nodeWidth = 100;
     this.nodeHeight = 20;
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
+    this.horizontalPadding = 40; // px separation between nodes
     this.nodeShapeRadius = 10;
 
     this.content.html(this.resources[1]);
@@ -70,7 +71,7 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
     // really confusing about this), with fixed node sizes / separation—we'll
     // rotate this later
     const layoutGenerator = d3.tree()
-      .nodeSize([this.nodeHeight, this.nodeWidth])
+      .nodeSize([this.nodeHeight, this.nodeWidth + this.horizontalPadding])
       .separation(() => this.nodeSeparation);
     layoutGenerator(this.tree);
     const xDomain = d3.extent(this.tree.descendants(), d => d.x);
@@ -112,12 +113,9 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
   drawNodes (transition) {
     let nodes = this.content.select('.nodeLayer').selectAll('.node')
       .data(this.tree.descendants(), d => d.data.name);
-    const nodesExit = nodes.exit();
     const nodesEnter = nodes.enter().append('g').classed('node', true);
+    const nodesExit = nodes.exit();
     nodes = nodes.merge(nodesEnter);
-
-    nodesEnter.append('path').classed('area', true);
-    nodesEnter.append('path').classed('outline', true);
 
     // Start new nodes at their parents' old coordinates (or their native
     // coordinates if this is the first draw)
@@ -141,12 +139,50 @@ M${this.nodeShapeRadius},${-this.nodeShapeRadius}\
 A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${this.nodeShapeRadius}\
 A${this.nodeShapeRadius},${this.nodeShapeRadius},0,0,0,${this.nodeShapeRadius},${-this.nodeShapeRadius}\
 Z`;
+    nodesEnter.append('path').classed('area', true);
+    nodesEnter.append('path').classed('outline', true);
     nodes.selectAll('.area, .outline')
       .transition(transition)
       .attr('d', d => d._children ? triangle : circle);
+
+    // Node label
+    nodesEnter.append('text')
+      .attr('x', 2 * this.nodeShapeRadius)
+      .text(d => this.linkedState.getPrimitiveDetails(d.data.name).name);
   }
   drawLinks (transition) {
-    // TODO
+    let links = this.content.select('.linkLayer').selectAll('.link')
+      .data(this.tree.links(), d => d.source.data.name + d.target.data.name);
+    const linksEnter = links.enter().append('path').classed('link', true);
+    const linksExit = links.exit();
+    links = links.merge(linksEnter);
+
+    // Some helper functions for computing custom paths
+    const computePath = (source, target) => {
+      const curveX = target.x - this.horizontalPadding / 2;
+      return `\
+M${source.x + 2 * this.nodeShapeRadius},${source.y}\
+L${source.x + this.nodeWidth},${source.y}\
+C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
+    };
+    const proxyParentTarget = node => {
+      return {
+        x: node.x0 || node.x,
+        y: node.y0 || node.y
+      };
+    };
+    const parentLinkGenerator = link => {
+      return computePath(link.source, proxyParentTarget(link.target));
+    };
+    const finalLinkGenerator = link => {
+      return computePath(link.source, link.target);
+    };
+    linksEnter.attr('d', parentLinkGenerator);
+    linksExit.transition(transition)
+      .attr('d', parentLinkGenerator)
+      .remove();
+    links.transition(transition)
+      .attr('d', finalLinkGenerator);
   }
   drawHoveredLinks () {
     // TODO

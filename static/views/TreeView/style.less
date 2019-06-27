@@ -1,6 +1,9 @@
 @import '../../style/colors.less';
 
 .TreeView {
+  text {
+    font: 9px sans-serif;
+  }
   .node {
     cursor: pointer;
 
@@ -14,5 +17,10 @@
       opacity: 0.25;
       fill: @overviewColor;
     }
+  }
+  .link {
+    fill: none;
+    stroke-width: 1px;
+    stroke: @separatorColor;
   }
 }
