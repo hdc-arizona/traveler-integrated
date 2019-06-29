@@ -68,7 +68,7 @@ def intervals(label: str, begin: float = None, end: float = None):
     if end is None:
         end = db[label]['intervalIndex'].top_node.stats['end']
 
-    async def intervalGenerator():
+    def intervalGenerator():
         yield '['
         firstItem = True
         for r in db[label]['intervalIndex'][begin:end]:
