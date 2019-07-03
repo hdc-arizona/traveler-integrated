@@ -35,18 +35,20 @@ const CursoredViewMixin = function (superclass) {
       this.updateCursor();
     }
     updateCursor () {
-      let position = this.linkedState.cursorPosition;
-      if (position !== null) {
-        const [low, high] = this.xScale.domain();
-        if (position > low && position < high) {
-          // Hide the cursor unless it's strictly within this view's domain
-          position = this.xScale(position);
+      if (this.xScale) {
+        let position = this.linkedState.cursorPosition;
+        if (position !== null) {
+          const [low, high] = this.xScale.domain();
+          if (position > low && position < high) {
+            // Hide the cursor unless it's strictly within this view's domain
+            position = this.xScale(position);
+          }
         }
+        this.content.select('.cursor')
+          .style('display', position === null ? 'none' : null)
+          .attr('x1', position)
+          .attr('x2', position);
       }
-      this.content.select('.cursor')
-        .style('display', position === null ? 'none' : null)
-        .attr('x1', position)
-        .attr('x2', position);
     }
   };
   CursoredView.prototype._instanceOfCursoredViewMixin = true;

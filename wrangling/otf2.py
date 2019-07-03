@@ -25,9 +25,11 @@ def _processEvent(event, primitives=None, intervals=None, guids=None, events=Non
     eventId = str(numEvents)
     newR = seenR = newG = seenG = 0
 
-    if 'Primitive' in event:
+    if 'Region' in event:
         # Identify the primitive (and add to its counter)
-        primitiveName = event['Primitive'].replace('::eval', '')
+        primitiveName = event['Region'].replace('::eval', '')
+        event['Primitive'] = primitiveName
+        del event['Region']
         primitive, newR = processPrimitive(primitiveName, primitives, 'otf2 event', debug=debug)
         seenR = 1 if newR == 0 else 0
         if debug is True:
@@ -40,8 +42,8 @@ def _processEvent(event, primitives=None, intervals=None, guids=None, events=Non
             if 'guids' not in primitive:
                 primitive['guids'] = [event['GUID']]
             elif event['GUID'] not in primitive['guids']:
-                # TODO: using a list instead of a set is expensive... but
-                # storing sets may or may not be supported
+                # TODO: list lookups instead of set lookups aren't as optimal...
+                # but storing sets may or may not be supported
                 primitive['guids'].append(event['GUID'])
             guid = guids.get(event['GUID'], None)
             if guid is None:
@@ -97,9 +99,9 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
             if currentEvent is not None:
                 counts = _processEvent(currentEvent, primitives, intervals, guids, events, debug)
                 newR += counts[0]
-                seenR += counts[0]
-                newG += counts[0]
-                seenG += counts[0]
+                seenR += counts[1]
+                newG += counts[2]
+                seenG += counts[3]
             currentEvent = {}
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = int(eventLineMatch.group(2))
@@ -119,13 +121,14 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
     if currentEvent is not None:
         counts = _processEvent(currentEvent, primitives, intervals, guids, events, debug)
         newR += counts[0]
-        seenR += counts[0]
-        newG += counts[0]
-        seenG += counts[0]
+        seenR += counts[1]
+        newG += counts[2]
+        seenG += counts[3]
     log('')
     log('Finished processing %i events' % numEvents)
     log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
-    log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
+    if guids is not None:
+        log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
 
     # Combine the sorted enter / leave events into intervals
     if intervals is not None:
@@ -168,9 +171,9 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
 
     # Create any missing parent-child primitive relationships based on the GUIDs we've collected
     if guids is not None:
-        log('Creating primitive links based on GUIDs (.=2500 relationships observed)')
+        log('Creating primitive links based on GUIDs (.=2500 GUIDs processed)')
         newL = seenL = 0
-        for guid in guids.values():
+        for nGuid, guid in enumerate(guids.values()):
             if guid['parent'] != '0':
                 parentGuid = guids.get(guid['parent'], None)
                 assert parentGuid is not None
@@ -179,13 +182,12 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
                         l = addPrimitiveChild(parentPrimitive, childPrimitive, primitives, primitiveLinks, 'guids', debug)[1]
                         newL += l
                         seenL += 1 if newL == 0 else 0
-
-                        if newL + seenL % 2500 == 0:
-                            log('.', end='')
-                        if newL + seenL % 100000 == 0:
-                            log('observed %i links' % (newL + seenL))
+            if nGuid > 0 and nGuid % 2500 == 0:
+                log('.', end='')
+            if nGuid > 0 and nGuid % 100000 == 0:
+                log('scanned %i GUIDs' % nGuid)
         log('')
-        log('Finished scanning GUIDs')
+        log('Finished scanning %d GUIDs' % len(guids))
         log('New links: %d, Observed existing links: %d' % (newL, seenL))
 
     return list(locations.keys())

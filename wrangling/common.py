@@ -50,9 +50,9 @@ def addPrimitiveChild(parent, child, primitives=None, primitiveLinks=None, sourc
     assert parentPrimitive is not None and childPrimitive is not None
     if child not in parentPrimitive['children']:
         parentPrimitive['children'].append(child)
+        if 'time' in childPrimitive:
+            parentPrimitive['childrenTime'] += childPrimitive['time']
         primitives[parent] = parentPrimitive
-        if 'time' in child:
-            primitives[parent]['childrenTime'] += child['time']
     if parent not in childPrimitive['parents']:
         childPrimitive['parents'].append(parent)
         primitives[child] = childPrimitive
