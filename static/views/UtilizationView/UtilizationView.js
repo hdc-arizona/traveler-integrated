@@ -12,6 +12,8 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
       { type: 'text', url: 'views/UtilizationView/template.svg' }
     ];
     super(argObj);
+    this.xScale = d3.scaleLinear().clamp(true);
+    this.yScale = d3.scaleLinear();
   }
   getData () {
     // Debounce...
@@ -43,12 +45,8 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
         domain[1] = Math.max(end, domain[1]);
       }
 
-      this.xScale = d3.scaleLinear()
-        .domain(domain)
-        .range([0, bounds.width]);
-      this.yScale = d3.scaleLinear()
-        .domain([0, maxCount])
-        .range([bounds.height, 0]);
+      this.xScale.domain(domain);
+      this.yScale.domain([0, maxCount]);
 
       this.render();
     }, 100);
@@ -61,7 +59,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
-    return {
+    const result = {
       width: bounds.width - this.margin.left - this.margin.right,
       height: bounds.height - this.margin.top - this.margin.bottom,
       left: bounds.left + this.margin.left,
@@ -69,6 +67,9 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
       right: bounds.right - this.margin.right,
       bottom: bounds.bottom - this.margin.bottom
     };
+    this.xScale.range([0, result.width]);
+    this.yScale.range([result.height, 0]);
+    return result;
   }
   setup () {
     super.setup();

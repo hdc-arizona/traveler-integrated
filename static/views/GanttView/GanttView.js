@@ -13,22 +13,44 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       { type: 'text', url: 'views/GanttView/template.svg' }
     ];
     super(argObj);
+    this.xScale = d3.scaleLinear().clamp(true);
+    this.yScale = d3.scaleBand()
+      .paddingInner(0.2)
+      .paddingOuter(0.1);
 
     this.stream = null;
     this.cache = new Set();
     this.newCache = null;
+    this.intervalCount = 0;
+
+    // Don't bother drawing bars if there are more than 500 visible intervals
+    this.renderCutoff = 500;
 
     // Override uki's default .1 second debouncing of render() because we want
     // to throttle incremental updates to at most once per second
     this.debounceWait = 1000;
   }
   getData () {
-    // Debounce...
+    // Debounce the start of this expensive process...
     window.clearTimeout(this._resizeTimeout);
-    this._resizeTimeout = window.setTimeout(() => {
+    this._resizeTimeout = window.setTimeout(async () => {
       const label = encodeURIComponent(this.layoutState.label);
       const intervalWindow = this.linkedState.intervalWindow;
       const self = this;
+      // First check whether we're asking for too much data by getting a
+      // histogram with a single bin (TODO: draw per-location histograms instead
+      // of just saying "Scroll or reverse-pinch to zoom in?")
+      this.histogram = await d3.json(`/datasets/${label}/histogram?bins=1&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
+      this.intervalCount = this.histogram[0][2];
+      if (this.isEmpty) {
+        // Empty out whatever we were looking at before and bail immediately
+        this.cache = new Set();
+        this.render();
+        return;
+      }
+
+      // Okay, start the stream, and collect it in a separate cache to avoid
+      // old intervals from disappearing from incremental refreshes
       this.newCache = new Set();
       this.waitingOnIncrementalRender = false;
       const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
@@ -60,11 +82,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     return super.isLoading || this.stream !== null;
   }
   get isEmpty () {
-    return this.cache.size === 0 && (this.newCache === null || this.newCache.size === 0);
+    return this.intervalCount === 0 || this.intervalCount > this.renderCutoff;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
-    return {
+    const result = {
       width: bounds.width - this.margin.left - this.margin.right,
       height: bounds.height - this.margin.top - this.margin.bottom,
       left: bounds.left + this.margin.left,
@@ -72,6 +94,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       right: bounds.right - this.margin.right,
       bottom: bounds.bottom - this.margin.bottom
     };
+    this.xScale.range([0, result.width]);
+    this.yScale.range([0, result.height]);
+    return result;
   }
   setup () {
     super.setup();
@@ -87,8 +112,19 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
-    // Start / abort + re-start the stream whenever the brush changes
-    this.linkedState.on('newIntervalWindow', () => { this.getData(); });
+    // Set up zoom / pan interactions
+    this.setupZoom();
+
+    // Update scales whenever something changes the brush
+    this.linkedState.on('newIntervalWindow', () => {
+      this.xScale.domain(this.linkedState.intervalWindow);
+      this.yScale.domain(this.linkedState.metadata.locationNames);
+      // Abort + re-start the stream
+      this.getData();
+    });
+    // Initialize the scales / stream
+    this.xScale.domain(this.linkedState.intervalWindow);
+    this.yScale.domain(this.linkedState.metadata.locationNames);
     this.getData();
   }
   draw () {
@@ -97,7 +133,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     if (this.isHidden) {
       return;
     } else if (this.isEmpty) {
-      this.emptyStateDiv.html('<p>No data to show</p>');
+      if (this.intervalCount === 0) {
+        this.emptyStateDiv.html('<p>No data to show</p>');
+      } else {
+        this.emptyStateDiv.html('<p>Scroll or reverse-pinch to zoom in</p>');
+      }
     }
     // Combine old data with any new data that's streaming in
     const data = (this.newCache ? this.newCache.union(this.cache) : this.cache).toArray();
@@ -113,17 +153,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
   }
   drawAxes () {
     const bounds = this.getChartBounds();
-
-    // Initialize / update the scales
-    this.xScale = d3.scaleLinear()
-      .domain([this.linkedState.begin, this.linkedState.end])
-      .range([0, bounds.width])
-      .clamp(true);
-    this.yScale = d3.scaleBand()
-      .domain(this.linkedState.metadata.locationNames)
-      .range([0, bounds.height])
-      .paddingInner(0.2)
-      .paddingOuter(0.1);
 
     // Update the x axis
     const xAxisGroup = this.content.select('.xAxis')
@@ -184,6 +213,94 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
   }
   drawLinks (data) {
     // TODO
+  }
+  setupZoom () {
+    // d3's zoom() implementation is a little clunky for 1D use cases / non-SVG
+    // events, so we DIY it:
+
+    const background = this.content.select('.background').node();
+    let originalDomain = null;
+    let firstPointer = null;
+    let secondPointer = null;
+    let zoomFactor = 1.0;
+    // Some helper functions:
+    const updateScale = (updateFactor = false) => {
+      // First compute the current zoom factor
+      let z = zoomFactor;
+      if (secondPointer) {
+        // Proportion of the distance between where the second point is to where
+        // it was, with the first point's current position acting as the anchor
+        z = z * Math.abs((secondPointer.x1 - firstPointer.x1) /
+          (secondPointer.x0 - firstPointer.x1));
+        if (updateFactor) {
+          zoomFactor = z;
+        }
+      }
+      // Compute how much we need to pan
+      const dx = zoomFactor * (firstPointer.x0 - firstPointer.x1);
+      // Derive the new domain
+      const originalScale = d3.scaleLinear()
+        .domain(originalDomain)
+        .range(this.xScale.range());
+      const moveEndpoint = position => {
+        return originalScale.invert(originalScale(position) + dx);
+      };
+      this.xScale.domain([
+        moveEndpoint(this.linkedState.begin),
+        moveEndpoint(this.linkedState.end)
+      ]);
+    };
+    const handlers = {
+      'down': event => {
+        background.setPointerCapture(event.pointerId);
+        const x0 = event.clientX;
+        if (!firstPointer) {
+          originalDomain = this.xScale.domain();
+          firstPointer = { id: event.pointerId, x0, x1: x0 };
+        } else if (!secondPointer) {
+          secondPointer = { id: event.pointerId, x0, x1: x0 };
+        }
+      },
+      'move': event => {
+        // Only update the axes while the user is panning / zooming
+        if (firstPointer && event.pointerId === firstPointer.id) {
+          firstPointer.x1 = event.clientX;
+          updateScale();
+          this.drawAxes();
+        } else if (secondPointer && event.pointerId === secondPointer.id) {
+          secondPointer.x1 = event.clientX;
+          updateScale();
+          this.drawAxes();
+        }
+      },
+      'up': event => {
+        background.releasePointerCapture(event.pointerId);
+        if (firstPointer && event.pointerId === firstPointer.id) {
+          firstPointer.x1 = event.clientX;
+          updateScale();
+          originalDomain = null;
+          firstPointer = null;
+          secondPointer = null;
+          // Update the domain for all views that use it (including this one);
+          // this should trigger full render() calls in those views
+          const newDomain = this.xScale.domain();
+          this.linkedState.setIntervalWindow({
+            begin: newDomain[0],
+            end: newDomain[1]
+          });
+        } else if (secondPointer && event.pointerId === secondPointer.id) {
+          secondPointer.x1 = event.clientX;
+          updateScale(true);
+          secondPointer = null;
+          this.drawAxes();
+        }
+      }
+    };
+    // Attach listeners to helper functions:
+    for (const [context, handler] of Object.entries(handlers)) {
+      background.addEventListener('pointer' + context, handler);
+    }
+    background.addEventListener('pointercance', handlers.up);
   }
 }
 export default GanttView;

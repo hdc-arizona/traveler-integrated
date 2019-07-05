@@ -2,13 +2,14 @@
 
 .GanttView {
   cursor: grab;
-  &.grabbing {
+  touch-action: none; /* Don't zoom the browser when the user pinches */
+  &:active {
     cursor: grabbing;
   }
   text {
     font: 9px sans-serif;
   }
-  .background {
+  .background rect {
     fill: transparent;
   }
   .cursor {

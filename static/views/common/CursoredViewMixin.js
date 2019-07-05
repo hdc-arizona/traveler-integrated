@@ -2,7 +2,7 @@
 
 /*
   Convenience mixin for GanttView and UtilizationView; this expects a
-  .background rectangle and a .cursor line to exist, as well as xScale
+  .background group with a .cursor line to exist, as well as xScale
 */
 const CursoredViewMixin = function (superclass) {
   const CursoredView = class extends superclass {
@@ -11,10 +11,11 @@ const CursoredViewMixin = function (superclass) {
       // For responsiveness, move the cursor immediately
       // (instead of waiting around for debounced events / server calls)
       this.linkedState.on('moveCursor', () => { this.updateCursor(); });
-      this.content
+      this.d3el
         .on('mousemove', () => {
           if (this.xScale) {
-            this.linkedState.moveCursor(this.xScale.invert(d3.event.offsetX - this.margin.left));
+            const bounds = this.getAvailableSpace();
+            this.linkedState.moveCursor(this.xScale.invert(d3.event.clientX - bounds.left - this.margin.left));
           }
         }).on('mouseout', () => {
           this.linkedState.moveCursor(null);
@@ -25,30 +26,29 @@ const CursoredViewMixin = function (superclass) {
       // This will be called less frequently than updateCursor(), for things
       // like resized windows
       const bounds = this.getChartBounds();
+      this.xScale.range([0, bounds.width]);
       this.content.select('.cursor')
         .attr('y1', 0)
         .attr('y2', bounds.height + this.emSize);
-      // Need a background rect to capture events
-      this.content.select('.background')
+      // Need a background rect to ensure events are captured
+      this.content.select('.background rect')
         .attr('width', bounds.width)
         .attr('height', bounds.height);
       this.updateCursor();
     }
     updateCursor () {
-      if (this.xScale) {
-        let position = this.linkedState.cursorPosition;
-        if (position !== null) {
-          const [low, high] = this.xScale.domain();
-          if (position > low && position < high) {
-            // Hide the cursor unless it's strictly within this view's domain
-            position = this.xScale(position);
-          }
+      let position = this.linkedState.cursorPosition;
+      if (position !== null) {
+        const [low, high] = this.xScale.domain();
+        if (position > low && position < high) {
+          // Hide the cursor unless it's strictly within this view's domain
+          position = this.xScale(position);
         }
-        this.content.select('.cursor')
-          .style('display', position === null ? 'none' : null)
-          .attr('x1', position)
-          .attr('x2', position);
       }
+      this.content.select('.cursor')
+        .style('display', position === null ? 'none' : null)
+        .attr('x1', position)
+        .attr('x2', position);
     }
   };
   CursoredView.prototype._instanceOfCursoredViewMixin = true;
