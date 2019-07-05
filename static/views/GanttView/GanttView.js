@@ -17,6 +17,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this.stream = null;
     this.cache = new Set();
     this.newCache = null;
+
+    // Override uki's default .1 second debouncing of render() because we want
+    // to throttle incremental updates to at most once per second
+    this.debounceWait = 1000;
   }
   getData () {
     // Debounce...
@@ -26,6 +30,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       const intervalWindow = this.linkedState.intervalWindow;
       const self = this;
       this.newCache = new Set();
+      this.waitingOnIncrementalRender = false;
       const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
         .node('!.*', function (chunk) {
           if (currentStream !== self.stream) {
@@ -34,9 +39,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
           } else {
             // Store the interval
             self.newCache = self.newCache.add(new Map(chunk));
-            if (self.newCache.size % 2) {
-              // Do an incremental render() every 2 intervals
+            if (!self.waitingOnIncrementalRender) {
+              // self.render() is debounced; this converts it to throttling,
+              // rate-limiting incremental refreshes by this.debounceWait
               self.render();
+              self.waitingOnIncrementalRender = true;
             }
           }
         })
@@ -100,6 +107,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this.drawBars(data);
     // TODO: Update the links
     this.drawLinks(data);
+
+    // Update the incremental flag so that we can call render again if needed
+    this.waitingOnIncrementalRender = false;
   }
   drawAxes () {
     const bounds = this.getChartBounds();
