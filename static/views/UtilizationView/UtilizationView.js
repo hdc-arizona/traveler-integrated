@@ -156,7 +156,6 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
     const brush = this.content.select('.brush');
     const brushDrag = d3.drag()
       .on('start', () => {
-        brush.classed('grabbing', true);
         initialState = {
           begin: this.linkedState.begin,
           end: this.linkedState.end,
@@ -182,9 +181,6 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
         // For responsiveness, draw the brush immediately
         // (instead of waiting around for debounced events / server calls)
         this.drawBrush({ begin, end });
-      })
-      .on('end', () => {
-        brush.classed('grabbing', false);
       });
     const leftDrag = d3.drag().on('drag', () => {
       let begin = this.xScale.invert(d3.event.x);

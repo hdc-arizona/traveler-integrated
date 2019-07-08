@@ -230,8 +230,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       if (secondPointer) {
         // Proportion of the distance between where the second point is to where
         // it was, with the first point's current position acting as the anchor
-        z = z * Math.abs((secondPointer.x1 - firstPointer.x1) /
-          (secondPointer.x0 - firstPointer.x1));
+        const originalDistance = Math.sqrt(
+          (secondPointer.x0 - secondPointer.firstPointerState.x) ** 2 +
+          (secondPointer.y0 - secondPointer.firstPointerState.y) ** 2);
+        const currentDistance = Math.sqrt(
+          (secondPointer.x1 - firstPointer.x1) ** 2 +
+          (secondPointer.y1 - firstPointer.y1) ** 2
+        );
+        z = z * currentDistance / originalDistance;
         if (updateFactor) {
           zoomFactor = z;
         }
@@ -254,21 +260,25 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       'down': event => {
         background.setPointerCapture(event.pointerId);
         const x0 = event.clientX;
+        const y0 = event.clientY;
         if (!firstPointer) {
           originalDomain = this.xScale.domain();
-          firstPointer = { id: event.pointerId, x0, x1: x0 };
+          firstPointer = { id: event.pointerId, x0, x1: x0, y0, y1: y0 };
         } else if (!secondPointer) {
-          secondPointer = { id: event.pointerId, x0, x1: x0 };
+          const firstPointerState = { x: firstPointer.x1, y: firstPointer.y1 };
+          secondPointer = { id: event.pointerId, x0, x1: x0, y0, y1: y0, firstPointerState };
         }
       },
       'move': event => {
         // Only update the axes while the user is panning / zooming
         if (firstPointer && event.pointerId === firstPointer.id) {
           firstPointer.x1 = event.clientX;
+          firstPointer.y1 = event.clientY;
           updateScale();
           this.drawAxes();
         } else if (secondPointer && event.pointerId === secondPointer.id) {
           secondPointer.x1 = event.clientX;
+          secondPointer.y1 = event.clientY;
           updateScale();
           this.drawAxes();
         }
@@ -280,6 +290,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
 
         if (firstPointer && event.pointerId === firstPointer.id) {
           firstPointer.x1 = event.clientX;
+          firstPointer.y1 = event.clientY;
           updateScale();
           originalDomain = null;
           firstPointer = null;
@@ -303,7 +314,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     for (const [context, handler] of Object.entries(handlers)) {
       background.addEventListener('pointer' + context, handler);
     }
-    background.addEventListener('pointercance', handlers.up);
+    background.addEventListener('pointercancel', handlers.up);
   }
 }
 export default GanttView;
