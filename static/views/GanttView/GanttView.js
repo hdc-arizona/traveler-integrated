@@ -4,6 +4,7 @@ import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
 import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import { Map, Set } from '../../node_modules/immutable/dist/immutable.es.js';
+import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
 class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))) {
@@ -13,7 +14,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       { type: 'text', url: 'views/GanttView/template.svg' }
     ];
     super(argObj);
-    this.xScale = d3.scaleLinear().clamp(true);
+    this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleBand()
       .paddingInner(0.2)
       .paddingOuter(0.1);
@@ -29,6 +30,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     // Override uki's default .1 second debouncing of render() because we want
     // to throttle incremental updates to at most once per second
     this.debounceWait = 1000;
+
+    // Some things like SVG clipPaths require ids instead of classes...
+    this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
+    GanttView.DOM_COUNT++;
   }
   getData () {
     // Debounce the start of this expensive process...
@@ -112,6 +117,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
+    // Create a view-specific clipPath id, as there can be more than one
+    // GanttView in the app
+    const clipId = this.uniqueDomId + 'clip';
+    this.content.select('clipPath')
+      .attr('id', clipId);
+    this.content.select('.clippedStuff')
+      .attr('clip-path', `url(#${clipId})`);
+
     // Set up zoom / pan interactions
     this.setupZoomAndPan();
 
@@ -143,8 +156,12 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     // immediately-drawn things like drawAxes that get executed repeatedly by
     // scrolling / panning)
     this._bounds = this.getChartBounds();
+
     // Combine old data with any new data that's streaming in
     const data = (this.newCache ? this.newCache.union(this.cache) : this.cache).toArray();
+
+    // Update the clip rect
+    this.drawClip();
     // Update the axes (also updates scales)
     this.drawAxes();
     // Update the bars
@@ -154,6 +171,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
 
     // Update the incremental flag so that we can call render again if needed
     this.waitingOnIncrementalRender = false;
+  }
+  drawClip () {
+    this.content.select('clipPath rect')
+      .attr('width', this._bounds.width)
+      .attr('height', this._bounds.height);
   }
   drawAxes () {
     // Update the x axis
@@ -196,6 +218,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
   }
   drawBars (data) {
+    if (!this.initialDragState) {
+      // Remove temporarily patched transformations
+      this.content.select('.bars').attr('transform', null);
+    }
     let bars = this.content.select('.bars')
       .selectAll('.bar').data(data, d => d);
     bars.exit().remove();
@@ -215,10 +241,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
   }
   drawLinks (data) {
     // TODO
+    if (!this.initialDragState) {
+      // Remove temporarily patched transformations
+      this.content.select('.links').attr('transform', null);
+    }
   }
   setupZoomAndPan () {
-    let initialState;
-    const setWindow = (begin, end) => {
+    this.initialDragState = null;
+    const clampWindow = (begin, end) => {
       // clamp to the lowest / highest possible values
       if (begin <= this.linkedState.beginLimit) {
         const offset = this.linkedState.beginLimit - begin;
@@ -230,14 +260,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
         begin -= offset;
         end -= offset;
       }
-      this.linkedState.setIntervalWindow({ begin, end });
-      // For responsiveness, draw the axes immediately (the full render()
-      // triggered by changing linkedState may take a while)
-      this.drawAxes();
+      return { begin, end };
     };
     this.content.select('.background')
       .on('wheel', () => {
-        const zoomFactor = 2 ** d3.event.deltaY;
+        const zoomFactor = 1.05 ** (normalizeWheel(d3.event).pixelY / 100);
         const originalWidth = this.linkedState.end - this.linkedState.begin;
         // Clamp the width to a min of 10ms, and the largest possible size
         let targetWidth = Math.max(zoomFactor * originalWidth, 10);
@@ -246,21 +273,62 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
         const mousedPoint = this.xScale.invert(d3.event.clientX - this._bounds.left - this.margin.left);
         const begin = mousedPoint - (targetWidth / originalWidth) * (mousedPoint - this.linkedState.begin);
         const end = mousedPoint + (targetWidth / originalWidth) * (this.linkedState.end - mousedPoint);
-        setWindow(begin, end);
+        const actualBounds = clampWindow(begin, end);
+
+        // There isn't a begin / end wheel event, so trigger the update across
+        // views immediately
+        this.linkedState.setIntervalWindow(actualBounds);
+
+        // For responsiveness, draw the axes immediately (the debounced, full
+        // render() triggered by changing linkedState may take a while)
+        this.drawAxes();
+
+        // TODO: patch a scale transformation
       }).call(d3.drag()
         .on('start', () => {
-          initialState = {
+          this.initialDragState = {
             begin: this.linkedState.begin,
             end: this.linkedState.end,
-            x: this.xScale.invert(d3.event.x)
+            x: this.xScale.invert(d3.event.x),
+            scale: d3.scaleLinear()
+              .domain(this.xScale.domain())
+              .range(this.xScale.range())
           };
         })
         .on('drag', () => {
-          const dx = initialState.x - this.xScale.invert(d3.event.x);
-          const begin = initialState.begin + dx;
-          const end = initialState.end + dx;
-          setWindow(begin, end);
+          const mousedPoint = this.initialDragState.scale.invert(d3.event.x);
+          const dx = this.initialDragState.x - mousedPoint;
+          const begin = this.initialDragState.begin + dx;
+          const end = this.initialDragState.end + dx;
+          const actualBounds = clampWindow(begin, end);
+          // Don't bother triggering a full update mid-drag...
+          // this.linkedState.setIntervalWindow(actualBounds)
+
+          // For responsiveness, draw the axes immediately (the debounced, full
+          // render() triggered by changing linkedState may take a while)
+          this.drawAxes();
+
+          // Patch a temporary translation to the bars / links layers (this gets
+          // removed by full drawBars() / drawLinks() calls)
+          const shift = this.initialDragState.scale(this.initialDragState.begin) -
+            this.initialDragState.scale(actualBounds.begin);
+          this.content.selectAll('.bars, .links')
+            .attr('transform', `translate(${shift}, 0)`);
+
+          // d3's drag behavior captures + prevents updating the cursor, so do
+          // that manually
+          this.linkedState.moveCursor(mousedPoint);
+          this.updateCursor();
+        })
+        .on('end', () => {
+          const dx = this.initialDragState.x - this.initialDragState.scale.invert(d3.event.x);
+          const begin = this.initialDragState.begin + dx;
+          const end = this.initialDragState.end + dx;
+          this.initialDragState = null;
+
+          this.linkedState.setIntervalWindow(clampWindow(begin, end));
         }));
   }
 }
+GanttView.DOM_COUNT = 1;
 export default GanttView;

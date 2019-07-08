@@ -1,3 +1,8 @@
+<defs>
+  <clipPath id="dummy">
+    <rect></rect>
+  </clipPath>
+</defs>
 <g class="chart">
   <g class="background">
     <rect></rect>
@@ -7,6 +12,8 @@
     <g class="xAxis"></g>
     <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
   </g>
-  <g class="bars"></g>
-  <g class="links"></g>
+  <g class="clippedStuff">
+    <g class="bars"></g>
+    <g class="links"></g>
+  </g>
 </g>
