@@ -42,6 +42,14 @@ def tree(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not contain tree data')
     return db[label]['coreTree']
 
+@app.get('/datasets/{label}/code')
+def code(label: str):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
+    if 'code' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not include source code')
+    return db[label]['code']
+
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):
     if label not in db:
