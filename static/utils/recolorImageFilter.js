@@ -1,6 +1,6 @@
 /* globals d3 */
 
-d3.select(window).on('load', () => {
+export default () => {
   // Extract all filters that look like url(#recolorImageToFFFFFF) from the
   // stylesheets that have been loaded in the document
   const colorScheme = {};
@@ -66,4 +66,4 @@ d3.select(window).on('load', () => {
       let hexvalue = d.slice(4, 6);
       return Math.pow(parseInt(hexvalue, 16) / 255, 2);
     });
-});
+};

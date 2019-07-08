@@ -274,7 +274,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
         }
       },
       'up': event => {
-        background.releasePointerCapture(event.pointerId);
+        try {
+          background.releasePointerCapture(event.pointerId);
+        } catch (e) { if (e.name !== 'InvalidPointerId') { throw e; } }
+
         if (firstPointer && event.pointerId === firstPointer.id) {
           firstPointer.x1 = event.clientX;
           updateScale();

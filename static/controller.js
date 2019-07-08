@@ -8,6 +8,7 @@ import CodeView from './views/CodeView/CodeView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import defaultLayout from './config/defaultLayout.js';
+import recolorImageFilter from './utils/recolorImageFilter.js';
 
 const viewClassLookup = {
   SummaryView,
@@ -72,9 +73,11 @@ class Controller {
       this.renderAllViews();
     });
     window.addEventListener('load', async () => {
-      // Don't actually initialize GoldenLayout until LESS has finished
-      // (otherwise we can get panes of size zero, especially in firefox)
+      // Don't actually add our image recoloring hacks or initialize
+      // GoldenLayout until LESS has finished (the 'load' event sometimes fires
+      // before LESS is finished generating styles, especially in firefox)
       await less.pageLoadFinished;
+      recolorImageFilter();
       this.goldenLayout.init();
       this.renderAllViews();
     });
