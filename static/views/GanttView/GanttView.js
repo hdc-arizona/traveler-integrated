@@ -3,7 +3,6 @@ import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
 import CursoredViewMixin from '../common/CursoredViewMixin.js';
-import { Map, Set } from '../../node_modules/immutable/dist/immutable.es.js';
 import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
@@ -20,7 +19,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       .paddingOuter(0.1);
 
     this.stream = null;
-    this.cache = new Set();
+    this.cache = {};
     this.newCache = null;
     this.intervalCount = 0;
 
@@ -49,23 +48,24 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       this.intervalCount = this.histogram[0][2];
       if (this.isEmpty) {
         // Empty out whatever we were looking at before and bail immediately
-        this.cache = new Set();
+        this.cache = {};
         this.render();
         return;
       }
 
       // Okay, start the stream, and collect it in a separate cache to avoid
       // old intervals from disappearing from incremental refreshes
-      this.newCache = new Set();
+      this.newCache = {};
       this.waitingOnIncrementalRender = false;
       const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
-        .node('!.*', function (chunk) {
+        .node('!.*', function (interval) {
           if (currentStream !== self.stream) {
             // A different stream has been started; abort this one
             this.abort();
           } else {
             // Store the interval
-            self.newCache = self.newCache.add(new Map(chunk));
+            const key = interval.enter.Timestamp + '_' + interval.leave.Timestamp + '_' + interval.Location;
+            self.newCache[key] = interval;
             if (!self.waitingOnIncrementalRender) {
               // self.render() is debounced; this converts it to throttling,
               // rate-limiting incremental refreshes by this.debounceWait
@@ -158,7 +158,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this._bounds = this.getChartBounds();
 
     // Combine old data with any new data that's streaming in
-    const data = (this.newCache ? this.newCache.union(this.cache) : this.cache).toArray();
+    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
 
     // Update the clip rect
     this.drawClip();
@@ -223,13 +223,13 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       this.content.select('.bars').attr('transform', null);
     }
     let bars = this.content.select('.bars')
-      .selectAll('.bar').data(data, d => d);
+      .selectAll('.bar').data(data, d => d.key);
     bars.exit().remove();
     const barsEnter = bars.enter().append('g')
       .classed('bar', true);
     bars = bars.merge(barsEnter);
 
-    bars.attr('transform', d => `translate(${this.xScale(d.get('enter').Timestamp)},${this.yScale(d.get('Location'))})`);
+    bars.attr('transform', d => `translate(${this.xScale(d.value.enter.Timestamp)},${this.yScale(d.value.Location)})`);
 
     barsEnter.append('rect')
       .classed('area', true);
@@ -237,7 +237,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       .classed('outline', true);
     bars.selectAll('rect')
       .attr('height', this.yScale.bandwidth())
-      .attr('width', d => this.xScale(d.get('leave').Timestamp) - this.xScale(d.get('enter').Timestamp));
+      .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
   }
   drawLinks (data) {
     // TODO
@@ -249,7 +249,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
   setupZoomAndPan () {
     this.initialDragState = null;
     let latentWidth = null;
-    let latentTimeout;
     const clampWindow = (begin, end) => {
       // clamp to the lowest / highest possible values
       if (begin <= this.linkedState.beginLimit) {

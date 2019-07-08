@@ -24,12 +24,6 @@ node_modules/oboe/*
 node_modules/oboe/dist/*
 !node_modules/oboe/dist/oboe-browser.min.js
 
-!node_modules/immutable/
-node_modules/immutable/*
-!node_modules/immutable/dist/
-node_modules/immutable/dist/*
-!node_modules/immutable/dist/immutable.es.js
-
 !node_modules/jquery/
 node_modules/jquery/*
 !node_modules/jquery/dist/

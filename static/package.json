@@ -19,7 +19,6 @@
     "codemirror": "^5.48.0",
     "d3": "^5.9.7",
     "golden-layout": "^1.5.9",
-    "immutable": "^4.0.0-rc.12",
     "jquery": "^3.4.1",
     "less": "^3.9.0",
     "oboe": "^2.1.4",
