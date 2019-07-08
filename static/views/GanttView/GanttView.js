@@ -248,6 +248,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
   }
   setupZoomAndPan () {
     this.initialDragState = null;
+    let latentWidth = null;
+    let latentTimeout;
     const clampWindow = (begin, end) => {
       // clamp to the lowest / highest possible values
       if (begin <= this.linkedState.beginLimit) {
@@ -270,9 +272,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
         let targetWidth = Math.max(zoomFactor * originalWidth, 10);
         targetWidth = Math.min(targetWidth, this.linkedState.endLimit - this.linkedState.beginLimit);
         // Compute the new begin / end points, centered on where the user is mousing
-        const mousedPoint = this.xScale.invert(d3.event.clientX - this._bounds.left - this.margin.left);
-        const begin = mousedPoint - (targetWidth / originalWidth) * (mousedPoint - this.linkedState.begin);
-        const end = mousedPoint + (targetWidth / originalWidth) * (this.linkedState.end - mousedPoint);
+        const mousedScreenPoint = d3.event.clientX - this._bounds.left - this.margin.left;
+        const mousedPosition = this.xScale.invert(mousedScreenPoint);
+        const begin = mousedPosition - (targetWidth / originalWidth) * (mousedPosition - this.linkedState.begin);
+        const end = mousedPosition + (targetWidth / originalWidth) * (this.linkedState.end - mousedPosition);
         const actualBounds = clampWindow(begin, end);
 
         // There isn't a begin / end wheel event, so trigger the update across
@@ -283,7 +286,15 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
         // render() triggered by changing linkedState may take a while)
         this.drawAxes();
 
-        // TODO: patch a scale transformation
+        // Patch a temporary scale transform to the bars / links layers (this
+        // gets removed by full drawBars() / drawLinks() calls)
+        if (!this.content.select('.bars').attr('transform')) {
+          latentWidth = originalWidth;
+        }
+        const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
+        const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
+        this.content.selectAll('.bars, .links')
+          .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
       }).call(d3.drag()
         .on('start', () => {
           this.initialDragState = {
@@ -296,8 +307,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
           };
         })
         .on('drag', () => {
-          const mousedPoint = this.initialDragState.scale.invert(d3.event.x);
-          const dx = this.initialDragState.x - mousedPoint;
+          const mousedPosition = this.initialDragState.scale.invert(d3.event.x);
+          const dx = this.initialDragState.x - mousedPosition;
           const begin = this.initialDragState.begin + dx;
           const end = this.initialDragState.end + dx;
           const actualBounds = clampWindow(begin, end);
@@ -317,7 +328,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
 
           // d3's drag behavior captures + prevents updating the cursor, so do
           // that manually
-          this.linkedState.moveCursor(mousedPoint);
+          this.linkedState.moveCursor(mousedPosition);
           this.updateCursor();
         })
         .on('end', () => {
