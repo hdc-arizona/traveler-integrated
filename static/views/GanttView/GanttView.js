@@ -23,8 +23,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this.newCache = null;
     this.intervalCount = 0;
 
-    // Don't bother drawing bars if there are more than 500 visible intervals
-    this.renderCutoff = 500;
+    // Don't bother drawing bars if there are more than 1000 visible intervals
+    this.renderCutoff = 1000;
 
     // Override uki's default .1 second debouncing of render() because we want
     // to throttle incremental updates to at most once per second
@@ -36,6 +36,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
   }
   getData () {
     // Debounce the start of this expensive process...
+    // (but flag that we're loading)
     window.clearTimeout(this._resizeTimeout);
     this._resizeTimeout = window.setTimeout(async () => {
       const label = encodeURIComponent(this.layoutState.label);
@@ -43,11 +44,12 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       const self = this;
       // First check whether we're asking for too much data by getting a
       // histogram with a single bin (TODO: draw per-location histograms instead
-      // of just saying "Scroll to zoom in?")
+      // of just saying "Too much data; scroll to zoom in?")
       this.histogram = await d3.json(`/datasets/${label}/histogram?bins=1&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
       this.intervalCount = this.histogram[0][2];
       if (this.isEmpty) {
         // Empty out whatever we were looking at before and bail immediately
+        self.stream = null;
         this.cache = {};
         this.render();
         return;
@@ -139,6 +141,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this.xScale.domain(this.linkedState.intervalWindow);
     this.yScale.domain(this.linkedState.metadata.locationNames);
     this.getData();
+
+    // Draw the axes right away (because we have a longer debounceWait than
+    // normal, there's an initial ugly flash before draw() gets called)
+    this._bounds = this.getChartBounds();
+    this.drawAxes();
   }
   draw () {
     super.draw();
@@ -147,9 +154,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       return;
     } else if (this.isEmpty) {
       if (this.intervalCount === 0) {
-        this.emptyStateDiv.html('<p>No data to show</p>');
+        this.emptyStateDiv.html('<p>No data in the current view</p>');
       } else {
-        this.emptyStateDiv.html('<p>Scroll to zoom in</p>');
+        this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
       }
     }
     // Update the dimensions of the plot in case we were resized (NOT updated by
@@ -160,6 +167,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     // Combine old data with any new data that's streaming in
     const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
 
+    // Hide the small spinner
+    this.content.select('.small.spinner').style('display', 'none');
     // Update the clip rect
     this.drawClip();
     // Update the axes (also updates scales)
@@ -294,6 +303,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
         const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
         this.content.selectAll('.bars, .links')
           .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
+        // Show the small spinner to indicate that some of the stuff the user
+        // sees may be inaccurate (will be hidden once the full draw() call
+        // happens)
+        this.content.select('.small.spinner').style('display', null);
       }).call(d3.drag()
         .on('start', () => {
           this.initialDragState = {
@@ -324,6 +337,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
             this.initialDragState.scale(actualBounds.begin);
           this.content.selectAll('.bars, .links')
             .attr('transform', `translate(${shift}, 0)`);
+
+          // Show the small spinner to indicate that some of the stuff the user
+          // sees may be inaccurate (will be hidden once the full draw() call
+          // happens)
+          this.content.select('.small.spinner').style('display', null);
 
           // d3's drag behavior captures + prevents updating the cursor, so do
           // that manually
