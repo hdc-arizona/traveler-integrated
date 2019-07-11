@@ -10,7 +10,7 @@ from wrangling import common, otf2, phylanx
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
 parser.add_argument('-l', '--label', dest='label', type=str, default='Latest',
-                    help='Label for the bundled dataset (default: "Latest"). Providing a label that already exists in the database will bundle with/overwrite any previous data. If globbing multiple inputs, this should be a regular expression, where the first capturing group indicates which files go together (e.g. --input data/*/phylanxLog.txt --otf2 data/*/OTF2_archive/APEX.otf2 --label data/([^/]*) would merge datasets based on their common directory name)')
+                    help='Label for the bundled dataset (default: "Latest"). Providing a label that already exists in the database will bundle with/overwrite any previous data. If globbing multiple inputs, this should be a regular expression, where the first capturing group indicates which files go together (e.g. --input data/*/phylanxLog.txt --otf2 data/*/OTF2_archive/APEX.otf2 --label data/([^/]*) would merge datasets based on their common directory name). Note that any captured "/" characters will be removed.')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
                     help='Directory to store the bundled data (default: /tmp/traveler-integrated')
 parser.add_argument('-i', '--input', dest='input', type=str, metavar='path', nargs='*', default=[],
@@ -65,7 +65,7 @@ if __name__ == '__main__':
                 elif arg == 'code':
                     # There was one instance of the code file matching the
                     singleCodeFile = False
-                label = m[1]
+                label = m[1].replace('/', '')
                 inputs[label] = inputs.get(label, {})
                 if arg in inputs[label]:
                     raise Exception('--label pattern found duplicate matches for --%s:\n%s\n%s' % (arg, inputs[label][arg], path))

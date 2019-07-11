@@ -52,6 +52,16 @@ Loading many files at once (using a regular expression to match globbed paths):
   --label "data/als_regression/(\d*-\d*-\d*).*"
 ```
 
+Bringing it all together:
+```bash
+./bundle.py \
+  --otf2 data/11July2019/factorial*/OTF2_archive/APEX.otf2 \
+  --input data/11July2019/factorial*/output.txt \
+  --code data/factorial.physl \
+  --label "data\/(11July2019\/factorial[^/]*).*" \
+  --guids
+```
+
 ## Serving
 Running `./serve.py` will launch a web server on port 8000
 

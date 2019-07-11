@@ -139,12 +139,19 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
             for _, event in eventList:
                 assert event is not None
                 if event['Event'] == 'ENTER':
-                    # Start a interval (don't output anything)
-                    assert lastEvent is None
+                    # Start an interval (don't output anything)
+                    if lastEvent is not None:
+                        log('WARNING: omitting ENTER event without a following LEAVE event (%s)' % lastEvent['Primitive']) #pylint: disable=unsubscriptable-object
+                    # TODO: factorial data violates this... why?
+                    # assert lastEvent is None
                     lastEvent = event
                 elif event['Event'] == 'LEAVE':
                     # Finish a interval
-                    assert lastEvent is not None
+                    if lastEvent is None:
+                        log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['Primitive'])
+                        continue
+                    # TODO: factorial data violates this... why?
+                    # assert lastEvent is not None
                     intervalId = str(numIntervals)
                     currentInterval = {'enter': {}, 'leave': {}}
                     for attr, value in event.items():
@@ -165,6 +172,8 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
             # Make sure there are no trailing ENTER events
             # TODO: fibonacci data violates this... why?
             # assert lastEvent is None
+            if lastEvent is not None:
+                log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
         # Finish the intervals dict
         log('')
         log('Finished processing %i intervals' % numIntervals)
@@ -182,9 +191,9 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
                         l = addPrimitiveChild(parentPrimitive, childPrimitive, primitives, primitiveLinks, 'guids', debug)[1]
                         newL += l
                         seenL += 1 if newL == 0 else 0
-            if nGuid > 0 and nGuid % 2500 == 0:
+            if nGuid > 0 and nGuid % 250 == 0:
                 log('.', end='')
-            if nGuid > 0 and nGuid % 100000 == 0:
+            if nGuid > 0 and nGuid % 10000 == 0:
                 log('scanned %i GUIDs' % nGuid)
         log('')
         log('Finished scanning %d GUIDs' % len(guids))
