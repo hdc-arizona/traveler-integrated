@@ -49,8 +49,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       this.intervalCount = this.histogram[0][2];
       if (this.isEmpty) {
         // Empty out whatever we were looking at before and bail immediately
-        self.stream = null;
+        this.stream = null;
         this.cache = {};
+        this.newCache = null;
         this.render();
         return;
       }
