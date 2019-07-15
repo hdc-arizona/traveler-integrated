@@ -25,10 +25,10 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
       try {
         const label = encodeURIComponent(this.layoutState.label);
         const numBins = Math.floor(bounds.width);
-        this.histogram = await d3.json(`/datasets/${label}/histogram?bins=${numBins}`);
+        this.histogram = await d3.json(`/datasets/${label}/utilizationHistogram?bins=${numBins}`);
         if (this.linkedState.selectedPrimitive) {
           const primitive = encodeURIComponent(this.linkedState.selectedPrimitive);
-          this.primitiveHistogram = await d3.json(`/datasets/${label}/histogram/${primitive}?bins=${numBins}`);
+          this.primitiveHistogram = await d3.json(`/datasets/${label}/utilizationHistogram/${primitive}?bins=${numBins}`);
         } else {
           delete this.primitiveHistogram;
         }

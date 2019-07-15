@@ -56,13 +56,21 @@ def primitives(label: str):
         raise HTTPException(status_code=404, detail='Dataset not found')
     return dict(db[label]['primitives'])
 
-@app.get('/datasets/{label}/histogram')
-def histogram(label: str, bins: int = 100, begin: float = None, end: float = None):
+@app.get('/datasets/{label}/countHistogram')
+def countHistogram(label: str, bins: int = 100, begin: float = None, end: float = None):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
     if 'intervalIndex' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
-    return db[label]['intervalIndex'].computeHistogram(bins, begin, end)
+    return db[label]['intervalIndex'].computeCountHistogram(bins, begin, end)
+
+@app.get('/datasets/{label}/utilizationHistogram')
+def utilizationHistogram(label: str, bins: int = 100, begin: float = None, end: float = None):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
+    if 'intervalIndex' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
+    return db[label]['intervalIndex'].computeUtilizationHistogram(bins, begin, end)
 
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
@@ -72,17 +80,17 @@ def intervals(label: str, begin: float = None, end: float = None):
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
     if begin is None:
-        begin = db[label]['intervalIndex'].top_node.stats['begin']
+        begin = db[label]['intervalIndex'].top_node.begin
     if end is None:
-        end = db[label]['intervalIndex'].top_node.stats['end']
+        end = db[label]['intervalIndex'].top_node.end
 
     def intervalGenerator():
         yield '['
         firstItem = True
-        for r in db[label]['intervalIndex'][begin:end]:
+        for i in db[label]['intervalIndex'].iterOverlap(begin, end):
             if not firstItem:
                 yield ','
-            yield json.dumps(db[label]['intervals'][r.data])
+            yield json.dumps(db[label]['intervals'][i.data])
             firstItem = False
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')

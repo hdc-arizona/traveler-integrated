@@ -2,7 +2,6 @@ import os
 import shelve
 import pickle
 import sys
-from intervaltree import IntervalTree #pylint: disable=import-error
 
 def log(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
@@ -40,8 +39,6 @@ def loadDatabase(dbDir):
                 if stype == 'intervalIndex':
                     log('(may take a while if %s is large)' % label)
                 db[label][stype] = pickle.load(open(spath, 'rb'))
-                if isinstance(db[label][stype], IntervalTree):
-                    db[label][stype].freeze() # TODO: not sure why this isn't getting pickled in the bundle stage...
     return db
 
 def addPrimitiveChild(parent, child, primitives=None, primitiveLinks=None, source=None, debug=False):

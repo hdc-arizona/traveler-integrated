@@ -222,9 +222,6 @@ def indexIntervals(intervals):
     index = IntervalTree(interval for interval in intervalIterator())
 
     log('')
-    log('Pre-computing binning statistics')
-    index.freeze()
-
     log('Finished indexing intervals')
 
     return index

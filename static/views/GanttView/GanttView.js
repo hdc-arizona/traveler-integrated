@@ -23,8 +23,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     this.newCache = null;
     this.intervalCount = 0;
 
-    // Don't bother drawing bars if there are more than 1000 visible intervals
-    this.renderCutoff = 1000;
+    // Don't bother drawing bars if there are more than 10000 visible intervals
+    this.renderCutoff = 10000;
 
     // Override uki's default .1 second debouncing of render() because we want
     // to throttle incremental updates to at most once per second
@@ -45,7 +45,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       // First check whether we're asking for too much data by getting a
       // histogram with a single bin (TODO: draw per-location histograms instead
       // of just saying "Too much data; scroll to zoom in?")
-      this.histogram = await d3.json(`/datasets/${label}/histogram?bins=1&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
+      this.histogram = await d3.json(`/datasets/${label}/countHistogram?bins=1&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
       this.intervalCount = this.histogram[0][2];
       if (this.isEmpty) {
         // Empty out whatever we were looking at before and bail immediately

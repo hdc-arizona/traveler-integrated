@@ -168,8 +168,8 @@ if __name__ == '__main__':
                 with open(os.path.join(dbDir, 'intervalIndex.pickle'), 'wb') as intervalIndexFile:
                     pickle.dump(db[label]['intervalIndex'], intervalIndexFile)
                 meta['intervalDomain'] = [
-                    db[label]['intervalIndex'].top_node.stats['begin'],
-                    db[label]['intervalIndex'].top_node.stats['end']
+                    db[label]['intervalIndex'].top_node.begin,
+                    db[label]['intervalIndex'].top_node.end
                 ]
 
                 # Save the extra files
