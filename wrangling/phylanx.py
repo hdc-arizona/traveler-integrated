@@ -4,6 +4,7 @@ from .common import log, processPrimitive, addPrimitiveChild
 
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')
+unflaggedTreeParser = re.compile(r'\(\(\(\(\(.*;')  # assume a line beginning with at least 5 parens is the tree
 
 def _processTree(node, primitives=None, primitiveLinks=None, debug=False):
     # Create the hashed primitive object
@@ -103,6 +104,12 @@ def parsePhylanxLog(path, primitives=None, primitiveLinks=None, debug=False):
                 if treeModeParser.match(line):
                     mode = 'tree'
                     log('Parsing tree...')
+                elif unflaggedTreeParser.match(line):
+                    log('Parsing unflagged line that looks like a newick tree...')
+                    coreTree, nr, sr, nl, sl = processTree(line, primitives, primitiveLinks, debug)
+                    log('Finished parsing newick tree')
+                    log('New primitives: %d, Observed existing primitives: %d' % (nr, sr))
+                    log('New links: %d, Observed existing links: %d' % (nl, sl))
                 elif dotModeParser.match(line):
                     mode = 'dot'
                     log('Parsing graph...')
