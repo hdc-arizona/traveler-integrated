@@ -147,6 +147,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     // normal, there's an initial ugly flash before draw() gets called)
     this._bounds = this.getChartBounds();
     this.drawAxes();
+
+    // Redraw when a new primitive is selected
+    // TODO: can probably do this immediately in a more light-weight way?
+    this.linkedState.on('primitiveSelected', () => { this.render(); });
   }
   draw () {
     super.draw();
@@ -249,20 +253,23 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       .attr('height', this.yScale.bandwidth())
       .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
 
-    bars.on('click', d => {
-      if (!d.value.Primitive) {
-        console.warn(`No primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
-      }
-      this.linkedState.selectPrimitive(d.value.Primitive);
-    }).on('mouseenter', function (d) {
-      window.controller.tooltip.show({
-        content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-        targetBounds: this.getBoundingClientRect(),
-        hideAfterMs: null
+    bars
+      .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
+      .on('click', d => {
+        if (!d.value.Primitive) {
+          console.warn(`No primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
+        } else {
+          this.linkedState.selectPrimitive(d.value.Primitive);
+        }
+      }).on('mouseenter', function (d) {
+        window.controller.tooltip.show({
+          content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
+          targetBounds: this.getBoundingClientRect(),
+          hideAfterMs: null
+        });
+      }).on('mouseleave', () => {
+        window.controller.tooltip.hide();
       });
-    }).on('mouseleave', () => {
-      window.controller.tooltip.hide();
-    });
   }
   drawLinks (data) {
     // TODO

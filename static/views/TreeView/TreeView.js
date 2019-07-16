@@ -63,6 +63,10 @@ Z`
     };
 
     this.content.html(this.resources[1]);
+
+    // Redraw when a new primitive is selected
+    // TODO: auto-expand and scroll if the selected primitive is collapsed?
+    this.linkedState.on('primitiveSelected', () => { this.render(); });
   }
   draw () {
     super.draw();
@@ -217,6 +221,26 @@ Z`
           // All children are showing
           return this.glyphs.expandedTriangle;
         }
+      });
+
+    // Main interactions
+    const self = this;
+    nodes.classed('selected', d => this.linkedState.selectedPrimitive === d.data.name)
+      .on('click', d => {
+        this.linkedState.selectPrimitive(d.data.name);
+      }).on('mouseenter', function (d) {
+        const primitive = self.linkedState.primitives[d.data.name];
+        if (!primitive) {
+          console.warn(`Can't find primitive of name: ${d.data.name}`);
+        } else {
+          window.controller.tooltip.show({
+            content: `<pre>${d.data.name}: ${JSON.stringify(primitive, null, 2)}</pre>`,
+            targetBounds: this.getBoundingClientRect(),
+            hideAfterMs: null
+          });
+        }
+      }).on('mouseleave', () => {
+        window.controller.tooltip.hide();
       });
   }
   drawLinks (transition) {

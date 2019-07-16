@@ -34,6 +34,10 @@
       opacity: 0.25;
       fill: @overviewColor;
     }
+    &.selected {
+      .outline { stroke: @selectedPrimitiveColor; }
+      .area { fill: @selectedPrimitiveColor; }
+    }
     &:hover {
       .area { opacity: 0.5; }
     }
