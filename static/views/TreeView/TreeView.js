@@ -209,6 +209,7 @@ Z`
           this._collapsedParent = d;
         }
         this.render();
+        d3.event.stopPropagation();
       }).transition(transition)
       .attr('d', d => {
         if (d._children) {
