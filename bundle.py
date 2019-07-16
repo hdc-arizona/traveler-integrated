@@ -161,15 +161,20 @@ if __name__ == '__main__':
                     db[label]['events'] = kwargs['events'] = shelve.open(os.path.join(dbDir, 'events.shelf'))
                     meta['hasEvents'] = True
                 # Otf2 parsing handles its logging internally
-                meta['locationNames'] = otf2.parseOtf2(paths['otf2'], **kwargs)
+                otf2Results = otf2.parseOtf2(paths['otf2'], **kwargs)
 
-                # Build and save indexes
-                db[label]['intervalIndex'] = otf2.indexIntervals(db[label]['intervals'])
-                with open(os.path.join(dbDir, 'intervalIndex.pickle'), 'wb') as intervalIndexFile:
-                    pickle.dump(db[label]['intervalIndex'], intervalIndexFile)
+                # Store metadata computed by parsing the OTF2 trace
+                meta['locationNames'] = otf2Results['locationNames']
+
+                # Pickle the indexes
+                db[label]['intervalIndexes'] = otf2Results['indexes']
+                with open(os.path.join(dbDir, 'intervalIndexes.pickle'), 'wb') as intervalIndexFile:
+                    pickle.dump(db[label]['intervalIndexes'], intervalIndexFile)
+
+                # Extract the domain from the main index as metadata
                 meta['intervalDomain'] = [
-                    db[label]['intervalIndex'].top_node.begin,
-                    db[label]['intervalIndex'].top_node.end
+                    db[label]['intervalIndexes']['main'].top_node.begin,
+                    db[label]['intervalIndexes']['main'].top_node.end
                 ]
 
                 # Save the extra files

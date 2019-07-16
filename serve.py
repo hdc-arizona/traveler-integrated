@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+from enum import Enum
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, HTTPException #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
@@ -56,38 +57,57 @@ def primitives(label: str):
         raise HTTPException(status_code=404, detail='Dataset not found')
     return dict(db[label]['primitives'])
 
-@app.get('/datasets/{label}/countHistogram')
-def countHistogram(label: str, bins: int = 100, begin: float = None, end: float = None):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'intervalIndex' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
-    return db[label]['intervalIndex'].computeCountHistogram(bins, begin, end)
+class HistogramMode(str, Enum):
+    utilization = 'utilization'
+    count = 'count'
 
-@app.get('/datasets/{label}/utilizationHistogram')
-def utilizationHistogram(label: str, bins: int = 100, begin: float = None, end: float = None):
+@app.get('/datasets/{label}/histogram')
+def histogram(label: str, \
+              mode: HistogramMode = HistogramMode.utilization, \
+              bins: int = 100, \
+              begin: float = None, \
+              end: float = None, \
+              location: str = None, \
+              primitive: str = None):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'intervalIndex' not in db[label]:
+    if 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
-    return db[label]['intervalIndex'].computeUtilizationHistogram(bins, begin, end)
+
+    def modeHelper(indexObj):
+        return getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
+
+    if location is not None:
+        if location not in db[label]['intervalIndexes']['locations']:
+            print(location, db[label]['intervalIndexes']['locations'].keys(), 1 in db[label]['intervalIndexes']['locations'])
+            raise HTTPException(status_code=404, detail='No index for location: %s' % location)
+        if primitive is not None:
+            if primitive not in db[label]['intervalIndexes']['both'][location]:
+                raise HTTPException(status_code=404, detail='No index for location, primitive combination: %s, %s' % (location, primitive))
+            return modeHelper(db[label]['intervalIndexes']['both'][location][primitive])
+        return modeHelper(db[label]['intervalIndexes']['locations'][location])
+    if primitive is not None:
+        if primitive not in db[label]['intervalIndexes']['primitives']:
+            raise HTTPException(status_code=404, detail='No index for primitive: %s' % primitive)
+        return modeHelper(db[label]['intervalIndexes']['primitives'][primitive])
+    return modeHelper(db[label]['intervalIndexes']['main'])
 
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'intervalIndex' not in db[label]:
+    if 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
     if begin is None:
-        begin = db[label]['intervalIndex'].top_node.begin
+        begin = db[label]['intervalIndexes']['main'].top_node.begin
     if end is None:
-        end = db[label]['intervalIndex'].top_node.end
+        end = db[label]['intervalIndexes']['main'].top_node.end
 
     def intervalGenerator():
         yield '['
         firstItem = True
-        for i in db[label]['intervalIndex'].iterOverlap(begin, end):
+        for i in db[label]['intervalIndexes']['main'].iterOverlap(begin, end):
             if not firstItem:
                 yield ','
             yield json.dumps(db[label]['intervals'][i.data])

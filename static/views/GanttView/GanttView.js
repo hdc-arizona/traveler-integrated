@@ -45,7 +45,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       // First check whether we're asking for too much data by getting a
       // histogram with a single bin (TODO: draw per-location histograms instead
       // of just saying "Too much data; scroll to zoom in?")
-      this.histogram = await d3.json(`/datasets/${label}/countHistogram?bins=1&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
+      this.histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
       this.intervalCount = this.histogram[0][2];
       if (this.isEmpty) {
         // Empty out whatever we were looking at before and bail immediately
