@@ -248,6 +248,21 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
     bars.selectAll('rect')
       .attr('height', this.yScale.bandwidth())
       .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
+
+    bars.on('click', d => {
+      if (!d.value.Primitive) {
+        console.warn(`No primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
+      }
+      this.linkedState.selectPrimitive(d.value.Primitive);
+    }).on('mouseenter', function (d) {
+      window.controller.tooltip.show({
+        content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
+        targetBounds: this.getBoundingClientRect(),
+        hideAfterMs: null
+      });
+    }).on('mouseleave', () => {
+      window.controller.tooltip.hide();
+    });
   }
   drawLinks (data) {
     // TODO
@@ -273,7 +288,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       }
       return { begin, end };
     };
-    this.content.select('.background')
+    this.content
       .on('wheel', () => {
         const zoomFactor = 1.05 ** (normalizeWheel(d3.event).pixelY / 100);
         const originalWidth = this.linkedState.end - this.linkedState.begin;
