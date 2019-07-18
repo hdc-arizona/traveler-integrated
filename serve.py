@@ -75,8 +75,10 @@ def histogram(label: str, \
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
     def modeHelper(indexObj):
-        if indexObj.is_empty():
-            raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
+        # TODO: respond with a 204 when the histogram is empty
+        # (d3.js doesn't have a good way to handle 204 error codes)
+        # if indexObj.is_empty():
+        #    raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
         return getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
 
     if location is not None:
