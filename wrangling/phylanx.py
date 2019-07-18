@@ -8,7 +8,10 @@ unflaggedTreeParser = re.compile(r'\(\(\(\(\(.*;')  # assume a line beginning wi
 
 def _processTree(node, primitives=None, primitiveLinks=None, debug=False):
     # Create the hashed primitive object
-    primitiveName = node.name.strip()
+    if node.name is None:
+        primitiveName = ''
+    else:
+        primitiveName = node.name.strip()
     newR = processPrimitive(primitiveName, primitives, 'tree', debug)[1]
     seenR = 1 if newR == 0 else 0
     tree = {'name': primitiveName, 'children': []}
