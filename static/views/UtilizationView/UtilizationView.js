@@ -80,7 +80,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
       top: 20,
       right: 20,
       bottom: 40,
-      left: 20
+      left: 40
     };
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
@@ -105,7 +105,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
       // Update the axis
-      this.drawAxis();
+      this.drawAxes();
 
       // Update the overview paths
       this.drawPaths(this.content.select('.overview'), this.histogram);
@@ -121,19 +121,27 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
       this.drawBrush();
     }
   }
-  drawAxis () {
+  drawAxes () {
     const bounds = this.getChartBounds();
-    // Update the axis
-    const axis = this.content.select('.axis')
+    // Update the x axis
+    const xAxis = this.content.select('.xAxis')
       .attr('transform', `translate(0, ${bounds.height})`)
       .call(d3.axisBottom(this.xScale));
 
-    cleanupAxis(axis);
+    cleanupAxis(xAxis);
 
-    // Position the label
-    this.content.select('.axisLabel')
+    // Position the x label
+    this.content.select('.xAxisLabel')
       .attr('x', bounds.width / 2)
       .attr('y', bounds.height + this.margin.bottom - this.emSize / 2);
+
+    // Update the y axis
+    this.content.select('.yAxis')
+      .call(d3.axisLeft(this.yScale));
+
+    // Position the y label
+    this.content.select('.yAxisLabel')
+      .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
   drawPaths (container, histogram) {
     const outlinePathGenerator = d3.line()
@@ -156,6 +164,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
     const brush = this.content.select('.brush');
     const brushDrag = d3.drag()
       .on('start', () => {
+        d3.event.sourceEvent.stopPropagation();
         initialState = {
           begin: this.linkedState.begin,
           end: this.linkedState.end,
@@ -183,6 +192,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
         this.drawBrush({ begin, end });
       });
     const leftDrag = d3.drag().on('drag', () => {
+      d3.event.sourceEvent.stopPropagation();
       let begin = this.xScale.invert(d3.event.x);
       // clamp to the lowest possible value
       begin = Math.max(begin, this.linkedState.beginLimit);
@@ -194,6 +204,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
       this.drawBrush({ begin });
     });
     const rightDrag = d3.drag().on('drag', () => {
+      d3.event.sourceEvent.stopPropagation();
       let end = this.xScale.invert(d3.event.x);
       // clamp to the highest possible value
       end = Math.min(end, this.linkedState.endLimit);
@@ -207,6 +218,32 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(
     brush.call(brushDrag);
     brush.select('.leftHandle .hoverTarget').call(leftDrag);
     brush.select('.rightHandle .hoverTarget').call(rightDrag);
+
+    const directDrag = d3.drag()
+      .on('start', () => {
+        d3.event.sourceEvent.stopPropagation();
+        initialState = {
+          x0: this.xScale.invert(d3.event.x - this.margin.left)
+        };
+      })
+      .on('drag', () => {
+        let begin = initialState.x0;
+        let end = this.xScale.invert(d3.event.x - this.margin.left);
+        // In case we're dragging to the left...
+        if (end < begin) {
+          const temp = begin;
+          begin = end;
+          end = temp;
+        }
+        // clamp to the lowest / highest possible values
+        begin = Math.max(begin, this.linkedState.beginLimit);
+        end = Math.min(end, this.linkedState.endLimit);
+        this.linkedState.setIntervalWindow({ begin, end });
+        // For responsiveness, draw the brush immediately
+        // (instead of waiting around for debounced events / server calls)
+        this.drawBrush({ begin, end });
+      });
+    this.content.select('.chart').call(directDrag);
   }
   drawBrush ({
     begin = this.linkedState.begin,

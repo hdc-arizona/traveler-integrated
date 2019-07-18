@@ -2,8 +2,10 @@
   <g class="background">
     <rect></rect>
     <line class="cursor" style="display:none"></line>
-    <g class="axis"></g>
-    <text class="axisLabel" text-anchor="middle">Time in Nanoseconds</text>
+    <g class="yAxis"></g>
+    <text class="yAxisLabel" text-anchor="middle">Utilization</text>
+    <g class="xAxis"></g>
+    <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
   </g>
   <g class="overview">
     <path class="area"></path>
