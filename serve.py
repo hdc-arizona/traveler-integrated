@@ -81,7 +81,6 @@ def histogram(label: str, \
 
     if location is not None:
         if location not in db[label]['intervalIndexes']['locations']:
-            print(location, db[label]['intervalIndexes']['locations'].keys(), 1 in db[label]['intervalIndexes']['locations'])
             raise HTTPException(status_code=404, detail='No index for location: %s' % location)
         if primitive is not None:
             if primitive not in db[label]['intervalIndexes']['both'][location]:

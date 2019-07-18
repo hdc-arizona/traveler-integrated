@@ -257,7 +257,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(Golden
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
       .on('click', d => {
         if (!d.value.Primitive) {
-          console.warn(`No primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
+          console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
+          if (d.value.enter.Primitive) {
+            this.linkedState.selectPrimitive(d.value.enter.Primitive);
+          }
         } else {
           this.linkedState.selectPrimitive(d.value.Primitive);
         }

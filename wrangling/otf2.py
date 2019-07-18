@@ -221,6 +221,9 @@ def parseOtf2(otf2Path, primitives=None, primitiveLinks=None, intervals=None, gu
             if 'Primitive' in intervalObj:
                 resultsToReturn['indexes']['primitives'][intervalObj['Primitive']].add(iv)
                 resultsToReturn['indexes']['both'][location][intervalObj['Primitive']].add(iv)
+            elif 'Primitive' in intervalObj['enter']:
+                resultsToReturn['indexes']['primitives'][intervalObj['enter']['Primitive']].add(iv)
+                resultsToReturn['indexes']['both'][location][intervalObj['enter']['Primitive']].add(iv)
 
             count += 1
             if count % 2500 == 0:
