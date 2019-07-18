@@ -53,6 +53,11 @@ node_modules/codemirror/mode/*
 !node_modules/codemirror/mode/scheme/
 node_modules/codemirror/mode/scheme/*
 !node_modules/codemirror/mode/scheme/scheme.js
+!node_modules/codemirror/addon/
+node_modules/codemirror/addon/*
+!node_modules/codemirror/addon/selection/
+node_modules/codemirror/addon/selection/*
+!node_modules/codemirror/addon/selection/active-line.js
 !node_modules/codemirror/theme/
 node_modules/codemirror/theme/*
 !node_modules/codemirror/theme/base16-light.css

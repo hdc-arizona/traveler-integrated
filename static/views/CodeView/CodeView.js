@@ -1,7 +1,8 @@
 /* globals CodeMirror */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
+import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
 
-class CodeView extends GoldenLayoutView {
+class CodeView extends SingleDatasetMixin(GoldenLayoutView) {
   constructor (argObj) {
     const label = encodeURIComponent(argObj.state.label);
     argObj.resources = [
@@ -17,7 +18,19 @@ class CodeView extends GoldenLayoutView {
       theme: 'base16-light',
       mode: 'scheme',
       lineNumbers: true,
+      styleActiveLine: true,
       value: this.resources[1]
+    });
+
+    // Move the cursor when a new primitive is selected
+    this.linkedState.on('primitiveSelected', () => {
+      const details = this.linkedState.getPrimitiveDetails();
+      if (details) {
+        /*this.codeMirror.setCursor({
+          line: details.line,
+          ch: details.char
+        });*/
+      }
     });
   }
 }

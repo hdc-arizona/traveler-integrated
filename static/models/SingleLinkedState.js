@@ -55,7 +55,7 @@ class SingleLinkedState extends Model {
     this.cursorPosition = position;
     this.trigger('moveCursor');
   }
-  getPrimitiveDetails (primitiveName) {
+  getPrimitiveDetails (primitiveName = this.selectedPrimitive) {
     return this.primitives ? this.primitives[primitiveName] : null;
   }
 }

@@ -230,7 +230,7 @@ Z`
       .on('click', d => {
         this.linkedState.selectPrimitive(d.data.name);
       }).on('mouseenter', function (d) {
-        const primitive = self.linkedState.primitives[d.data.name];
+        const primitive = self.linkedState.getPrimitiveDetails(d.data.name);
         if (!primitive) {
           console.warn(`Can't find primitive of name: ${d.data.name}`);
         } else {
