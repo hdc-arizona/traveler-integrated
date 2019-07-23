@@ -4,27 +4,45 @@
   text {
     font: 9px sans-serif;
   }
+  .legend {
+    position: absolute;
+    left: 1em;
+    top: 1em;
+  }
   .node {
     cursor: pointer;
 
-    .outline {
-      fill: none;
-      stroke-width: 1px;
-      stroke: @overviewColor;
-    }
-    .area {
-      stroke: none;
-      opacity: 0.25;
-      fill: @overviewColor;
-    }
-    &.selected {
-      .outline { stroke: @selectedPrimitiveColor; }
-      .area { fill: @selectedPrimitiveColor; }
+    .mainGlyph {
+      .area {
+        stroke: none;
+      }
+      .outline {
+        fill: none;
+        stroke-width: 1px;
+        opacity: 0.25;
+        stroke: @overviewColor;
+      }
+      .unknownValue {
+        fill: @separatorColor;
+      }
+      &:hover .outline {
+        opacity: 0.75;
+      }
+      &.selected .outline {
+        stroke: @selectedPrimitiveColor;
+      }
     }
 
     .expander {
+      .outline {
+        fill: none;
+        stroke-width: 1px;
+        stroke: @overviewColor;
+      }
       .area {
+        stroke: none;
         opacity: 0.1;
+        fill: @overviewColor;
       }
       &:hover .area {
         opacity: 0.5;

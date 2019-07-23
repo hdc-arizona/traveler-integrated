@@ -1,6 +1,7 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
+import prettyPrintTime from '../../utils/prettyPrintTime.js';
 
 class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
   constructor (argObj) {
@@ -9,6 +10,8 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
       { type: 'text', url: 'views/TreeView/template.html' }
     ];
     super(argObj);
+
+    this.colorMode = 'INCLUSIVE';
 
     (async () => {
       try {
@@ -41,27 +44,6 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
     this.mainGlyphRadius = this.nodeHeight / 2;
     this.expanderRadius = this.mainGlyphRadius / 2;
 
-    // Custom shapes based on these measurements:
-    this.glyphs = {
-      collapsedTriangle: `\
-M0,0\
-L${2 * this.expanderRadius},${this.expanderRadius}\
-L0,${2 * this.expanderRadius}\
-L${this.expanderRadius},${this.expanderRadius}\
-Z`,
-      expandedTriangle: `\
-M${2 * this.expanderRadius},0\
-L0,${this.expanderRadius}\
-L${2 * this.expanderRadius},${2 * this.expanderRadius}\
-L${this.expanderRadius},${this.expanderRadius}\
-Z`,
-      circle: `\
-M${this.mainGlyphRadius},${-this.mainGlyphRadius}\
-A${this.mainGlyphRadius},${this.mainGlyphRadius},0,0,0,${this.mainGlyphRadius},${this.mainGlyphRadius}\
-A${this.mainGlyphRadius},${this.mainGlyphRadius},0,0,0,${this.mainGlyphRadius},${-this.mainGlyphRadius}\
-Z`
-    };
-
     this.content.html(this.resources[1]);
 
     // Redraw when a new primitive is selected
@@ -78,6 +60,9 @@ Z`
     } else {
       // Compute the new layout
       this.updateLayout();
+
+      // Draw the legend (note: this also sets up this.currentColorTimeScale)
+      this.drawLegend();
 
       const transition = d3.transition()
         .duration(1000);
@@ -140,6 +125,48 @@ Z`
       .attr('width', xRange[1] + this.nodeWidth + this.margin.right)
       .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
   }
+  drawLegend () {
+    // TODO: get this list based on this.colorMode; for now we just look at
+    // inclusive time
+    const colorMap = TreeView.COLOR_MAPS.INCLUSIVE;
+    const times = this.tree.descendants()
+      .map(d => this.linkedState.getPrimitiveDetails(d.data.name).time)
+      .filter(d => d !== undefined);
+    if (times.length === 0) {
+      return; // No time data; don't bother creating the legend
+    }
+
+    // Set the color scale for this function (and the others)
+    this.currentColorTimeScale = d3.scaleQuantize()
+      .domain(d3.extent(times))
+      .range(colorMap);
+    // Get the domain windows for each color
+    const windows = colorMap.map(d => this.currentColorTimeScale.invertExtent(d));
+    const ticks = [windows[0][0]].concat(windows.map(d => d[1]));
+
+    // Create a spatial scale + axis based on the color map
+    const axisScale = d3.scaleLinear()
+      .domain([ticks[0], ticks[ticks.length - 1]])
+      .range([0, 300]);
+    const axis = d3.axisBottom()
+      .scale(axisScale)
+      .tickSize(13)
+      .tickValues(ticks)
+      .tickFormat(d => prettyPrintTime(d));
+    // This blows away the previous contents (if any), so we can just deal in
+    // .enter() calls from here on
+    const g = this.d3el.select('.legend .contents').call(axis);
+
+    // Patch the d3-generated axis
+    g.select('.domain').remove();
+    g.selectAll('rect').data(colorMap)
+      .enter()
+      .insert('rect', '.tick')
+      .attr('height', 8)
+      .attr('x', (d, i) => axisScale(windows[i][0]))
+      .attr('width', (d, i) => axisScale(windows[i][1]) - axisScale(windows[i][0]))
+      .attr('fill', d => d);
+  }
   drawNodes (transition) {
     let nodes = this.content.select('.nodeLayer').selectAll('.node')
       .data(this.tree.descendants(), d => d.data.name);
@@ -176,9 +203,33 @@ Z`
     const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);
     mainGlyphEnter.append('path').classed('area', true);
     mainGlyphEnter.append('path').classed('outline', true);
-    nodes.select('.mainGlyph').selectAll('.area, .outline')
+    mainGlyphEnter.append('text').classed('unknownValue', true)
+      .attr('x', this.mainGlyphRadius)
+      .attr('text-anchor', 'middle')
+      .attr('y', 3)
+      .style('opacity', 0)
+      .text('?');
+    const mainGlyph = nodes.select('.mainGlyph');
+    mainGlyph.selectAll('.area')
       .transition(transition)
-      .attr('d', this.glyphs.circle);
+      .attr('d', TreeView.GLYPHS.CIRCLE(this.mainGlyphRadius))
+      .attr('fill', d => {
+        const time = this.linkedState.getPrimitiveDetails(d.data.name).time;
+        if (time === undefined) {
+          return 'transparent';
+        } else {
+          return this.currentColorTimeScale(time);
+        }
+      });
+    mainGlyph.selectAll('.outline')
+      .transition(transition)
+      .attr('d', TreeView.GLYPHS.CIRCLE(1.5 * this.mainGlyphRadius))
+      .attr('transform', `translate(${-0.5 * this.mainGlyphRadius})`);
+    mainGlyph.selectAll('.unknownValue')
+      .transition(transition)
+      .style('opacity', d => {
+        return this.linkedState.getPrimitiveDetails(d.data.name).time === undefined ? 1 : 0;
+      });
 
     // Node label
     nodesEnter.append('text')
@@ -214,13 +265,13 @@ Z`
       .attr('d', d => {
         if (d._children) {
           // There are hidden children
-          return this.glyphs.collapsedTriangle;
+          return TreeView.GLYPHS.COLLAPSED_TRIANGLE(this.expanderRadius);
         } else if (!d.children || d.children.length === 0) {
           // No children; this is a leaf
           return null;
         } else {
           // All children are showing
-          return this.glyphs.expandedTriangle;
+          return TreeView.GLYPHS.EXPANDED_TRIANGLE(this.expanderRadius);
         }
       });
 
@@ -291,4 +342,28 @@ C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
     // TODO
   }
 }
+TreeView.COLOR_MAPS = {
+  INCLUSIVE: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'], // purple
+  EXCLUSIVE: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'], // green
+  DIFFERENCE: ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0'] // diverging red blue
+};
+TreeView.GLYPHS = {
+  CIRCLE: r => `\
+M${r},${-r}\
+A${r},${r},0,0,0,${r},${r}\
+A${r},${r},0,0,0,${r},${-r}\
+Z`,
+  COLLAPSED_TRIANGLE: r => `\
+M0,0\
+L${2 * r},${r}\
+L0,${2 * r}\
+L${r},${r}\
+Z`,
+  EXPANDED_TRIANGLE: r => `\
+M${2 * r},0\
+L0,${r}\
+L${2 * r},${2 * r}\
+L${r},${r}\
+Z`
+};
 export default TreeView;
