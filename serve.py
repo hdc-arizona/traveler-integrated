@@ -3,17 +3,23 @@ import argparse
 import json
 from enum import Enum
 import uvicorn #pylint: disable=import-error
-from fastapi import FastAPI, HTTPException #pylint: disable=import-error
+from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
-from wrangling import common
+from database import Database
 
-parser = argparse.ArgumentParser(description='Serve data bundled by bundle.py')
+parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
-                    help='Directory where the bundled data is stored (default: /tmp/traveler-integrated)')
+                    help='Directory where the bundled data is already / will be stored (default: /tmp/traveler-integrated)')
+parser.add_argument('-s', '--debug', dest='debug', action='store_true',
+                    help='Store additional information for debugging source files, etc.')
 
 args = parser.parse_args()
-db = common.loadDatabase(args.dbDir)
+db = Database(args.dbDir, args.debug)
+def checkLabel(label):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
+
 app = FastAPI(
     title=__name__,
     description='This is a test',
@@ -26,41 +32,56 @@ def index():
     return RedirectResponse(url='/static/index.html')
 
 @app.get('/datasets')
-def datasets(includeMeta: bool = False):
-    result = {}
-    for label, data in db.items():
-        if includeMeta:
-            result[label] = dict(data['meta'])
-        else:
-            result[label] = {}
-    return result
+def datasets():
+    return db.datasetList()
 
+@app.get('/datasets/{label}')
+def get_dataset(label: str):
+    checkLabel(label)
+    return db[label]['meta']
+@app.post('/datasets/{label}')
+def create_dataset(label: str):
+    db.createDataset(label)
+    return db[label]['meta']
+
+class TreeSource(str, Enum):
+    newick = 'newick'
+    otf2 = 'otf2'
+    graph = 'graph'
 @app.get('/datasets/{label}/tree')
-def tree(label: str):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'coreTree' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain tree data')
-    return db[label]['coreTree']
+def get_tree(label: str, source: TreeSource = TreeSource.newick):
+    checkLabel(label)
+    if source not in db[label]['meta']['trees']:
+        raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source)
+    return db[label]['meta']['trees'][source]
 
-@app.get('/datasets/{label}/code')
-def code(label: str):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'code' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not include source code')
-    return db[label]['code']
+@app.get('/datasets/{label}/physl')
+def get_physl(label: str):
+    checkLabel(label)
+    if 'physl' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not include physl source code')
+    return db[label]['physl']
+@app.get('/datasets/{label}/python')
+def get_python(label: str):
+    checkLabel(label)
+    if 'python' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not include python source code')
+    return db[label]['python']
+@app.get('/datasets/{label}/cpp')
+def get_cpp(label: str):
+    checkLabel(label)
+    if 'cpp' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not include C++ source code')
+    return db[label]['cpp']
 
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
+    checkLabel(label)
     return dict(db[label]['primitives'])
 
 class HistogramMode(str, Enum):
     utilization = 'utilization'
     count = 'count'
-
 @app.get('/datasets/{label}/histogram')
 def histogram(label: str, \
               mode: HistogramMode = HistogramMode.utilization, \
@@ -69,8 +90,7 @@ def histogram(label: str, \
               end: float = None, \
               location: str = None, \
               primitive: str = None):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
+    checkLabel(label)
     if 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
@@ -97,8 +117,7 @@ def histogram(label: str, \
 
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
+    checkLabel(label)
     if 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
