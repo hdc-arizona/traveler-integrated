@@ -32,17 +32,20 @@ def index():
     return RedirectResponse(url='/static/index.html')
 
 @app.get('/datasets')
-def datasets():
+def list_datasets():
     return db.datasetList()
 
 @app.get('/datasets/{label}')
 def get_dataset(label: str):
     checkLabel(label)
     return db[label]['meta']
-@app.post('/datasets/{label}')
+@app.post('/datasets/{label}', status_code=201)
 def create_dataset(label: str):
     db.createDataset(label)
     return db[label]['meta']
+@app.delete('/datasets/{label}')
+def delete_dataset(label: str):
+    db.purgeDataset(label)
 
 class TreeSource(str, Enum):
     newick = 'newick'
@@ -51,9 +54,9 @@ class TreeSource(str, Enum):
 @app.get('/datasets/{label}/tree')
 def get_tree(label: str, source: TreeSource = TreeSource.newick):
     checkLabel(label)
-    if source not in db[label]['meta']['trees']:
-        raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source)
-    return db[label]['meta']['trees'][source]
+    if source not in db[label]['trees']:
+        raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
+    return db[label]['trees'][source]
 
 @app.get('/datasets/{label}/physl')
 def get_physl(label: str):

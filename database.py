@@ -11,8 +11,9 @@ from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 # Possible files / metadata structures that we create / open / update
 shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
 requiredShelves = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['intervalIndexes', 'physl', 'python', 'cpp']
-requiredMetaDicts = ['sourceFiles', 'trees']
+pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
+requiredMetaDicts = ['sourceFiles']
+requiredPickleDicts = ['trees']
 
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')
@@ -61,7 +62,7 @@ class Database:
             self.datasets[label] = {}
             labelDir = os.path.join(dbDir, label)
             for stype in shelves:
-                spath = os.path.join(labelDir, stype + '.shelf')
+                spath = os.path.join(labelDir, stype)
                 if os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames
                     log('Loading %s %s...' % (label, stype))
                     self.datasets[label][stype] = shelve.open(spath)
@@ -96,6 +97,8 @@ class Database:
         for stype in requiredShelves:
             spath = os.path.join(labelDir, stype)
             self.datasets[label][stype] = shelve.open(spath)
+        for stype in requiredPickleDicts:
+            self.datasets[label][stype] = {}
         for dictType in requiredMetaDicts:
             self.datasets[label]['meta'][dictType] = self.datasets[label]['meta'].get(dictType, {})
 
@@ -111,9 +114,7 @@ class Database:
         self.datasets[label]['meta']['sourceFiles'] = sourceFiles # Have to do this separately because meta is a shelf
 
     def addTree(self, label, tree, sourceType):
-        trees = self.datasets[label]['meta']['trees']
-        trees[sourceType] = tree
-        self.datasets[label]['meta']['trees'] = trees # Have to do this separately because meta is a shelf
+        self.datasets[label]['trees'][sourceType] = tree
 
     def save(self, label):
         labelDir = os.path.join(self.dbDir, label)
@@ -283,10 +284,7 @@ class Database:
                     log('Parsing tree...')
                 elif unflaggedTreeParser.match(line):
                     log('Parsing unflagged line that looks like a newick tree...')
-                    nr, sr, nl, sl = self.processNewickTree(label, line)
-                    log('Finished parsing newick tree')
-                    log('New primitives: %d, Observed existing primitives: %d' % (nr, sr))
-                    log('New links: %d, Observed existing links: %d' % (nl, sl))
+                    self.processNewickTree(label, line)
                 elif dotModeParser.match(line):
                     mode = 'dot'
                     log('Parsing graph...')
@@ -297,11 +295,8 @@ class Database:
                     time = 1000000000 * float(timeParser.match(line)[1])
                     log('Total inclusive time from phylanx log (converted to ns): %f' % time)
             elif mode == 'tree':
-                nr, sr, nl, sl = self.processNewickTree(label, line)
+                self.processNewickTree(label, line)
                 mode = None
-                log('Finished parsing newick tree')
-                log('New primitives: %d, Observed existing primitives: %d' % (nr, sr))
-                log('New links: %d, Observed existing links: %d' % (nl, sl))
             elif mode == 'dot':
                 counts = self.processDotLine(label, line)
                 if counts is not None:
@@ -392,7 +387,7 @@ class Database:
         # Set up database files
         labelDir = os.path.join(self.dbDir, label)
         primitives = self.datasets[label]['primitives']
-        intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals.shelf'))
+        intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals'))
         intervalIndexes = self.datasets[label]['intervalIndexes'] = {
             'primitives': {},
             'locations': {},
@@ -400,10 +395,10 @@ class Database:
         }
         self.datasets[label]['meta']['hasGuids'] = parseGuids
         if parseGuids:
-            guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
+            guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids'))
         self.datasets[label]['meta']['hasEvents'] = storeEvents
         if storeEvents:
-            events = self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events.shelf'))
+            events = self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events'))
 
         # Temporary counters / lists for sorting
         numEvents = 0
