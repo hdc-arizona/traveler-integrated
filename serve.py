@@ -42,6 +42,7 @@ def get_dataset(label: str):
 @app.post('/datasets/{label}', status_code=201)
 def create_dataset(label: str):
     db.createDataset(label)
+    db.save(label)
     return db[label]['meta']
 @app.delete('/datasets/{label}')
 def delete_dataset(label: str):
@@ -57,6 +58,18 @@ def get_tree(label: str, source: TreeSource = TreeSource.newick):
     if source not in db[label]['trees']:
         raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
     return db[label]['trees'][source]
+@app.post('/datasets/{label}/tree')
+async def add_newick_tree(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    # TODO: stream the log back
+    log = ''
+    def logToClient(value, end='\n'):
+        nonlocal log
+        log += value + end
+    db.addSourceFile(label, file.filename, 'newick')
+    db.processNewickTree(label, (await file.read()).decode(), logToClient)
+    db.save(label)
+    return log
 
 @app.get('/datasets/{label}/physl')
 def get_physl(label: str):
