@@ -223,8 +223,8 @@ class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
       });
     mainGlyph.selectAll('.outline')
       .transition(transition)
-      .attr('d', TreeView.GLYPHS.CIRCLE(1.5 * this.mainGlyphRadius))
-      .attr('transform', `translate(${-0.5 * this.mainGlyphRadius})`);
+      .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
+      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`);
     mainGlyph.selectAll('.unknownValue')
       .transition(transition)
       .style('opacity', d => {
