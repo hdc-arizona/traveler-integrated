@@ -6,6 +6,7 @@ from enum import Enum
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
+from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
 from database import Database
 from clientLogger import ClientLogger
@@ -18,17 +19,16 @@ parser.add_argument('-s', '--debug', dest='debug', action='store_true',
 
 args = parser.parse_args()
 db = Database(args.dbDir, args.debug)
-
-def checkLabel(label):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-
 app = FastAPI(
     title=__name__,
     description='This is a test',
     version='0.1.0'
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
+
+def checkLabel(label):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
 
 @app.get('/')
 def index():
@@ -72,24 +72,81 @@ def add_newick_tree(label: str, file: UploadFile = File(...)):
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
+@app.post('/datasets/{label}/csv')
+def add_performance_csv(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'csv')
+        await db.processCsv(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
+
+@app.post('/datasets/{label}/dot')
+def add_dot_graph(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'dot')
+        await db.processDot(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
+
+@app.post('/datasets/{label}/log')
+def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'log')
+        await db.processPhylanxLog(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
+
+@app.post('/datasets/{label}/otf2')
+async def add_otf2_trace(label: str, request: Request):
+    # TODO: I think we can accept a raw stream instead of a otf2-print dump
+    # (which would be a huge file):
+    # async for chunk in request.stream()
+    # ... but I'm not sure if this will even work with a linked Jupyter
+    # approach, nor how to best map chunks to lines in db.processOtf2()
+    raise HTTPException(status_code=501)
+
 @app.get('/datasets/{label}/physl')
 def get_physl(label: str):
     checkLabel(label)
     if 'physl' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not include physl source code')
     return db[label]['physl']
+@app.post('/datasets/{label}/physl')
+async def add_physl(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    db.processCode(label, file.filename, (await file.read()).decode(), 'physl')
+    db.save(label)
 @app.get('/datasets/{label}/python')
 def get_python(label: str):
     checkLabel(label)
     if 'python' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not include python source code')
     return db[label]['python']
+@app.post('/datasets/{label}/python')
+async def add_python(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    db.processCode(label, file.filename, (await file.read()).decode(), 'python')
+    db.save(label)
 @app.get('/datasets/{label}/cpp')
 def get_cpp(label: str):
     checkLabel(label)
     if 'cpp' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not include C++ source code')
     return db[label]['cpp']
+@app.post('/datasets/{label}/cpp')
+async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    db.processCode(label, file.filename, (await file.read()).decode(), 'cpp')
+    db.save(label)
 
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):

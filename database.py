@@ -230,11 +230,10 @@ class Database:
         newL = self.addPrimitiveChild(dotLine[1], dotLine[2], 'dot')[1]
         seenL = 1 if newL == 0 else 0
         return (newR, seenR, newL, seenL)
-    async def processDotFile(self, label, file, log=logToConsole):
-        self.addSourceFile(label, file.name, 'dot')
+    async def processDot(self, label, lines, log=logToConsole):
         newR = seenR = newL = seenL = 0
-        assert dotModeParser.match(file.readline()) is not None
-        for line in file:
+        assert dotModeParser.match(next(lines)) is not None
+        for line in lines:
             temp = self.processDotLine(label, line)
             if temp is None:
                 break
@@ -245,6 +244,12 @@ class Database:
         await log('Finished parsing DOT graph')
         await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
         await log('New links: %d, Observed existing links: %d' % (newL, seenL))
+    async def processDotFile(self, label, file, log=logToConsole):
+        def lineGenerator():
+            for line in file:
+                yield line
+        self.addSourceFile(label, file.name, 'dot')
+        await self.processDot(label, lineGenerator(), log)
 
     def processCsvLine(self, label, line):
         perfLine = perfLineParser.match(line)
@@ -260,11 +265,10 @@ class Database:
         primitive['avg_time'] = primitive['time'] / primitive['count'] if primitive['count'] != 0 else primitive['time']
         self.datasets[label]['primitives'][primitiveName] = primitive # tells the primitives shelf that there was an update
         return (newR, primitive['time'])
-    async def processCsvFile(self, label, file, log=logToConsole):
-        self.addSourceFile(label, file.name, 'csv')
+    async def processCsv(self, label, lines, log=logToConsole):
         newR = seenR = maxTime = 0
-        assert perfModeParser.match(file.readline()) is not None
-        for line in file:
+        assert perfModeParser.match(next(lines)) is not None
+        for line in lines:
             counts = self.processCsvLine(label, line)
             if counts is None:
                 break
@@ -274,12 +278,17 @@ class Database:
         await log('Finished parsing performance CSV')
         await log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
         await log('Max inclusive time seen in performance CSV (ns): %f' % maxTime)
+    async def processCsvFile(self, label, file, log=logToConsole):
+        def lineGenerator():
+            for line in file:
+                yield line
+        self.addSourceFile(label, file.name, 'csv')
+        await self.processCsv(label, lineGenerator(), log)
 
-    async def processPhylanxLog(self, label, file, log=logToConsole):
-        self.addSourceFile(label, file.name, 'log')
+    async def processPhylanxLog(self, label, lines, log=logToConsole):
         mode = None
         newR = seenR = newL = seenL = maxTime = 0
-        for line in file:
+        for line in lines:
             if mode is None:
                 if treeModeParser.match(line):
                     mode = 'tree'
@@ -327,6 +336,12 @@ class Database:
             else:
                 # Should never reach this point
                 assert False
+    async def processPhylanxLogFile(self, label, file, log=logToConsole):
+        def lineGenerator():
+            for line in file:
+                yield line
+        self.addSourceFile(label, file.name, 'log')
+        await self.processPhylanxLog(label, lineGenerator(), log)
 
     def processCode(self, label, name, code, codeType):
         assert codeType in ['physl', 'python', 'cpp']

@@ -106,7 +106,7 @@ async def main():
             # Handle performance files
             if 'performance' in paths:
                 with open(paths['performance'], 'r') as file:
-                    await db.processPerfFile(label, file)
+                    await db.processCsvFile(label, file)
 
             # Handle tree files:
             if 'tree' in paths:
@@ -114,14 +114,14 @@ async def main():
                     await db.processNewickFile(label, file)
 
             # Handle graph files:
-            if 'tree' in paths:
+            if 'graph' in paths:
                 with open(paths['graph'], 'r') as file:
                     await db.processDotFile(label, file)
 
             # Handle stdout from phylanx
             if 'input' in paths:
                 with open(paths['input'], 'r') as file:
-                    await db.processPhylanxLog(label, file)
+                    await db.processPhylanxLogFile(label, file)
 
             # Handle code files
             for codeType in ['physl', 'python', 'cpp']:
