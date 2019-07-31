@@ -2,6 +2,7 @@
 import re
 import argparse
 import subprocess
+import asyncio
 from database import Database, logToConsole
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
@@ -40,9 +41,10 @@ class FakeFile: #pylint: disable=R0903
         for line in otfPipe.stdout:
             yield line.decode()
 
-if __name__ == '__main__':
+async def main():
     args = vars(parser.parse_args())
     db = Database(args['dbDir'], args['debug'])
+    await db.load()
 
     inputs = {}
     r = re.compile(args['label'])
@@ -65,7 +67,7 @@ if __name__ == '__main__':
         singlePhysl = args['physl'][0] if len(args['physl']) == 1 else None
         singlePython = args['python'][0] if len(args['python']) == 1 else None
         singleCpp = args['cpp'][0] if len(args['cpp']) == 1 else None
-        for arg in ['input', 'tree', 'performance', 'graph', 'otf2', 'code']:
+        for arg in ['input', 'tree', 'performance', 'graph', 'otf2', 'physl', 'python', 'cpp']:
             if arg == 'physl' and singlePhysl is not None:
                 continue
             if arg == 'python' and singlePython is not None:
@@ -95,8 +97,8 @@ if __name__ == '__main__':
         if 'input' in paths and ('tree' in paths or 'performance' in paths or 'graph' in paths):
             raise Exception('Don\'t use --input with --tree, --performance, or --graph for the same --label: %s' % label)
         try:
-            logToConsole('#################' + ''.join(['#' for x in range(len(label))]))
-            logToConsole('Adding data for: %s' % label)
+            await logToConsole('#################' + ''.join(['#' for x in range(len(label))]))
+            await logToConsole('Adding data for: %s' % label)
 
             # Initialize the dataset
             db.createDataset(label)
@@ -104,38 +106,41 @@ if __name__ == '__main__':
             # Handle performance files
             if 'performance' in paths:
                 with open(paths['performance'], 'r') as file:
-                    db.processPerfFile(label, file)
+                    await db.processPerfFile(label, file)
 
             # Handle tree files:
             if 'tree' in paths:
                 with open(paths['tree'], 'r') as file:
-                    db.processNewickFile(label, file)
+                    await db.processNewickFile(label, file)
 
             # Handle graph files:
             if 'tree' in paths:
                 with open(paths['graph'], 'r') as file:
-                    db.processDotFile(label, file)
+                    await db.processDotFile(label, file)
 
             # Handle stdout from phylanx
             if 'input' in paths:
                 with open(paths['input'], 'r') as file:
-                    db.processPhylanxLog(label, file)
+                    await db.processPhylanxLog(label, file)
 
             # Handle code files
             for codeType in ['physl', 'python', 'cpp']:
                 if codeType in paths:
                     with open(paths[codeType], 'r') as file:
-                        db.processCode(label, file, codeType)
+                        await db.processCodeFile(label, file, codeType)
 
             # Handle otf2
             if 'otf2' in paths:
-                db.processOtf2(label, FakeFile(paths['otf2']), args['guids'], args['events'])
+                await db.processOtf2(label, FakeFile(paths['otf2']), args['guids'], args['events'])
 
             # Save all the data
             db.save(label)
         except: #pylint: disable=W0702
-            logToConsole('Error encountered; purging corrupted data for: %s' % label)
+            await logToConsole('Error encountered; purging corrupted data for: %s' % label)
             db.purgeDataset(label)
             raise
         # Always close all shelves
         db.close()
+
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())

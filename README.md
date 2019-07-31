@@ -38,7 +38,7 @@ build the tree—note that, due to the combinatoric nature, this is slow!):
 ```bash
 ./bundle.py \
   --otf2 data/fibonacci-04Apr2018/OTF2_archive/APEX.otf2 \
-  --code data/fibonacci-04Apr2018/fibonacci.py \
+  --python data/fibonacci-04Apr2018/fibonacci.py \
   --label "2019-04-04 Fibonacci" \
   --guids
 ```
@@ -48,7 +48,7 @@ Loading many files at once (using a regular expression to match globbed paths):
 ./bundle.py \
   --tree data/als_regression/*.txt \
   --performance data/als_regression/*.csv \
-  --code data/als_regression/als.physl \
+  --physl data/als_regression/als.physl \
   --label "data/als_regression/(\d*-\d*-\d*).*"
 ```
 
@@ -57,7 +57,7 @@ Bringing it all together:
 ./bundle.py \
   --otf2 data/11July2019/factorial*/OTF2_archive/APEX.otf2 \
   --input data/11July2019/factorial*/output.txt \
-  --code data/factorial.physl \
+  --physl data/factorial.physl \
   --label "data\/(11July2019\/factorial[^/]*).*" \
   --guids
 ```

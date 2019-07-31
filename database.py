@@ -43,12 +43,13 @@ addAttrLineParser = re.compile(r'^\s+ADDITIONAL ATTRIBUTES: (.*)$')
 addAttrSplitter = re.compile(r'\), \(')
 addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
-def logToConsole(value, end='\n'):
+async def logToConsole(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
     sys.stderr.flush()
 
+# pylint: disable=R0904
 class Database:
-    def __init__(self, dbDir='/tmp/traveler-integrated', debugSources=False, log=logToConsole):
+    def __init__(self, dbDir='/tmp/traveler-integrated', debugSources=False):
         self.dbDir = dbDir
         self.debugSources = debugSources
         self.sortedEventsByLocation = None
@@ -57,24 +58,25 @@ class Database:
 
         self.datasets = {}
 
+    async def load(self, log=logToConsole):
         # Load any files that exist (or create missing required files)
-        for label in os.listdir(dbDir):
+        for label in os.listdir(self.dbDir):
             self.datasets[label] = {}
-            labelDir = os.path.join(dbDir, label)
+            labelDir = os.path.join(self.dbDir, label)
             for stype in shelves:
                 spath = os.path.join(labelDir, stype)
                 if os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames
-                    log('Loading %s %s...' % (label, stype))
+                    await log('Loading %s %s...' % (label, stype))
                     self.datasets[label][stype] = shelve.open(spath)
                 elif stype in requiredShelves:
-                    log('Creating missing required %s for %s...' % (stype, label))
+                    await log('Creating missing required %s for %s...' % (stype, label))
                     self.datasets[label][stype] = shelve.open(spath)
             for stype in pickles:
                 spath = os.path.join(labelDir, stype + '.pickle')
                 if os.path.exists(spath):
-                    log('Loading %s %s...' % (label, stype))
+                    await log('Loading %s %s...' % (label, stype))
                     if stype == 'intervalIndexes':
-                        log('(may take a while if %s is large)' % label)
+                        await log('(may take a while if %s is large)' % label)
                     self.datasets[label][stype] = pickle.load(open(spath, 'rb'))
             for dictType in requiredMetaDicts:
                 self.datasets[label]['meta'][dictType] = self.datasets[label]['meta'].get(dictType, {})
@@ -204,16 +206,16 @@ class Database:
                 newL += nl + l
                 seenL += sl + (1 if l == 0 else 0)
         return (tree, newR, seenR, newL, seenL)
-    def processNewickTree(self, label, newickText, log=logToConsole):
+    async def processNewickTree(self, label, newickText, log=logToConsole):
         tree, newR, seenR, newL, seenL = self.processNewickNode(label, newick.loads(newickText)[0])
         self.addTree(label, tree, 'newick')
-        log('Finished parsing newick tree')
-        log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
-        log('New links: %d, Observed existing links: %d' % (newL, seenL))
+        await log('Finished parsing newick tree')
+        await log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
+        await log('New links: %d, Observed existing links: %d' % (newL, seenL))
         return (newR, seenR, newL, seenL)
-    def processNewickFile(self, label, file, log=logToConsole):
+    async def processNewickFile(self, label, file, log=logToConsole):
         self.addSourceFile(label, file.name, 'newick')
-        self.processNewickTree(label, file.read(), log)
+        await self.processNewickTree(label, file.read(), log)
 
     def processDotLine(self, label, line):
         dotLine = dotLineParser.match(line)
@@ -228,7 +230,7 @@ class Database:
         newL = self.addPrimitiveChild(dotLine[1], dotLine[2], 'dot')[1]
         seenL = 1 if newL == 0 else 0
         return (newR, seenR, newL, seenL)
-    def processDotFile(self, label, file, log=logToConsole):
+    async def processDotFile(self, label, file, log=logToConsole):
         self.addSourceFile(label, file.name, 'dot')
         newR = seenR = newL = seenL = 0
         assert dotModeParser.match(file.readline()) is not None
@@ -240,9 +242,9 @@ class Database:
             seenR += temp[1]
             newL += temp[2]
             seenL += temp[3]
-        log('Finished parsing DOT graph')
-        log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
-        log('New links: %d, Observed existing links: %d' % (newL, seenL))
+        await log('Finished parsing DOT graph')
+        await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
+        await log('New links: %d, Observed existing links: %d' % (newL, seenL))
 
     def processCsvLine(self, label, line):
         perfLine = perfLineParser.match(line)
@@ -258,7 +260,7 @@ class Database:
         primitive['avg_time'] = primitive['time'] / primitive['count'] if primitive['count'] != 0 else primitive['time']
         self.datasets[label]['primitives'][primitiveName] = primitive # tells the primitives shelf that there was an update
         return (newR, primitive['time'])
-    def processCsvFile(self, label, file, log=logToConsole):
+    async def processCsvFile(self, label, file, log=logToConsole):
         self.addSourceFile(label, file.name, 'csv')
         newR = seenR = maxTime = 0
         assert perfModeParser.match(file.readline()) is not None
@@ -269,11 +271,11 @@ class Database:
             newR += counts[0]
             seenR += 1 if counts[0] == 0 else 0
             maxTime = max(maxTime, counts[1])
-        log('Finished parsing performance CSV')
-        log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
-        log('Max inclusive time seen in performance CSV (ns): %f' % maxTime)
+        await log('Finished parsing performance CSV')
+        await log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
+        await log('Max inclusive time seen in performance CSV (ns): %f' % maxTime)
 
-    def processPhylanxLog(self, label, file, log=logToConsole):
+    async def processPhylanxLog(self, label, file, log=logToConsole):
         self.addSourceFile(label, file.name, 'log')
         mode = None
         newR = seenR = newL = seenL = maxTime = 0
@@ -281,21 +283,21 @@ class Database:
             if mode is None:
                 if treeModeParser.match(line):
                     mode = 'tree'
-                    log('Parsing tree...')
+                    await log('Parsing tree...')
                 elif unflaggedTreeParser.match(line):
-                    log('Parsing unflagged line that looks like a newick tree...')
-                    self.processNewickTree(label, line)
+                    await log('Parsing unflagged line that looks like a newick tree...')
+                    await self.processNewickTree(label, line)
                 elif dotModeParser.match(line):
                     mode = 'dot'
-                    log('Parsing graph...')
+                    await log('Parsing graph...')
                 elif perfModeParser.match(line):
                     mode = 'perf'
-                    log('Parsing performance csv...')
+                    await log('Parsing performance csv...')
                 elif timeParser.match(line):
                     time = 1000000000 * float(timeParser.match(line)[1])
-                    log('Total inclusive time from phylanx log (converted to ns): %f' % time)
+                    await log('Total inclusive time from phylanx log (converted to ns): %f' % time)
             elif mode == 'tree':
-                self.processNewickTree(label, line)
+                await self.processNewickTree(label, line, log)
                 mode = None
             elif mode == 'dot':
                 counts = self.processDotLine(label, line)
@@ -306,9 +308,9 @@ class Database:
                     seenL += counts[3]
                 else:
                     mode = None
-                    log('Finished parsing DOT graph')
-                    log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
-                    log('New links: %d, Observed existing links: %d' % (newL, seenL))
+                    await log('Finished parsing DOT graph')
+                    await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
+                    await log('New links: %d, Observed existing links: %d' % (newL, seenL))
                     newR = seenR = newL = seenL = 0
             elif mode == 'perf':
                 counts = self.processCsvLine(label, line)
@@ -318,18 +320,21 @@ class Database:
                     maxTime = max(maxTime, counts[1])
                 else:
                     mode = None
-                    log('Finished parsing performance CSV')
-                    log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
-                    log('Max inclusive time seen in performance CSV (ns): %f' % maxTime)
+                    await log('Finished parsing performance CSV')
+                    await log('New primitives: %d, Observed existing primitives: %d' % (newR, seenR))
+                    await log('Max inclusive time seen in performance CSV (ns): %f' % maxTime)
                     newR = seenR = 0
             else:
                 # Should never reach this point
                 assert False
 
-    def processCode(self, label, file, codeType):
+    def processCode(self, label, name, code, codeType):
         assert codeType in ['physl', 'python', 'cpp']
-        self.addSourceFile(label, file.name, codeType)
-        self.datasets[label][codeType] = file.read()
+        self.addSourceFile(label, name, codeType)
+        self.datasets[label][codeType] = code
+    async def processCodeFile(self, label, file, codeType, log=logToConsole):
+        self.processCode(label, file.name, file.read(), codeType)
+        await log('Finished parsing %s code' % codeType)
 
     def processEvent(self, label, event, eventId):
         newR = seenR = newG = seenG = 0
@@ -381,7 +386,7 @@ class Database:
             self.datasets[label]['events'][eventId] = event
         return (newR, seenR, newG, seenG)
 
-    def processOtf2(self, label, file, parseGuids=False, storeEvents=False, log=logToConsole):
+    async def processOtf2(self, label, file, parseGuids=False, storeEvents=False, log=logToConsole):
         self.addSourceFile(label, file.name, 'otf2')
 
         # Set up database files
@@ -398,13 +403,13 @@ class Database:
             guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids'))
         self.datasets[label]['meta']['hasEvents'] = storeEvents
         if storeEvents:
-            events = self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events'))
+            self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events'))
 
         # Temporary counters / lists for sorting
         numEvents = 0
         self.sortedEventsByLocation = {}
 
-        log('Parsing events (.=2500 events)')
+        await log('Parsing events (.=2500 events)')
         newR = seenR = newG = seenG = 0
         currentEvent = None
         for line in file:
@@ -421,9 +426,9 @@ class Database:
                     # Log that we've processed another event
                     numEvents += 1
                     if numEvents % 2500 == 0:
-                        log('.', end='')
+                        await log('.', end='')
                     if numEvents % 100000 == 0:
-                        log('processed %i events' % numEvents)
+                        await log('processed %i events' % numEvents)
                     # Add to primitive / guid counts
                     newR += counts[0]
                     seenR += counts[1]
@@ -451,18 +456,18 @@ class Database:
             seenR += counts[1]
             newG += counts[2]
             seenG += counts[3]
-        log('')
-        log('Finished processing %i events' % numEvents)
-        log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
+        await log('')
+        await log('Finished processing %i events' % numEvents)
+        await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
         if parseGuids:
-            log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
+            await log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
 
         # Now that we've seen all the locations, store that list in our metadata
         locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
 
         # Combine the sorted enter / leave events into intervals, and then index
         # the intervals
-        log('Combining enter / leave events into intervals (.=2500 intervals)')
+        await log('Combining enter / leave events into intervals (.=2500 intervals)')
         numIntervals = 0
         for location, eventList in self.sortedEventsByLocation.items():
             lastEvent = None
@@ -471,17 +476,15 @@ class Database:
                 if event['Event'] == 'ENTER':
                     # Start an interval (don't output anything)
                     if lastEvent is not None:
-                        log('WARNING: omitting ENTER event without a following LEAVE event (%s)' % lastEvent['name']) #pylint: disable=unsubscriptable-object
-                    # TODO: factorial data used to violate this... why?
-                    # assert lastEvent is None
+                        # TODO: factorial data used to trigger this... why?
+                        await log('WARNING: omitting ENTER event without a following LEAVE event (%s)' % lastEvent['name']) #pylint: disable=unsubscriptable-object
                     lastEvent = event
                 elif event['Event'] == 'LEAVE':
                     # Finish a interval
                     if lastEvent is None:
-                        log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['name'])
+                        # TODO: factorial data used to trigger this... why?
+                        await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['name'])
                         continue
-                    # TODO: factorial data used to violate this... why?
-                    # assert lastEvent is not None
                     intervalId = str(numIntervals)
                     currentInterval = {'enter': {}, 'leave': {}}
                     for attr, value in event.items():
@@ -495,22 +498,21 @@ class Database:
                     # Log that we've finished the finished interval
                     numIntervals += 1
                     if numIntervals % 2500 == 0:
-                        log('.', end='')
+                        await log('.', end='')
                     if numIntervals % 100000 == 0:
-                        log('processed %i intervals' % numIntervals)
+                        await log('processed %i intervals' % numIntervals)
                     lastEvent = None
             # Make sure there are no trailing ENTER events
-            # TODO: fibonacci data violates this... why?
-            # assert lastEvent is None
             if lastEvent is not None:
-                log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
-        log('')
-        log('Finished creating %i intervals' % numIntervals)
+                # TODO: fibonacci data triggers this... why?
+                await log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
+        await log('')
+        await log('Finished creating %i intervals' % numIntervals)
 
         # Now for indexing: we want per-location indexes, per-primitive indexes,
         # as well as both filters at the same time (we key by locations first)
-        # TODO: these are all built in memory... I should probably find a way
-        # to make a shelve-like version of IntervalTree:
+        # TODO: these are all built in memory... should probably find a way to
+        # make a shelve-like version of IntervalTree:
         for location in locationNames:
             intervalIndexes['locations'][location] = IntervalTree()
             intervalIndexes['both'][location] = {}
@@ -519,9 +521,9 @@ class Database:
             for location in locationNames:
                 intervalIndexes['both'][location][primitive] = IntervalTree()
 
-        log('Assembling interval indexes (.=2500 intervals)')
+        await log('Assembling interval indexes (.=2500 intervals)')
         count = 0
-        def intervalIterator():
+        async def intervalIterator():
             nonlocal count
             for intervalId, intervalObj in intervals.items():
                 enter = intervalObj['enter']['Timestamp']
@@ -544,20 +546,20 @@ class Database:
 
                 count += 1
                 if count % 2500 == 0:
-                    log('.', end='')
+                    await log('.', end='')
                 if count % 100000 == 0:
-                    log('processed %i intervals' % count)
+                    await log('processed %i intervals' % count)
 
                 yield iv
         # Iterate through all intervals to construct the main index:
-        intervalIndexes['main'] = IntervalTree(intervalIterator())
+        intervalIndexes['main'] = IntervalTree([iv async for iv in intervalIterator()])
 
-        log('')
-        log('Finished indexing %i intervals' % count)
+        await log('')
+        await log('Finished indexing %i intervals' % count)
 
         # Create any missing parent-child primitive relationships based on the GUIDs we've collected
         if parseGuids:
-            log('Creating primitive links based on GUIDs (.=2500 GUIDs processed)')
+            await log('Creating primitive links based on GUIDs (.=2500 GUIDs processed)')
             newL = seenL = 0
             for nGuid, guid in enumerate(guids.values()):
                 if guid['parent'] != '0':
@@ -569,9 +571,9 @@ class Database:
                             newL += l
                             seenL += 1 if newL == 0 else 0
                 if nGuid > 0 and nGuid % 250 == 0:
-                    log('.', end='')
+                    await log('.', end='')
                 if nGuid > 0 and nGuid % 10000 == 0:
-                    log('scanned %i GUIDs' % nGuid)
-            log('')
-            log('Finished scanning %d GUIDs' % len(guids))
-            log('New links: %d, Observed existing links: %d' % (newL, seenL))
+                    await log('scanned %i GUIDs' % nGuid)
+            await log('')
+            await log('Finished scanning %d GUIDs' % len(guids))
+            await log('New links: %d, Observed existing links: %d' % (newL, seenL))

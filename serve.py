@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import asyncio
 from enum import Enum
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
 from database import Database
+from clientLogger import ClientLogger
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
@@ -16,6 +18,7 @@ parser.add_argument('-s', '--debug', dest='debug', action='store_true',
 
 args = parser.parse_args()
 db = Database(args.dbDir, args.debug)
+
 def checkLabel(label):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
@@ -59,17 +62,15 @@ def get_tree(label: str, source: TreeSource = TreeSource.newick):
         raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
     return db[label]['trees'][source]
 @app.post('/datasets/{label}/tree')
-async def add_newick_tree(label: str, file: UploadFile = File(...)):
+def add_newick_tree(label: str, file: UploadFile = File(...)):
     checkLabel(label)
-    # TODO: stream the log back
-    log = ''
-    def logToClient(value, end='\n'):
-        nonlocal log
-        log += value + end
-    db.addSourceFile(label, file.filename, 'newick')
-    db.processNewickTree(label, (await file.read()).decode(), logToClient)
-    db.save(label)
-    return log
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'newick')
+        await db.processNewickTree(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.get('/datasets/{label}/physl')
 def get_physl(label: str):
@@ -154,4 +155,5 @@ def intervals(label: str, begin: float = None, end: float = None):
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(db.load())
     uvicorn.run(app)
