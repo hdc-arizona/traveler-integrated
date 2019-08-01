@@ -12,7 +12,7 @@ from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
 requiredShelves = ['meta', 'primitives', 'primitiveLinks']
 pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
-requiredMetaDicts = ['sourceFiles']
+requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
 
 # Tools for handling the tree
@@ -78,8 +78,8 @@ class Database:
                     if stype == 'intervalIndexes':
                         await log('(may take a while if %s is large)' % label)
                     self.datasets[label][stype] = pickle.load(open(spath, 'rb'))
-            for dictType in requiredMetaDicts:
-                self.datasets[label]['meta'][dictType] = self.datasets[label]['meta'].get(dictType, {})
+            for listType in requiredMetaLists:
+                self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, {})
 
     def datasetList(self):
         return list(self.datasets.keys())
@@ -101,8 +101,8 @@ class Database:
             self.datasets[label][stype] = shelve.open(spath)
         for stype in requiredPickleDicts:
             self.datasets[label][stype] = {}
-        for dictType in requiredMetaDicts:
-            self.datasets[label]['meta'][dictType] = self.datasets[label]['meta'].get(dictType, {})
+        for listType in requiredMetaLists:
+            self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, [])
 
     def purgeDataset(self, label):
         del self.datasets[label]
@@ -112,7 +112,7 @@ class Database:
 
     def addSourceFile(self, label, fileName, fileType):
         sourceFiles = self.datasets[label]['meta']['sourceFiles']
-        sourceFiles[fileType] = fileName
+        sourceFiles.append({fileName: fileName, fileType: fileType})
         self.datasets[label]['meta']['sourceFiles'] = sourceFiles # Have to do this separately because meta is a shelf
 
     def addTree(self, label, tree, sourceType):

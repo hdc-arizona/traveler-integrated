@@ -23,7 +23,12 @@ class Controller {
   constructor () {
     this.tooltip = window.tooltip = new Tooltip();
     (async () => {
-      this.datasets = await d3.json('/datasets?includeMeta=true');
+      const datasetList = await d3.json(`/datasets`);
+      const metas = await Promise.all(datasetList.map(d => d3.json(`/datasets/${encodeURIComponent(d)}`)));
+      this.datasets = {};
+      for (const [index, label] of datasetList.entries()) {
+        this.datasets[label] = metas[index];
+      }
     })();
     this.setupLayout();
   }

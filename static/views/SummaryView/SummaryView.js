@@ -60,12 +60,10 @@ class SummaryView extends GoldenLayoutView {
     this.drawDatasets();
   }
   drawDatasets () {
-    const sortedDatasets = Object.values(window.controller.datasets).sort((a, b) => {
-      return Date(a.timestamp) - Date(b.timestamp);
-    });
+    const datasetList = Object.entries(window.controller.datasets);
 
     let datasets = this.content.selectAll('.dataset')
-      .data(sortedDatasets, d => d.label);
+      .data(datasetList, d => d.key);
     datasets.exit().remove();
     const datasetsEnter = datasets.enter().append('div')
       .classed('dataset', true);
@@ -73,70 +71,24 @@ class SummaryView extends GoldenLayoutView {
 
     // Use the space to the right of all the labels / buttons for the bar,
     // minus 2em of space for padding between each section
-    let availableBarWidth = this.content.node().getBoundingClientRect().width - 4 * this.emSize;
     let labelSpace = 0;
-    let buttonSpace = 0;
-    const timeScale = d3.scaleLinear()
-      .domain([0, d3.max(sortedDatasets.map(d => +d.time))]);
 
     datasetsEnter.append('h3').classed('name', true);
-    datasets.select('.name').text(d => d.label)
+    datasets.select('.name').text(d => d.key)
       .each(function () {
         labelSpace = Math.max(labelSpace, this.getBoundingClientRect().width);
       });
 
     datasetsEnter.append('div').classed('timestamp', true);
-    datasets.select('.timestamp').text(d => Object.values(d.sourceFiles)[0].modified || 'Couldn\'t get timestamp')
+    datasets.select('.timestamp').text(d => d.key)
       .each(function () {
         labelSpace = Math.max(labelSpace, this.getBoundingClientRect().width);
       });
 
-    availableBarWidth -= labelSpace;
-
     datasetsEnter.append('div').classed('viewContainer', true);
     this.drawViewButtons(datasets);
     datasets.select('.viewContainer')
-      .style('left', (labelSpace + this.emSize) + 'px')
-      .each(function () {
-        buttonSpace = Math.max(buttonSpace, this.getBoundingClientRect().width);
-      });
-
-    availableBarWidth -= buttonSpace;
-    // Require at least 15em of space for the bar (may trigger horizontal scrolling)
-    if (availableBarWidth < 15 * this.emSize) {
-      availableBarWidth = 15 * this.emSize;
-      datasets.style('width', labelSpace + buttonSpace + availableBarWidth);
-    } else {
-      datasets.style('width', null);
-    }
-    timeScale.range([0, availableBarWidth]);
-
-    const barContainerEnter = datasetsEnter.append('div').classed('barContainer', true);
-    barContainerEnter.append('div').classed('bar', true);
-    barContainerEnter.append('label');
-    datasets.select('.barContainer')
-      .style('left', (labelSpace + buttonSpace + 2 * this.emSize) + 'px')
-      .style('width', availableBarWidth + 'px');
-    datasets.select('.barContainer .bar')
-      .style('width', d => !isNaN(parseFloat(d.time)) ? timeScale(parseFloat(d.time)) + 'px' : timeScale.range()[1] + 'px')
-      .classed('unknown', d => isNaN(parseFloat(d.time)));
-    datasets.select('.barContainer label').text(d => !isNaN(parseFloat(d.time)) ? `Inclusive time: ${prettyPrintTime(d.time)}` : 'Inclusive time unknown');
-
-    const pairwiseBannerEnter = datasetsEnter.append('div')
-      .classed('pairwiseBanner', true)
-      .style('display', 'none');
-    pairwiseBannerEnter.append('h3')
-      .text('Choose another dataset to compare');
-    const cancelButtonEnter = pairwiseBannerEnter.append('div')
-      .classed('button', true);
-    cancelButtonEnter.append('a');
-    cancelButtonEnter.append('span').text('Cancel');
-    datasets.select('.pairwiseBanner')
-      .style('display', d => this.pairwiseMode && this.pairwiseMode.metadata === d ? null : 'none')
-      .select('.button').on('click', () => {
-        this.pairwiseMode = null;
-        this.render();
-      });
+      .style('left', (labelSpace + this.emSize) + 'px');
   }
   drawViewButtons (datasets) {
     let viewButtons = datasets.select('.viewContainer').selectAll('.button')
