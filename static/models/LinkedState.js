@@ -1,7 +1,7 @@
 /* globals d3 */
 import { Model } from '/static/node_modules/uki/dist/uki.esm.js';
 
-class SingleLinkedState extends Model {
+class LinkedState extends Model {
   constructor (label, metadata) {
     super();
 
@@ -60,4 +60,4 @@ class SingleLinkedState extends Model {
   }
 }
 
-export default SingleLinkedState;
+export default LinkedState;

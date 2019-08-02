@@ -1,8 +1,8 @@
 /* globals CodeMirror */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
+import LinkedMixin from '../common/LinkedMixin.js';
 
-class CodeView extends SingleDatasetMixin(GoldenLayoutView) {
+class CodeView extends LinkedMixin(GoldenLayoutView) {
   constructor (argObj) {
     const label = encodeURIComponent(argObj.state.label);
     argObj.resources = [

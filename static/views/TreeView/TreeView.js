@@ -1,9 +1,9 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
+import LinkedMixin from '../common/LinkedMixin.js';
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
 
-class TreeView extends SingleDatasetMixin(GoldenLayoutView) {
+class TreeView extends LinkedMixin(GoldenLayoutView) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/TreeView/style.less' },

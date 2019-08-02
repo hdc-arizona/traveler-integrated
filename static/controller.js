@@ -1,17 +1,15 @@
 /* globals d3, less, GoldenLayout */
 import Tooltip from './views/Tooltip/Tooltip.js';
 import SummaryView from './views/SummaryView/SummaryView.js';
-import SingleLinkedState from './models/SingleLinkedState.js';
+import LinkedState from './models/LinkedState.js';
 import TreeView from './views/TreeView/TreeView.js';
 import TreeComparisonView from './views/TreeComparisonView/TreeComparisonView.js';
 import CodeView from './views/CodeView/CodeView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
-import defaultLayout from './config/defaultLayout.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 
 const viewClassLookup = {
-  SummaryView,
   TreeView,
   TreeComparisonView,
   CodeView,
@@ -22,6 +20,7 @@ const viewClassLookup = {
 class Controller {
   constructor () {
     this.tooltip = window.tooltip = new Tooltip();
+    this.summaryView = new SummaryView(d3.select('.SummaryView'));
     (async () => {
       const datasetList = await d3.json(`/datasets`);
       const metas = await Promise.all(datasetList.map(d => d3.json(`/datasets/${encodeURIComponent(d)}`)));
@@ -32,23 +31,24 @@ class Controller {
     })();
     this.setupLayout();
   }
+  getLinkedState (label) {
+    // Get a linkedState object from an existing view that this new one
+    // should communicate with, or create it if it doesn't exist
+    return (this.views[label] && this.views[label][0].linkedState) ||
+        new LinkedState(label, this.datasets[label]);
+  }
   setupLayout () {
-    this.goldenLayout = new GoldenLayout(defaultLayout, d3.select('#layoutRoot').node());
+    this.goldenLayout = new GoldenLayout({
+      settings: {
+        showPopoutIcon: false
+      },
+      content: []
+    }, d3.select('#layoutRoot').node());
     this.views = {};
     for (const [className, ViewClass] of Object.entries(viewClassLookup)) {
       const self = this;
       this.goldenLayout.registerComponent(className, function (container, state) {
-        if (className === 'SummaryView') {
-          // There's no dataset / linked state associated with the SummaryView
-          const view = new ViewClass({ container, state });
-          self.summaryView = view;
-          return view;
-        }
-
-        // Get a linkedState object from an existing view that this new one
-        // should communicate, or create it if it doesn't exist
-        let linkedState = (self.views[state.label] && self.views[state.label][0].linkedState) ||
-            new SingleLinkedState(state.label, self.datasets[state.label]);
+        let linkedState = self.getLinkedState(state.label);
         // Create the view
         const view = new ViewClass({ container, state, linkedState });
         // Store the view
@@ -98,9 +98,7 @@ class Controller {
     }
   }
   renderAllViews () {
-    if (this.summaryView) {
-      this.summaryView.render();
-    }
+    this.summaryView.render();
     for (const viewList of Object.values(this.views)) {
       for (const view of viewList) {
         view.render();

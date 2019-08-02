@@ -1,11 +1,11 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
+import LinkedMixin from '../common/LinkedMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
 import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
-class UtilizationView extends CursoredViewMixin(SvgViewMixin(SingleDatasetMixin(GoldenLayoutView))) {
+class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/UtilizationView/style.less' },
