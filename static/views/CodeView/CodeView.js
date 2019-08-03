@@ -11,12 +11,15 @@ class CodeView extends LinkedMixin(GoldenLayoutView) {
     ];
     super(argObj);
   }
+  get mode () {
+    throw new Error('This function should be overridden to return an appropriate codeMirror mode');
+  }
   setup () {
     super.setup();
 
     this.codeMirror = CodeMirror(this.content.node(), {
       theme: 'base16-light',
-      mode: 'scheme',
+      mode: this.mode,
       lineNumbers: true,
       styleActiveLine: true,
       value: this.resources[1]

@@ -4,7 +4,9 @@ import SummaryView from './views/SummaryView/SummaryView.js';
 import LinkedState from './models/LinkedState.js';
 import TreeView from './views/TreeView/TreeView.js';
 import TreeComparisonView from './views/TreeComparisonView/TreeComparisonView.js';
-import CodeView from './views/CodeView/CodeView.js';
+import CppView from './views/CodeView/CppView.js';
+import PythonView from './views/CodeView/PythonView.js';
+import PhyslView from './views/CodeView/PhyslView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
@@ -12,7 +14,9 @@ import recolorImageFilter from './utils/recolorImageFilter.js';
 const viewClassLookup = {
   TreeView,
   TreeComparisonView,
-  CodeView,
+  CppView,
+  PythonView,
+  PhyslView,
   GanttView,
   UtilizationView
 };
@@ -42,7 +46,11 @@ class Controller {
       settings: {
         showPopoutIcon: false
       },
-      content: []
+      content: [{
+        type: 'stack',
+        isCloseable: false,
+        content: []
+      }]
     }, d3.select('#layoutRoot').node());
     this.views = {};
     for (const [className, ViewClass] of Object.entries(viewClassLookup)) {
@@ -114,6 +122,86 @@ class Controller {
     }
     if (parent.setActiveContentItem) {
       parent.setActiveContentItem(child);
+    }
+  }
+  assembleViews (linkedState, targetView = null) {
+    const views = linkedState.getPossibleViews();
+    let newLayout = { type: 'row', content: [] };
+    // Put Gantt and Utilization views in a column
+    if (views.GanttView && views.UtilizationView) {
+      delete views.GanttView;
+      delete views.UtilizationView;
+      newLayout.content.push({
+        type: 'column',
+        content: [{
+          type: 'component',
+          componentName: 'GanttView',
+          componentState: { label: linkedState.label }
+        }, {
+          type: 'component',
+          componentName: 'UtilizationView',
+          componentState: { label: linkedState.label }
+        }]
+      });
+    }
+    // Put all code views into a stack, and share a column with a tree
+    const codeTreeColumn = { type: 'column', content: [] };
+    if (views.CppView || views.PythonView || views.PhyslView) {
+      const codeStack = { type: 'stack', content: [] };
+      for (const componentName in ['CppView', 'PythonView', 'PhyslView']) {
+        if (views[componentName]) {
+          codeStack.content.push({
+            type: 'component',
+            componentName,
+            componentState: { label: linkedState.label }
+          });
+        }
+        delete views[componentName];
+      }
+      codeTreeColumn.content.push(codeStack);
+    }
+    if (views.TreeView) {
+      codeTreeColumn.content.push({
+        type: 'component',
+        componentName: 'TreeView',
+        componentState: { label: linkedState.label }
+      });
+      delete views.TreeView;
+    }
+    if (codeTreeColumn.content.length > 0) {
+      newLayout.content.push(codeTreeColumn);
+    }
+    // Add any remaining views as a stack (fallback so we don't have to debug
+    // layout right off the bat if we want to add more views)
+    if (Object.keys(views).length > 0) {
+      newLayout.content.push({
+        type: 'stack',
+        content: Object.keys(views).map(componentName => {
+          return {
+            type: 'component',
+            componentName,
+            componentState: { label: linkedState.label }
+          };
+        })
+      });
+    }
+
+    // Get a list of old views to purge before creating the new ones:
+    const oldItems = this.goldenLayout.root.getItemsByFilter(d => {
+      return d.config.componentState &&
+        d.config.componentState.label === linkedState.label;
+    });
+    // Create the new views
+    let newContainer = this.goldenLayout.createContentItem(newLayout);
+    // Add them
+    if (targetView && targetView.container && targetView.container.parent) {
+      targetView.container.parent.replaceChild(targetView.container, newContainer);
+    } else {
+      this.goldenLayout.root.contentItems[0].addChild(newContainer);
+    }
+    // Purge the old views
+    for (const item of oldItems) {
+      item.remove();
     }
   }
   getView (className, label) {

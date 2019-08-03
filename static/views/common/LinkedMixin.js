@@ -22,7 +22,8 @@ const LinkedMixin = function (superclass) {
             targetBounds: this.getBoundingClientRect()
           });
         })
-        .on('mouseleave', () => { window.controller.tooltip.hide(); });
+        .on('mouseleave', () => { window.controller.tooltip.hide(); })
+        .on('click', () => { window.controller.assembleViews(this.linkedState, this); });
 
       const colorButton = d3el.append('div')
         .classed('button', true)

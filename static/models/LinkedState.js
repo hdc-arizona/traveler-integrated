@@ -58,6 +58,24 @@ class LinkedState extends Model {
   getPrimitiveDetails (primitiveName = this.selectedPrimitive) {
     return this.primitives ? this.primitives[primitiveName] : null;
   }
+  getPossibleViews () {
+    const views = {};
+    for (const { fileType } of this.metadata.sourceFiles) {
+      if (fileType === 'log' || fileType === 'newick') {
+        views['TreeView'] = true;
+      } else if (fileType === 'otf2') {
+        views['GanttView'] = true;
+        views['UtilizationView'] = true;
+      } else if (fileType === 'cpp') {
+        views['CppView'] = true;
+      } else if (fileType === 'python') {
+        views['PythonView'] = true;
+      } else if (fileType === 'physl') {
+        views['PhyslView'] = true;
+      }
+    }
+    return views;
+  }
 }
 
 export default LinkedState;

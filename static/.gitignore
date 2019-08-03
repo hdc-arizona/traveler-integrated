@@ -53,6 +53,12 @@ node_modules/codemirror/mode/*
 !node_modules/codemirror/mode/scheme/
 node_modules/codemirror/mode/scheme/*
 !node_modules/codemirror/mode/scheme/scheme.js
+!node_modules/codemirror/mode/python/
+node_modules/codemirror/mode/python/*
+!node_modules/codemirror/mode/python/python.js
+!node_modules/codemirror/mode/clike/
+node_modules/codemirror/mode/clike/*
+!node_modules/codemirror/mode/clike/clike.js
 !node_modules/codemirror/addon/
 node_modules/codemirror/addon/*
 !node_modules/codemirror/addon/selection/

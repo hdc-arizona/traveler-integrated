@@ -112,7 +112,7 @@ class Database:
 
     def addSourceFile(self, label, fileName, fileType):
         sourceFiles = self.datasets[label]['meta']['sourceFiles']
-        sourceFiles.append({fileName: fileName, fileType: fileType})
+        sourceFiles.append({'fileName': fileName, 'fileType': fileType})
         self.datasets[label]['meta']['sourceFiles'] = sourceFiles # Have to do this separately because meta is a shelf
 
     def addTree(self, label, tree, sourceType):
