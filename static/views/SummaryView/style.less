@@ -26,11 +26,57 @@
       }
     }
   }
-  li, .new.button {
+  li, .new.button, .jupyter.button {
     margin: 1em;
   }
 }
 .UploadView {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  .upload.button {
+    position: absolute;
+    top: 1em;
+    left: 1em;
+  }
+  .selectedFiles {
+    margin-top: @buttonSize;
+    min-width: 30em;
+    overflow-y: auto;
+    .file {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      margin: @tinyButtonSize;
+      img {
+        width: @tinyButtonSize;
+        height: @tinyButtonSize;
+      }
+      .dragHandle, .filename {
+        margin-right: @tinyButtonSize;
+      }
+      .dragHandle {
+        filter: @disabledImageFilter;
+        cursor: grab;
+        &:active {
+          cursor: grabbing;
+        }
+      }
+      select {
+        margin-left: auto;
+      }
+      .status {
+        margin-left: @tinyButtonSize;
+        cursor: help;
+      }
+    }
+  }
+  .uploadLog {
+    resize: none;
+    min-width: 30em;
+    margin-left: 1em;
+    margin-bottom: @buttonSize + 2em;
+  }
   .buttonContainer {
     position: absolute;
     bottom: 1em;
@@ -38,8 +84,12 @@
     right: 1em;
     display: flex;
     justify-content: flex-end;
+    align-items: center;
     .button {
       margin-left: 1em;
+    }
+    .uploadSpinner {
+      height: @smallButtonSize;
     }
   }
 }
