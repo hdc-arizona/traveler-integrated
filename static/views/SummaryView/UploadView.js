@@ -22,7 +22,7 @@ const ROLE_OPTIONS = d3.entries({
   cpp: 'C++ source code',
   physl: 'Physl source code'
 });
-ROLE_OPTIONS.unshift({ key: null, value: 'Select file type:' });
+ROLE_OPTIONS.unshift({ key: null, value: "(don't parse file)" });
 
 class UploadView extends IntrospectableMixin(View) {
   constructor (d3el) {
@@ -31,6 +31,7 @@ class UploadView extends IntrospectableMixin(View) {
     ]);
 
     this.selectedFiles = [];
+    this.log = null;
     this.tree = null;
     this.csv = null;
     this.dot = null;
@@ -62,7 +63,7 @@ class UploadView extends IntrospectableMixin(View) {
           const extension = fileObj.name.toLocaleLowerCase().split('.').pop();
           let role = null;
           if (LOG_EXTENSIONS[extension] && this.tree === null && this.csv === null && this.dot === null) {
-            this.tree = this.csv = this.dot = this.selectedFiles.length;
+            this.log = this.tree = this.csv = this.dot = this.selectedFiles.length;
             role = 'log';
           } else {
             for (const [possibleRole, candidates] of Object.entries(CANDIDATE_EXTENSIONS)) {
@@ -108,14 +109,40 @@ class UploadView extends IntrospectableMixin(View) {
     filesEnter.append('div').classed('filename', true);
     files.select('.filename').text(d => d.fileObj.name);
 
-    filesEnter.append('select');
+    filesEnter.append('select')
+      .on('change', (d, i) => {
+        const newRole = d3.event.target.value || null;
+        if (newRole === 'log') {
+          if (this.log !== null) {
+            this.selectedFiles[this.log].role = null;
+          }
+          if (this.tree !== null) {
+            this.selectedFiles[this.tree].role = null;
+          }
+          if (this.csv !== null) {
+            this.selectedFiles[this.csv].role = null;
+          }
+          if (this.dot !== null) {
+            this.selectedFiles[this.dot].role = null;
+          }
+          this.log = this.tree = this.csv = this.dot = i;
+          d.role = 'log';
+        } else if (newRole !== null) {
+          if (this[newRole] !== null) {
+            this.selectedFiles[this[newRole]].role = null;
+          }
+          this[newRole] = i;
+        }
+        d.role = newRole;
+        this.render();
+      });
     const options = files.select('select').selectAll('option')
       .data(ROLE_OPTIONS);
     options.enter().append('option')
-      .property('value', d => d.key)
+      .property('value', d => d.key || '')
       .text(d => d.value);
     files.select('select')
-      .property('value', d => d.role);
+      .property('value', d => d.role || '');
 
     filesEnter.append('img')
       .classed('status', true);
