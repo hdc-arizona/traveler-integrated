@@ -1,20 +1,22 @@
 /* globals d3, less, GoldenLayout */
 import Tooltip from './views/Tooltip/Tooltip.js';
 import SummaryView from './views/SummaryView/SummaryView.js';
-import SingleLinkedState from './models/SingleLinkedState.js';
+import LinkedState from './models/LinkedState.js';
 import TreeView from './views/TreeView/TreeView.js';
 import TreeComparisonView from './views/TreeComparisonView/TreeComparisonView.js';
-import CodeView from './views/CodeView/CodeView.js';
+import CppView from './views/CodeView/CppView.js';
+import PythonView from './views/CodeView/PythonView.js';
+import PhyslView from './views/CodeView/PhyslView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
-import defaultLayout from './config/defaultLayout.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 
 const viewClassLookup = {
-  SummaryView,
   TreeView,
   TreeComparisonView,
-  CodeView,
+  CppView,
+  PythonView,
+  PhyslView,
   GanttView,
   UtilizationView
 };
@@ -22,28 +24,41 @@ const viewClassLookup = {
 class Controller {
   constructor () {
     this.tooltip = window.tooltip = new Tooltip();
-    (async () => {
-      this.datasets = await d3.json('/datasets?includeMeta=true');
-    })();
+    this.summaryView = new SummaryView(d3.select('.SummaryView'));
+    this.modal = null;
+    this.getDatasets();
     this.setupLayout();
   }
+  async getDatasets () {
+    const datasetList = await d3.json(`/datasets`);
+    const metas = await Promise.all(datasetList.map(d => d3.json(`/datasets/${encodeURIComponent(d)}`)));
+    this.datasets = {};
+    for (const [index, label] of datasetList.entries()) {
+      this.datasets[label] = metas[index];
+    }
+  }
+  getLinkedState (label) {
+    // Get a linkedState object from an existing view that this new one
+    // should communicate with, or create it if it doesn't exist
+    return (this.views[label] && this.views[label][0].linkedState) ||
+        new LinkedState(label, this.datasets[label]);
+  }
   setupLayout () {
-    this.goldenLayout = new GoldenLayout(defaultLayout, d3.select('#layoutRoot').node());
+    this.goldenLayout = new GoldenLayout({
+      settings: {
+        showPopoutIcon: false
+      },
+      content: [{
+        type: 'stack',
+        isCloseable: false,
+        content: []
+      }]
+    }, d3.select('#layoutRoot').node());
     this.views = {};
     for (const [className, ViewClass] of Object.entries(viewClassLookup)) {
       const self = this;
       this.goldenLayout.registerComponent(className, function (container, state) {
-        if (className === 'SummaryView') {
-          // There's no dataset / linked state associated with the SummaryView
-          const view = new ViewClass({ container, state });
-          self.summaryView = view;
-          return view;
-        }
-
-        // Get a linkedState object from an existing view that this new one
-        // should communicate, or create it if it doesn't exist
-        let linkedState = (self.views[state.label] && self.views[state.label][0].linkedState) ||
-            new SingleLinkedState(state.label, self.datasets[state.label]);
+        let linkedState = self.getLinkedState(state.label);
         // Create the view
         const view = new ViewClass({ container, state, linkedState });
         // Store the view
@@ -93,8 +108,9 @@ class Controller {
     }
   }
   renderAllViews () {
-    if (this.summaryView) {
-      this.summaryView.render();
+    this.summaryView.render();
+    if (this.modal) {
+      this.modal.render();
     }
     for (const viewList of Object.values(this.views)) {
       for (const view of viewList) {
@@ -113,6 +129,93 @@ class Controller {
       parent.setActiveContentItem(child);
     }
   }
+  closeAllViews (linkedState) {
+    for (const layout of this.goldenLayout.root.getItemsById(linkedState.label)) {
+      layout.remove();
+    }
+    for (const view of Object.values(this.views[linkedState.label] || {})) {
+      view.container.close();
+    }
+  }
+  assembleViews (linkedState) {
+    const views = linkedState.getPossibleViews();
+    const existingLayout = this.goldenLayout.root.getItemsById(linkedState.label)[0];
+    if (existingLayout) {
+      // Remove it and all of its contents (TODO: use it instead!)
+      existingLayout.remove();
+    }
+
+    let newLayout = { type: 'row', content: [], title: linkedState.label, id: linkedState.label };
+    // Put Gantt and Utilization views in a column
+    if (views.GanttView && views.UtilizationView) {
+      delete views.GanttView;
+      delete views.UtilizationView;
+      newLayout.content.push({
+        type: 'column',
+        content: [{
+          type: 'component',
+          componentName: 'GanttView',
+          componentState: { label: linkedState.label }
+        }, {
+          type: 'component',
+          componentName: 'UtilizationView',
+          componentState: { label: linkedState.label }
+        }]
+      });
+    }
+    // Put all code views into a stack, and share a column with a tree
+    const codeTreeColumn = { type: 'column', content: [] };
+    if (views.CppView || views.PythonView || views.PhyslView) {
+      const codeStack = { type: 'stack', content: [] };
+      for (const componentName of ['CppView', 'PythonView', 'PhyslView']) {
+        if (views[componentName]) {
+          codeStack.content.push({
+            type: 'component',
+            componentName,
+            componentState: { label: linkedState.label }
+          });
+        }
+        delete views[componentName];
+      }
+      codeTreeColumn.content.push(codeStack);
+    }
+    if (views.TreeView) {
+      codeTreeColumn.content.push({
+        type: 'component',
+        componentName: 'TreeView',
+        componentState: { label: linkedState.label }
+      });
+      delete views.TreeView;
+    }
+    if (codeTreeColumn.content.length > 0) {
+      newLayout.content.push(codeTreeColumn);
+    }
+    // Add any remaining views as a stack (fallback so we don't have to debug
+    // layout right off the bat if we want to add more views)
+    if (Object.keys(views).length > 0) {
+      newLayout.content.push({
+        type: 'stack',
+        content: Object.keys(views).map(componentName => {
+          return {
+            type: 'component',
+            componentName,
+            componentState: { label: linkedState.label }
+          };
+        })
+      });
+    }
+
+    // Add the new layout
+    if (this.goldenLayout.root.contentItems.length === 0) {
+      this.goldenLayout.root.addChild({
+        type: 'stack',
+        isCloseable: false,
+        content: [newLayout]
+      });
+    } else {
+      this.goldenLayout.root.contentItems[0].addChild(newLayout);
+    }
+  }
   getView (className, label) {
     if (className === 'SummaryView') {
       return this.summaryView;
@@ -121,20 +224,16 @@ class Controller {
         this.views[label].find(view => view.constructor.name === className);
     }
   }
-  openViews (viewNames, stateObj) {
-    for (const viewName of viewNames) {
-      const view = this.getView(viewName, stateObj.label);
-      if (view) {
-        this.raiseView(view);
-      } else {
-        // TODO: try to position new views intelligently
-        this.goldenLayout.root.contentItems[0].addChild({
-          type: 'component',
-          componentName: viewName,
-          componentState: stateObj
-        });
-      }
-    }
+  showModal (ModalViewClass) {
+    d3.select('#modal').style('display', null);
+    const modalContents = d3.select('#modal .contents')
+      .attr('class', `contents ${ModalViewClass.type}`);
+    this.modal = new ModalViewClass(modalContents);
+  }
+  hideModal () {
+    this.modal = null;
+    d3.select('#modal').style('display', 'none');
+    d3.select('#modal .contents').html('');
   }
 }
 

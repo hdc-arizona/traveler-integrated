@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import asyncio
 from enum import Enum
 import uvicorn #pylint: disable=import-error
-from fastapi import FastAPI, HTTPException #pylint: disable=import-error
+from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
+from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
-from wrangling import common
+from database import Database
+from clientLogger import ClientLogger
 
-parser = argparse.ArgumentParser(description='Serve data bundled by bundle.py')
+parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
-                    help='Directory where the bundled data is stored (default: /tmp/traveler-integrated)')
+                    help='Directory where the bundled data is already / will be stored (default: /tmp/traveler-integrated)')
+parser.add_argument('-s', '--debug', dest='debug', action='store_true',
+                    help='Store additional information for debugging source files, etc.')
 
 args = parser.parse_args()
-db = common.loadDatabase(args.dbDir)
+db = Database(args.dbDir, args.debug)
 app = FastAPI(
     title=__name__,
     description='This is a test',
@@ -21,46 +26,136 @@ app = FastAPI(
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
 
+def checkLabel(label):
+    if label not in db:
+        raise HTTPException(status_code=404, detail='Dataset not found')
+
 @app.get('/')
 def index():
     return RedirectResponse(url='/static/index.html')
 
 @app.get('/datasets')
-def datasets(includeMeta: bool = False):
-    result = {}
-    for label, data in db.items():
-        if includeMeta:
-            result[label] = dict(data['meta'])
-        else:
-            result[label] = {}
-    return result
+def list_datasets():
+    return db.datasetList()
 
+@app.get('/datasets/{label}')
+def get_dataset(label: str):
+    checkLabel(label)
+    return db[label]['meta']
+@app.post('/datasets/{label}', status_code=201)
+def create_dataset(label: str):
+    db.createDataset(label)
+    db.save(label)
+    return db[label]['meta']
+@app.delete('/datasets/{label}')
+def delete_dataset(label: str):
+    db.purgeDataset(label)
+
+class TreeSource(str, Enum):
+    newick = 'newick'
+    otf2 = 'otf2'
+    graph = 'graph'
 @app.get('/datasets/{label}/tree')
-def tree(label: str):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'coreTree' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain tree data')
-    return db[label]['coreTree']
+def get_tree(label: str, source: TreeSource = TreeSource.newick):
+    checkLabel(label)
+    if source not in db[label]['trees']:
+        raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
+    return db[label]['trees'][source]
+@app.post('/datasets/{label}/tree')
+def add_newick_tree(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'newick')
+        await db.processNewickTree(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
-@app.get('/datasets/{label}/code')
-def code(label: str):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-    if 'code' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not include source code')
-    return db[label]['code']
+@app.post('/datasets/{label}/csv')
+def add_performance_csv(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'csv')
+        await db.processCsv(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
+
+@app.post('/datasets/{label}/dot')
+def add_dot_graph(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'dot')
+        await db.processDot(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
+
+@app.post('/datasets/{label}/log')
+def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, file.filename, 'log')
+        await db.processPhylanxLog(label, (await file.read()).decode(), logger.log)
+        db.save(label)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
+
+@app.post('/datasets/{label}/otf2')
+async def add_otf2_trace(label: str, request: Request):
+    # TODO: I think we can accept a raw stream instead of a otf2-print dump
+    # (which would be a huge file):
+    # async for chunk in request.stream()
+    # ... but I'm not sure if this will even work with a linked Jupyter
+    # approach, nor how to best map chunks to lines in db.processOtf2()
+    raise HTTPException(status_code=501)
+
+@app.get('/datasets/{label}/physl')
+def get_physl(label: str):
+    checkLabel(label)
+    if 'physl' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not include physl source code')
+    return db[label]['physl']
+@app.post('/datasets/{label}/physl')
+async def add_physl(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    db.processCode(label, file.filename, (await file.read()).decode(), 'physl')
+    db.save(label)
+@app.get('/datasets/{label}/python')
+def get_python(label: str):
+    checkLabel(label)
+    if 'python' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not include python source code')
+    return db[label]['python']
+@app.post('/datasets/{label}/python')
+async def add_python(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    db.processCode(label, file.filename, (await file.read()).decode(), 'python')
+    db.save(label)
+@app.get('/datasets/{label}/cpp')
+def get_cpp(label: str):
+    checkLabel(label)
+    if 'cpp' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not include C++ source code')
+    return db[label]['cpp']
+@app.post('/datasets/{label}/cpp')
+async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
+    checkLabel(label)
+    db.processCode(label, file.filename, (await file.read()).decode(), 'cpp')
+    db.save(label)
 
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
+    checkLabel(label)
     return dict(db[label]['primitives'])
 
 class HistogramMode(str, Enum):
     utilization = 'utilization'
     count = 'count'
-
 @app.get('/datasets/{label}/histogram')
 def histogram(label: str, \
               mode: HistogramMode = HistogramMode.utilization, \
@@ -69,10 +164,14 @@ def histogram(label: str, \
               end: float = None, \
               location: str = None, \
               primitive: str = None):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
+    checkLabel(label)
     if 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
+
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
 
     def modeHelper(indexObj):
         # TODO: respond with a 204 when the histogram is empty
@@ -97,15 +196,14 @@ def histogram(label: str, \
 
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
+    checkLabel(label)
     if 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
     if begin is None:
-        begin = db[label]['intervalIndexes']['main'].top_node.begin
+        begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
-        end = db[label]['intervalIndexes']['main'].top_node.end
+        end = db[label]['meta']['intervalDomain'][1]
 
     def intervalGenerator():
         yield '['
@@ -119,4 +217,5 @@ def intervals(label: str, begin: float = None, end: float = None):
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(db.load())
     uvicorn.run(app)

@@ -1,25 +1,24 @@
 /* globals CodeMirror */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import SingleDatasetMixin from '../common/SingleDatasetMixin.js';
+import LinkedMixin from '../common/LinkedMixin.js';
 
-class CodeView extends SingleDatasetMixin(GoldenLayoutView) {
+class CodeView extends LinkedMixin(GoldenLayoutView) {
   constructor (argObj) {
-    const label = encodeURIComponent(argObj.state.label);
-    argObj.resources = [
-      { type: 'less', url: `views/CodeView/style.less` },
-      { type: 'json', url: `/datasets/${label}/code` }
-    ];
+    argObj.resources.push({ type: 'less', url: `views/CodeView/style.less` });
     super(argObj);
+  }
+  get mode () {
+    throw new Error('This function should be overridden to return an appropriate codeMirror mode');
   }
   setup () {
     super.setup();
 
     this.codeMirror = CodeMirror(this.content.node(), {
       theme: 'base16-light',
-      mode: 'scheme',
+      mode: this.mode,
       lineNumbers: true,
       styleActiveLine: true,
-      value: this.resources[1]
+      value: this.resources[0]
     });
 
     // Move the cursor when a new primitive is selected
@@ -32,6 +31,9 @@ class CodeView extends SingleDatasetMixin(GoldenLayoutView) {
         });*/
       }
     });
+  }
+  draw () {
+    this.codeMirror.refresh();
   }
 }
 export default CodeView;

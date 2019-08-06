@@ -1,56 +1,45 @@
+@import '../../style/measurements.less';
 @import '../../style/colors.less';
 
 .SummaryView {
-  .dataset {
-    position: relative;
-    .name,
-    .timestamp,
-    .viewContainer {
-      width: -moz-fit-content;
-      width: fit-content;
-    }
-    .name {
-      margin-bottom: 0;
-    }
-    .viewContainer {
-      position: absolute;
-      top: 0px;
-      white-space: nowrap;
-      .button {
-        display: inline-block;
-        margin-right: 0.25em;
-      }
-    }
-    .barContainer {
-      position: absolute;
-      top: 3px;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  bottom: 0px;
+  width: @summarySize;
+  overflow-y: auto;
+  background-color: @invertedBackgroundColor;
+  color: @invertedTextColor;
 
-      .bar {
-        height: 1em;
-        background-color: @textColor;
-        &.unknown {
-          box-sizing: border-box;
-          border: 3px dotted @separatorColor;
-          background-color: unset;
-        }
-      }
-      label {
-        display: block;
-        margin-top: 5px;
+  ul {
+    margin: 0;
+    padding: 0;
+  }
+
+  li {
+    list-style: none;
+    .legend {
+      display: flex;
+      justify-content: flex-end;
+      .button {
+        margin-left: @buttonSize / 4;
       }
     }
-    .pairwiseBanner {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      right: 0;
-      background-color: rgba(255,255,255,0.85);
-      display: flex;
-      align-items: center;
-      h3 {
-        margin: 0 2em;
-      }
+  }
+  li, .new.button {
+    margin: 1em;
+  }
+}
+.UploadView {
+  .buttonContainer {
+    position: absolute;
+    bottom: 1em;
+    left: 1em;
+    right: 1em;
+    display: flex;
+    justify-content: flex-end;
+    .button {
+      margin-left: 1em;
     }
   }
 }

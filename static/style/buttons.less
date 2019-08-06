@@ -32,35 +32,35 @@
     height: 100%;
     left: -1px;
     top: -1px;
-    border: 1px solid @separatorColor;
+    border: 1px solid @shadowColor;
     border-radius: @borderRadius;
     overflow: hidden;
 
     background: @interactableGradient;
-
-    img {
-      position: absolute;
-      left: @buttonSize / 2 - @buttonImageSize / 2;
-      top: @buttonSize / 2 - @buttonImageSize / 2;
-      width: @buttonImageSize;
-      height: @buttonImageSize;
-      filter: @textColorImageFilter;
-    }
   }
-  span {
+  img {
+    position: relative;
+    left: @buttonSize / 2 - @buttonImageSize / 2;
+    top: @buttonSize / 2 - @buttonImageSize / 2;
+    width: @buttonImageSize;
+    height: @buttonImageSize;
+    filter: @textColorImageFilter;
+  }
+  .label {
     white-space: nowrap;
     position: relative;
+    vertical-align: top;
     top: (@buttonSize - 1em) / 2 - 0.1em;
     margin: 0px @buttonTextPadding;
     color: @textColor;
   }
-  &.small a img {
+  &.small img {
     left: @smallButtonSize / 2 - @smallButtonImageSize / 2;
     top: @smallButtonSize / 2 - @smallButtonImageSize / 2;
     width: @smallButtonImageSize;
     height: @smallButtonImageSize;
   }
-  &.tiny a img {
+  &.tiny img {
     left: @tinyButtonSize / 2 - @tinyButtonImageSize / 2;
     top: @tinyButtonSize / 2 - @tinyButtonImageSize / 2;
     width: @tinyButtonImageSize;
@@ -82,7 +82,7 @@
     border-radius: @borderRadius;
     border: 1px solid @shadowColor;
   }
-  &.small span {
+  &.small .label {
     /* todo */
   }
 
@@ -103,9 +103,9 @@
     a {
       border-color: @shadowColor;
       background: @selectedButtonGradient;
-      img {
-        filter: @backgroundImageFilter;
-      }
+    }
+    img {
+      filter: @backgroundImageFilter;
     }
     &:hover a {
       border-color: @shadowColor;
@@ -124,11 +124,11 @@
     a {
       border-color: @disabledColor;
       background: @darkBackgroundColor;
-      img {
-        filter: @disabledImageFilter;
-      }
     }
-    span {
+    img {
+      filter: @disabledImageFilter;
+    }
+    .label {
       color: @disabledColor;
     }
   }

@@ -10,6 +10,8 @@
         <link rel="stylesheet/less" type="text/css" href="style/style.less"/>
         <script src="node_modules/codemirror/lib/codemirror.js"></script>
         <script src="node_modules/codemirror/mode/scheme/scheme.js"></script>
+        <script src="node_modules/codemirror/mode/python/python.js"></script>
+        <script src="node_modules/codemirror/mode/clike/clike.js"></script>
         <script src="node_modules/codemirror/addon/selection/active-line.js"></script>
         <link rel="stylesheet" href="node_modules/codemirror/lib/codemirror.css" />
         <link rel="stylesheet" href="node_modules/codemirror/theme/base16-light.css" />
@@ -18,7 +20,11 @@
         <script type="module" src="controller.js"></script>
     </head>
     <body>
+      <div class="SummaryView"></div>
       <div id="layoutRoot" class="gl_keep"></div>
+      <div id="modal" class="gl_keep" style="display:none">
+        <div class="contents"></div>
+      </div>
       <div id="tooltip" class="gl_keep" style="display:none"></div>
     </body>
 </html>
