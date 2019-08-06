@@ -32,5 +32,8 @@ class CodeView extends LinkedMixin(GoldenLayoutView) {
       }
     });
   }
+  draw () {
+    this.codeMirror.refresh();
+  }
 }
 export default CodeView;
