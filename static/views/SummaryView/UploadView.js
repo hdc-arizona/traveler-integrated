@@ -83,8 +83,10 @@ class UploadView extends IntrospectableMixin(View) {
     this.d3el.select('.ok.button').on('click', async () => {
       if (this.ready && !this.loading) {
         this.loading = true;
+        this.render();
         await this.uploadFiles();
-        // window.controller.hideModal();
+        this.loading = false;
+        this.render();
       }
     });
     this.d3el.select('.uploadLog').node().value = 'Upload progress:\n================\n';
@@ -202,7 +204,6 @@ class UploadView extends IntrospectableMixin(View) {
         }
       }
     } catch (e) {
-      this.loading = false;
       console.warn(e);
     }
 
