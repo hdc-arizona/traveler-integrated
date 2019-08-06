@@ -124,9 +124,15 @@ class Controller {
       parent.setActiveContentItem(child);
     }
   }
-  assembleViews (linkedState, targetView = null) {
+  assembleViews (linkedState) {
     const views = linkedState.getPossibleViews();
-    let newLayout = { type: 'row', content: [] };
+    const existingLayout = this.goldenLayout.root.getItemsById(linkedState.label)[0];
+    if (existingLayout) {
+      // Remove all of its contents
+      existingLayout.remove();
+    }
+
+    let newLayout = { type: 'row', content: [], title: linkedState.label, id: linkedState.label };
     // Put Gantt and Utilization views in a column
     if (views.GanttView && views.UtilizationView) {
       delete views.GanttView;
@@ -148,7 +154,7 @@ class Controller {
     const codeTreeColumn = { type: 'column', content: [] };
     if (views.CppView || views.PythonView || views.PhyslView) {
       const codeStack = { type: 'stack', content: [] };
-      for (const componentName in ['CppView', 'PythonView', 'PhyslView']) {
+      for (const componentName of ['CppView', 'PythonView', 'PhyslView']) {
         if (views[componentName]) {
           codeStack.content.push({
             type: 'component',
@@ -186,22 +192,19 @@ class Controller {
       });
     }
 
-    // Get a list of old views to purge before creating the new ones:
-    const oldItems = this.goldenLayout.root.getItemsByFilter(d => {
-      return d.config.componentState &&
-        d.config.componentState.label === linkedState.label;
-    });
-    // Create the new views
-    let newContainer = this.goldenLayout.createContentItem(newLayout);
-    // Add them
-    if (targetView && targetView.container && targetView.container.parent) {
-      targetView.container.parent.replaceChild(targetView.container, newContainer);
+    // Close any old views before creating new ones:
+    /*for (const oldView of Object.values(this.views[linkedState.label] || {})) {
+      oldView.container.close();
+    }*/
+    // Add the new layout
+    if (this.goldenLayout.root.contentItems.length === 0) {
+      this.goldenLayout.root.addChild({
+        type: 'stack',
+        isCloseable: false,
+        content: [newLayout]
+      });
     } else {
-      this.goldenLayout.root.contentItems[0].addChild(newContainer);
-    }
-    // Purge the old views
-    for (const item of oldItems) {
-      item.remove();
+      this.goldenLayout.root.contentItems[0].addChild(newLayout);
     }
   }
   getView (className, label) {

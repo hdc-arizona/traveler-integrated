@@ -4,11 +4,7 @@ import LinkedMixin from '../common/LinkedMixin.js';
 
 class CodeView extends LinkedMixin(GoldenLayoutView) {
   constructor (argObj) {
-    const label = encodeURIComponent(argObj.state.label);
-    argObj.resources = [
-      { type: 'less', url: `views/CodeView/style.less` },
-      { type: 'json', url: `/datasets/${label}/code` }
-    ];
+    argObj.resources.push({ type: 'less', url: `views/CodeView/style.less` });
     super(argObj);
   }
   get mode () {
@@ -22,7 +18,7 @@ class CodeView extends LinkedMixin(GoldenLayoutView) {
       mode: this.mode,
       lineNumbers: true,
       styleActiveLine: true,
-      value: this.resources[1]
+      value: this.resources[0]
     });
 
     // Move the cursor when a new primitive is selected

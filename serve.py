@@ -168,6 +168,11 @@ def histogram(label: str, \
     if 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
     def modeHelper(indexObj):
         # TODO: respond with a 204 when the histogram is empty
         # (d3.js doesn't have a good way to handle 204 error codes)
@@ -196,9 +201,9 @@ def intervals(label: str, begin: float = None, end: float = None):
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
     if begin is None:
-        begin = db[label]['intervalIndexes']['main'].top_node.begin
+        begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
-        end = db[label]['intervalIndexes']['main'].top_node.end
+        end = db[label]['meta']['intervalDomain'][1]
 
     def intervalGenerator():
         yield '['

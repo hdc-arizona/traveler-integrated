@@ -569,6 +569,12 @@ class Database:
         # Iterate through all intervals to construct the main index:
         intervalIndexes['main'] = IntervalTree([iv async for iv in intervalIterator()])
 
+        # Store the domain of the data from the computed index as metadata
+        self.datasets[label]['meta']['intervalDomain'] = [
+            intervalIndexes['main'].top_node.begin,
+            intervalIndexes['main'].top_node.end
+        ]
+
         await log('')
         await log('Finished indexing %i intervals' % count)
 
