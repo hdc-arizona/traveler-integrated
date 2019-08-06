@@ -25,6 +25,7 @@ class Controller {
   constructor () {
     this.tooltip = window.tooltip = new Tooltip();
     this.summaryView = new SummaryView(d3.select('.SummaryView'));
+    this.modal = null;
     (async () => {
       const datasetList = await d3.json(`/datasets`);
       const metas = await Promise.all(datasetList.map(d => d3.json(`/datasets/${encodeURIComponent(d)}`)));
@@ -107,6 +108,9 @@ class Controller {
   }
   renderAllViews () {
     this.summaryView.render();
+    if (this.modal) {
+      this.modal.render();
+    }
     for (const viewList of Object.values(this.views)) {
       for (const view of viewList) {
         view.render();
@@ -211,20 +215,16 @@ class Controller {
         this.views[label].find(view => view.constructor.name === className);
     }
   }
-  openViews (viewNames, stateObj) {
-    for (const viewName of viewNames) {
-      const view = this.getView(viewName, stateObj.label);
-      if (view) {
-        this.raiseView(view);
-      } else {
-        // TODO: try to position new views intelligently
-        this.goldenLayout.root.contentItems[0].addChild({
-          type: 'component',
-          componentName: viewName,
-          componentState: stateObj
-        });
-      }
-    }
+  showModal (ModalViewClass) {
+    d3.select('#modal').style('display', null);
+    const modalContents = d3.select('#modal .contents')
+      .attr('class', `contents ${ModalViewClass.type}`);
+    this.modal = new ModalViewClass(modalContents);
+  }
+  hideModal () {
+    this.modal = null;
+    d3.select('#modal').style('display', 'none');
+    d3.select('#modal .contents').html('');
   }
 }
 

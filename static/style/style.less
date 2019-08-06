@@ -34,6 +34,29 @@ pre, code {
   bottom: 0px;
 }
 
+#modal {
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  right: 0px;
+  bottom: 0px;
+  display: flex;
+  background-color: fade(@shadowColor, 75%);
+  .contents {
+    position: relative;
+    background-color: @backgroundColor;
+    border: 1px solid @shadowColor;
+    border-radius: @borderRadius;
+    box-shadow: 0.5em 0.5em 2em @shadowColor;
+    min-width: 20em;
+    max-width: calc(100% - 4em);
+    min-height: 20em;
+    max-height: calc(100% - 4em);
+    margin: auto;
+    padding: 1em;
+  }
+}
+
 .scrollArea {
   position: absolute;
   top: @contentPadding;

@@ -1,33 +1,14 @@
 /* globals d3 */
 import { View } from '../../node_modules/uki/dist/uki.esm.js';
-import LinkedMixin from '../common/LinkedMixin.js';
-
-class DatasetSummaryHelperView extends LinkedMixin(View) {
-  constructor ({ linkedState, datasetTemplate }) {
-    super({ linkedState });
-    this.datasetTemplate = datasetTemplate;
-  }
-  setup () {
-    this.d3el.html(this.datasetTemplate);
-    this.d3el.select('.label').text(this.linkedState.label);
-    this.d3el.select('.delete.button').on('click', d => {
-      if (window.confirm(`Are you sure you want to delete ${this.linkedState.label}?`)) {
-        console.log('todo: delete');
-      }
-    });
-    this.setupLegend(this.d3el.select('.legend'));
-  }
-  draw () {
-    this.drawLegend(this.d3el.select('.legend'));
-  }
-}
+import HelperView from './HelperView.js';
+import UploadView from './UploadView.js';
 
 class SummaryView extends View {
   constructor (d3el) {
     super(d3el, [
       { type: 'less', url: 'views/SummaryView/style.less' },
       { type: 'text', url: 'views/SummaryView/template.html' },
-      { type: 'text', url: 'views/SummaryView/datasetTemplate.html' }
+      { type: 'text', url: 'views/SummaryView/helperTemplate.html' }
     ]);
 
     this.helperViews = {};
@@ -38,7 +19,7 @@ class SummaryView extends View {
   setup () {
     this.d3el.html(this.resources[1]);
     this.d3el.select('.new.button').on('click', () => {
-      console.log('todo: show a modal');
+      window.controller.showModal(UploadView);
     });
   }
   draw () {
@@ -63,7 +44,7 @@ class SummaryView extends View {
     const datasetsEnter = datasets.enter().append('li')
       .classed('dataset', true)
       .each(d => {
-        this.helperViews[d] = new DatasetSummaryHelperView({
+        this.helperViews[d] = new HelperView({
           linkedState: window.controller.getLinkedState(d),
           datasetTemplate: this.resources[2]
         });
