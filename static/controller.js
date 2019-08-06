@@ -128,7 +128,7 @@ class Controller {
     const views = linkedState.getPossibleViews();
     const existingLayout = this.goldenLayout.root.getItemsById(linkedState.label)[0];
     if (existingLayout) {
-      // Remove all of its contents
+      // Remove it and all of its contents (TODO: use it instead!)
       existingLayout.remove();
     }
 
@@ -192,10 +192,6 @@ class Controller {
       });
     }
 
-    // Close any old views before creating new ones:
-    /*for (const oldView of Object.values(this.views[linkedState.label] || {})) {
-      oldView.container.close();
-    }*/
     // Add the new layout
     if (this.goldenLayout.root.contentItems.length === 0) {
       this.goldenLayout.root.addChild({
