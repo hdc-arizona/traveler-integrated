@@ -26,15 +26,16 @@ class Controller {
     this.tooltip = window.tooltip = new Tooltip();
     this.summaryView = new SummaryView(d3.select('.SummaryView'));
     this.modal = null;
-    (async () => {
-      const datasetList = await d3.json(`/datasets`);
-      const metas = await Promise.all(datasetList.map(d => d3.json(`/datasets/${encodeURIComponent(d)}`)));
-      this.datasets = {};
-      for (const [index, label] of datasetList.entries()) {
-        this.datasets[label] = metas[index];
-      }
-    })();
+    this.getDatasets();
     this.setupLayout();
+  }
+  async getDatasets () {
+    const datasetList = await d3.json(`/datasets`);
+    const metas = await Promise.all(datasetList.map(d => d3.json(`/datasets/${encodeURIComponent(d)}`)));
+    this.datasets = {};
+    for (const [index, label] of datasetList.entries()) {
+      this.datasets[label] = metas[index];
+    }
   }
   getLinkedState (label) {
     // Get a linkedState object from an existing view that this new one
@@ -126,6 +127,14 @@ class Controller {
     }
     if (parent.setActiveContentItem) {
       parent.setActiveContentItem(child);
+    }
+  }
+  closeAllViews (linkedState) {
+    for (const layout of this.goldenLayout.root.getItemsById(linkedState.label)) {
+      layout.remove();
+    }
+    for (const view of Object.values(this.views[linkedState.label] || {})) {
+      view.container.close();
     }
   }
   assembleViews (linkedState) {

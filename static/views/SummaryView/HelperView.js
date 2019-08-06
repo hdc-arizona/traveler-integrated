@@ -13,9 +13,14 @@ class HelperView extends LinkedMixin(View) {
   setup () {
     this.d3el.html(this.datasetTemplate);
     this.d3el.select('.label').text(this.linkedState.label);
-    this.d3el.select('.delete.button').on('click', d => {
+    this.d3el.select('.delete.button').on('click', async d => {
       if (window.confirm(`Are you sure you want to delete ${this.linkedState.label}?`)) {
-        console.log('todo: delete');
+        await window.fetch(`/datasets/${encodeURIComponent(d)}`, {
+          method: 'delete'
+        });
+        window.controller.closeAllViews(this.linkedState);
+        await window.controller.getDatasets();
+        window.controller.renderAllViews();
       }
     });
     this.setupLegend(this.d3el.select('.legend'));

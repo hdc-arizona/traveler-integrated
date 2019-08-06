@@ -40,9 +40,7 @@ const LinkedMixin = function (superclass) {
         })
         .on('mouseleave', () => { window.controller.tooltip.hide(); });
     }
-    drawLegend (d3el) {
-      console.warn('unimplemented');
-    }
+    drawLegend (d3el) {}
   };
   LinkedView.prototype._instanceOfLinkedMixin = true;
   return LinkedView;
