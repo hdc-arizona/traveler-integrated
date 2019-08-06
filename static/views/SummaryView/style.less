@@ -34,10 +34,16 @@
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  .upload.button {
+  .header {
     position: absolute;
     top: 1em;
     left: 1em;
+    display: flex;
+    flex-direction: row;
+    .datasetLabel {
+      margin-right: 1em;
+      width: 20em;
+    }
   }
   .selectedFiles {
     margin-top: @buttonSize;

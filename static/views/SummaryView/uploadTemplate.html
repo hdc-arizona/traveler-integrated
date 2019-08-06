@@ -1,10 +1,13 @@
 <input class="hiddenUpload" type="file" multiple style="display:none"/>
-<div class="upload button">
-  <a></a>
-  <div class="label">Choose Files...</div>
+<div class="header">
+  <input placeholder="Enter a label for the new dataset" class="datasetLabel" />
+  <div class="upload button">
+    <a></a>
+    <div class="label">Choose Files...</div>
+  </div>
 </div>
 <div class="selectedFiles"></div>
-<textarea class="uploadLog" readonly></textarea>
+<textarea class="uploadLog" readonly value=""></textarea>
 <div class="buttonContainer">
   <img class="uploadSpinner" src="/static/img/spinner.gif" style="display:none"/>
   <div class="cancel button">

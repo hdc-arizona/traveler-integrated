@@ -14,7 +14,13 @@ class ClientLogger:
 
     async def iterate(self, startProcess):
         await startProcess()
+        yield '['
+        firstMessage = True
         while not self.finished:
-            yield self.message
+            if not firstMessage:
+                yield ','
+            yield '"' + self.message + '"'
+            firstMessage = False
             self.message = ''
             await asyncio.sleep(1)
+        yield ']'

@@ -43,20 +43,22 @@ class UploadView extends IntrospectableMixin(View) {
     this.loading = false;
   }
   get ready () {
-    return this.selectedFiles.some(d => d.role !== null);
+    const label = this.d3el.select('.datasetLabel').node();
+    return label && label.value && !window.controller.datasets[label.value] && this.selectedFiles.some(d => d.role !== null);
   }
   setup () {
     this.d3el.html(this.resources[0]);
 
     this.d3el.select('.cancel.button').on('click', () => {
       if (this.loading) {
-        console.warn('todo: cancel the upload in progress');
+        console.warn('TODO: abort the upload process, probably just with oboe stream.abort()');
       }
       window.controller.hideModal();
     });
     this.d3el.select('.upload.button').on('click', () => {
       this.d3el.select('.hiddenUpload').node().click();
     });
+    this.d3el.select('.datasetLabel').on('change', () => { this.render(); });
     this.d3el.select('.hiddenUpload').on('change', () => {
       for (const fileObj of d3.event.target.files) {
         if (!this.selectedFiles.find(d => d.fileObj === fileObj)) {
@@ -81,10 +83,11 @@ class UploadView extends IntrospectableMixin(View) {
     this.d3el.select('.ok.button').on('click', async () => {
       if (this.ready && !this.loading) {
         this.loading = true;
-        console.warn('todo: actually upload the files');
-        window.controller.hideModal();
+        await this.uploadFiles();
+        // window.controller.hideModal();
       }
     });
+    this.d3el.select('.uploadLog').node().value = 'Upload progress:\n================\n';
   }
   draw () {
     this.d3el.select('.ok.button')
@@ -156,6 +159,55 @@ class UploadView extends IntrospectableMixin(View) {
           return '/static/img/ex.svg';
         }
       });
+  }
+  async uploadFiles () {
+    const label = this.d3el.select('.datasetLabel').node().value;
+    // TODO: use oboe to stream the log response more cleanly, but unfortunately
+    // oboe can't POST files yet... when I get a chance, maybe look into helping
+    // with https://github.com/jimhigson/oboe.js/pull/167
+    const decoder = new TextDecoder('utf-8');
+    const uploadLog = this.d3el.select('.uploadLog').node();
+
+    async function handleResponse (response, message = null) {
+      const reader = response.body.getReader();
+      while (true) {
+        let { done, value } = await reader.read();
+        if (done) {
+          break;
+        } else {
+          if (!response.ok) {
+            uploadLog.value += `\n\nERROR communicating with server: ${response.status}\n\n`;
+            throw new Error(decoder.decode(value));
+          } else if (message) {
+            uploadLog.value += message;
+          } else {
+            uploadLog.value += decoder.decode(value);
+          }
+        }
+      }
+    }
+
+    try {
+      await handleResponse(await window.fetch(`/datasets/${label}`, {
+        method: 'POST'
+      }), `Dataset created: ${label}\n`);
+      for (const { fileObj, role } of this.selectedFiles) {
+        if (role !== null) {
+          const body = new window.FormData();
+          body.append('file', fileObj);
+          await handleResponse(await window.fetch(`/datasets/${label}/${role}`, {
+            method: 'POST',
+            body
+          }));
+        }
+      }
+    } catch (e) {
+      this.loading = false;
+      console.warn(e);
+    }
+
+    await window.controller.getDatasets();
+    window.controller.renderAllViews();
   }
 }
 export default UploadView;
