@@ -20,7 +20,6 @@ class HelperView extends LinkedMixin(View) {
         });
         window.controller.closeAllViews(this.linkedState);
         await window.controller.getDatasets();
-        window.controller.renderAllViews();
       }
     });
     this.setupLegend(this.d3el.select('.legend'));

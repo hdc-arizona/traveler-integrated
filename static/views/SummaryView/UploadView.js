@@ -58,7 +58,9 @@ class UploadView extends IntrospectableMixin(View) {
     this.d3el.select('.upload.button').on('click', () => {
       this.d3el.select('.hiddenUpload').node().click();
     });
-    this.d3el.select('.datasetLabel').on('change', () => { this.render(); });
+    this.d3el.select('.datasetLabel')
+      .on('change', () => { this.render(); })
+      .on('keyup', () => { this.render(); });
     this.d3el.select('.hiddenUpload').on('change', () => {
       for (const fileObj of d3.event.target.files) {
         if (!this.selectedFiles.find(d => d.fileObj === fileObj)) {

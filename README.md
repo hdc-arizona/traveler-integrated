@@ -49,6 +49,7 @@ Loading many files at once (using a regular expression to match globbed paths):
   --tree data/als_regression/*.txt \
   --performance data/als_regression/*.csv \
   --physl data/als_regression/als.physl \
+  --cpp data/als_regression/als_csv_instrumented.cpp \
   --label "data/als_regression/(\d*-\d*-\d*).*"
 ```
 

@@ -14,6 +14,7 @@ class LinkedState extends Model {
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
     this.cursorPosition = null;
     this.selectedPrimitive = null;
+    this.mode = 'inclusive';
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
     })();
@@ -79,5 +80,18 @@ class LinkedState extends Model {
     return views;
   }
 }
-
+LinkedState.COLOR_SCHEMES = {
+  inclusive: {
+    selectionColor: '#e6ab02', // yellow
+    timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple
+  },
+  exclusive: {
+    selectionColor: '#7570b3', // purple
+    timeScale: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'] // green
+  },
+  difference: {
+    selectionColor: '',
+    timeScale: ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0'] // diverging red blue
+  }
+};
 export default LinkedState;

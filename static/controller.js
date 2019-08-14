@@ -36,6 +36,7 @@ class Controller {
     for (const [index, label] of datasetList.entries()) {
       this.datasets[label] = metas[index];
     }
+    this.renderAllViews();
   }
   getLinkedState (label) {
     // Get a linkedState object from an existing view that this new one
