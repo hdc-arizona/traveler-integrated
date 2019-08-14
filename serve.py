@@ -126,6 +126,7 @@ def get_physl(label: str):
 @app.post('/datasets/{label}/physl')
 async def add_physl(label: str, file: UploadFile = File(...)):
     checkLabel(label)
+    db.addSourceFile(label, file.filename, 'physl')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'physl')
     db.save(label)
 @app.get('/datasets/{label}/python')
@@ -137,6 +138,7 @@ def get_python(label: str):
 @app.post('/datasets/{label}/python')
 async def add_python(label: str, file: UploadFile = File(...)):
     checkLabel(label)
+    db.addSourceFile(label, file.filename, 'python')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'python')
     db.save(label)
 @app.get('/datasets/{label}/cpp')
@@ -148,6 +150,7 @@ def get_cpp(label: str):
 @app.post('/datasets/{label}/cpp')
 async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
     checkLabel(label)
+    db.addSourceFile(label, file.filename, 'cpp')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
     db.save(label)
 

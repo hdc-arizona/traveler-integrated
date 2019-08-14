@@ -79,7 +79,7 @@ class Database:
                         await log('(may take a while if %s is large)' % label)
                     self.datasets[label][stype] = pickle.load(open(spath, 'rb'))
             for listType in requiredMetaLists:
-                self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, {})
+                self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, [])
 
     def datasetList(self):
         return list(self.datasets.keys())
@@ -111,9 +111,10 @@ class Database:
             shutil.rmtree(labelDir)
 
     def addSourceFile(self, label, fileName, fileType):
+        # Have to do this separately because meta is a shelf
         sourceFiles = self.datasets[label]['meta']['sourceFiles']
         sourceFiles.append({'fileName': fileName, 'fileType': fileType})
-        self.datasets[label]['meta']['sourceFiles'] = sourceFiles # Have to do this separately because meta is a shelf
+        self.datasets[label]['meta']['sourceFiles'] = sourceFiles
 
     def addTree(self, label, tree, sourceType):
         self.datasets[label]['trees'][sourceType] = tree
@@ -122,7 +123,10 @@ class Database:
         labelDir = os.path.join(self.dbDir, label)
         for stype in self.datasets[label].keys():
             if stype in shelves:
-                self.datasets[label][stype].sync()
+                self.datasets[label][stype].close()
+                # .sync() doesn't actually push all the data to disk (because we're not
+                # using writeback?), so we close + reopen the shelf
+                self.datasets[label][stype] = shelve.open(os.path.join(labelDir, stype))
             elif stype in pickles:
                 with open(os.path.join(labelDir, stype + '.pickle'), 'wb') as pickleFile:
                     pickle.dump(self.datasets[label][stype], pickleFile)
