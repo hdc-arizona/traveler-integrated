@@ -42,6 +42,7 @@ class Controller {
     // Get a linkedState object from an existing view that this new one
     // should communicate with, or create it if it doesn't exist
     return (this.views[label] && this.views[label][0].linkedState) ||
+        (this.summaryView.helperViews[label] && this.summaryView.helperViews[label].linkedState) ||
         new LinkedState(label, this.datasets[label]);
   }
   setupLayout () {

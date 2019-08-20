@@ -253,6 +253,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .attr('height', this.yScale.bandwidth())
       .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
 
+    bars.select('.area')
+      .style('fill', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
+    bars.select('.outline')
+      .style('stroke', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
     bars
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
       .on('click', d => {

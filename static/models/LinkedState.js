@@ -14,7 +14,7 @@ class LinkedState extends Model {
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
     this.cursorPosition = null;
     this.selectedPrimitive = null;
-    this.mode = 'inclusive';
+    this._mode = 'Inclusive';
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
     })();
@@ -30,6 +30,13 @@ class LinkedState extends Model {
   }
   get endLimit () {
     return this.metadata.intervalDomain[1];
+  }
+  get mode () {
+    return this._mode;
+  }
+  set mode (newMode) {
+    this._mode = newMode;
+    this.trigger('changeMode');
   }
   setIntervalWindow ({
     begin = this.begin,
@@ -61,6 +68,13 @@ class LinkedState extends Model {
   getPrimitiveDetails (primitiveName = this.selectedPrimitive) {
     return this.primitives ? this.primitives[primitiveName] : null;
   }
+  get timeScale () {
+    // TODO: identify the color map based on the data, across views...
+    return LinkedState.COLOR_SCHEMES[this.mode].timeScale;
+  }
+  get selectionColor () {
+    return LinkedState.COLOR_SCHEMES[this.mode].selectionColor;
+  }
   getPossibleViews () {
     const views = {};
     for (const { fileType } of this.metadata.sourceFiles) {
@@ -81,16 +95,16 @@ class LinkedState extends Model {
   }
 }
 LinkedState.COLOR_SCHEMES = {
-  inclusive: {
+  Inclusive: {
     selectionColor: '#e6ab02', // yellow
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple
   },
-  exclusive: {
+  Exclusive: {
     selectionColor: '#7570b3', // purple
     timeScale: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'] // green
   },
-  difference: {
-    selectionColor: '',
+  Difference: {
+    selectionColor: '#4daf4a', // green
     timeScale: ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0'] // diverging red blue
   }
 };

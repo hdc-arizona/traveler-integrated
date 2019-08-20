@@ -11,8 +11,6 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
     ];
     super(argObj);
 
-    this.colorMode = 'INCLUSIVE';
-
     (async () => {
       try {
         this.tree = d3.hierarchy(await d3.json(`/datasets/${encodeURIComponent(this.layoutState.label)}/tree`));
@@ -126,9 +124,9 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
   }
   drawLegend () {
-    // TODO: get this list based on this.colorMode; for now we just look at
-    // inclusive time
-    const colorMap = TreeView.COLOR_MAPS.INCLUSIVE;
+    // TODO: need to move the color scale stuff to this.linkedState so that
+    // other views can use it
+    const colorMap = this.linkedState.timeScale;
     const times = this.tree.descendants()
       .map(d => this.linkedState.getPrimitiveDetails(d.data.name).time)
       .filter(d => d !== undefined);
@@ -155,7 +153,7 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       .tickFormat(d => prettyPrintTime(d));
     // This blows away the previous contents (if any), so we can just deal in
     // .enter() calls from here on
-    const g = this.d3el.select('.legend .contents').call(axis);
+    const g = this.d3el.select('.legend .contents').html('').call(axis);
 
     // Patch the d3-generated axis
     g.select('.domain').remove();
@@ -224,7 +222,8 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
     mainGlyph.selectAll('.outline')
       .transition(transition)
       .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
-      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`);
+      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`)
+      .style('stroke', d => this.linkedState.selectedPrimitive === d.data.name ? this.linkedState.selectionColor : null);
     mainGlyph.selectAll('.unknownValue')
       .transition(transition)
       .style('opacity', d => {

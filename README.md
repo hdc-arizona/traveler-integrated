@@ -68,3 +68,19 @@ Running `./serve.py` will launch a web server on port 8000
 
 The web server contains a [(work in progress) web interface](https://raw.githubusercontent.com/alex-r-bigelow/traveler-integrated/master/docs/interface.png) for viewing trees and
 traces directly, as well as a [REST API (with a Swagger interface)](https://raw.githubusercontent.com/alex-r-bigelow/traveler-integrated/master/docs/api.png)
+
+# Developing
+Anything inside the `static` directory will be served; see its [README](https://github.com/alex-r-bigelow/traveler-integrated/master/static/README.md) for info on developing the web interface.
+
+On the server side, one of the big priorities at the moment is that we're using
+a [hacked version](https://github.com/alex-r-bigelow/intervaltree) of [intervaltree](https://github.com/chaimleib/intervaltree)
+as a poor man's index into the data (that allows for fast histogram computations).
+There are probably a few opportunities for scalability:
+- These are all built in memory and pickled to a file, meaning that this is the
+current bottleneck for loading large trace files. It would be really cool if we
+could make a version of this library that spools to disk when it gets too big,
+kind of like python's native `shelve` library.
+- We really only need to build these things once, and do read-only queries—we
+should be able to build the indexes more efficiently if we know we'll never have
+to update them, and there's likely some functionality in the original library
+that we could get away with cutting

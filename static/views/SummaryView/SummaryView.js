@@ -21,6 +21,13 @@ class SummaryView extends View {
     this.d3el.select('.new.button').on('click', () => {
       window.controller.showModal(UploadView);
     });
+    this.d3el.select('.jupyter.button').on('mouseenter', function () {
+      window.controller.tooltip.show({
+        content: `<p>Jupyter support coming soon</p>`,
+        targetBounds: this.getBoundingClientRect(),
+        hideAfterMs: null
+      });
+    }).on('mouseleave', () => { window.controller.tooltip.hide(); });
   }
   draw () {
     this.d3el.select('.spinner')

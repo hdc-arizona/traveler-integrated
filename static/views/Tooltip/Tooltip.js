@@ -31,7 +31,8 @@ class Tooltip extends View {
     content = '',
     targetBounds = null,
     anchor = null,
-    hideAfterMs = 1000
+    hideAfterMs = 1000,
+    interactive = false
   } = {}) {
     window.clearTimeout(this._tooltipTimeout);
     const showEvent = d3.event;
@@ -44,6 +45,7 @@ class Tooltip extends View {
     });
 
     let tooltip = this.d3el
+      .classed('interactive', interactive)
       .style('left', null)
       .style('top', null)
       .style('display', content ? null : 'none');
@@ -125,6 +127,32 @@ class Tooltip extends View {
         }, hideAfterMs);
       }
     }
+  }
+  showContextMenu ({ menuEntries, targetBounds, anchor } = {}) {
+    this.show({
+      targetBounds,
+      anchor,
+      hideAfterMs: 0,
+      interactive: true,
+      content: d3el => {
+        d3el.html('');
+
+        const menuItems = d3el.selectAll('.button')
+          .data(menuEntries)
+          .enter().append('div')
+          .classed('button', true);
+        menuItems.append('a');
+        menuItems.append('div')
+          .classed('label', true);
+        menuItems.each(function (d) {
+          d.drawButton(d3.select(this));
+        });
+        menuItems.on('click', d => {
+          d.onClick();
+          this.hide();
+        });
+      }
+    });
   }
 }
 

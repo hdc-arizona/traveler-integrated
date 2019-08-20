@@ -114,6 +114,10 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
       const selectedPrimitive = this.content.select('.selectedPrimitive');
       selectedPrimitive.style('display', this.primitiveHistogram ? null : 'none');
       if (this.primitiveHistogram) {
+        selectedPrimitive.select('.area')
+          .style('fill', this.linkedState.selectionColor);
+        selectedPrimitive.select('.outline')
+          .style('stroke', this.linkedState.selectionColor);
         this.drawPaths(selectedPrimitive, this.primitiveHistogram);
       }
 
