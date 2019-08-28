@@ -25,6 +25,11 @@ and/or OTF2 trace files). The `serve.py` phase serves all data that you've
 bundled in an integrated visualization system that you can load in the browser.
 
 ## Bundling
+For details on all of the ways to bundle data:
+```bash
+./bundle.py --help
+```
+
 A simple example bundling the full phylanx output and an OTF2 trace:
 ```bash
 ./bundle.py \
