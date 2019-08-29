@@ -48,7 +48,7 @@ def get_dataset(label: str):
 @app.post('/datasets/{label}', status_code=201)
 def create_dataset(label: str):
     db.createDataset(label)
-    db.save(label)
+    await db.save(label)
     return db[label]['meta']
 @app.delete('/datasets/{label}')
 def delete_dataset(label: str):
@@ -71,7 +71,7 @@ def add_newick_tree(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'newick')
         await db.processNewickTree(label, (await file.read()).decode(), logger.log)
-        db.save(label)
+        await db.save(label, logger)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
@@ -82,7 +82,7 @@ def add_performance_csv(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'csv')
         await db.processCsv(label, iterUploadFile(await file.read()), logger.log)
-        db.save(label)
+        await db.save(label, logger)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
@@ -93,7 +93,7 @@ def add_dot_graph(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'dot')
         await db.processDot(label, iterUploadFile(await file.read()), logger.log)
-        db.save(label)
+        await db.save(label, logger)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
@@ -104,7 +104,7 @@ def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'log')
         await db.processPhylanxLog(label, iterUploadFile(await file.read()), logger.log)
-        db.save(label)
+        await db.save(label, logger)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
@@ -128,7 +128,7 @@ async def add_physl(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     db.addSourceFile(label, file.filename, 'physl')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'physl')
-    db.save(label)
+    await db.save(label)
 @app.get('/datasets/{label}/python')
 def get_python(label: str):
     checkLabel(label)
@@ -140,7 +140,7 @@ async def add_python(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     db.addSourceFile(label, file.filename, 'python')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'python')
-    db.save(label)
+    await db.save(label)
 @app.get('/datasets/{label}/cpp')
 def get_cpp(label: str):
     checkLabel(label)
@@ -152,7 +152,7 @@ async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     db.addSourceFile(label, file.filename, 'cpp')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
-    db.save(label)
+    await db.save(label)
 
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):

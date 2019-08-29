@@ -134,13 +134,13 @@ async def main():
                 await db.processOtf2(label, FakeFile(paths['otf2']), args['guids'], args['events'])
 
             # Save all the data
-            db.save(label)
+            await db.save(label)
         except: #pylint: disable=W0702
             await logToConsole('Error encountered; purging corrupted data for: %s' % label)
             db.purgeDataset(label)
             raise
         # Always close all shelves
-        db.close()
+        await db.close()
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())

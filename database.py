@@ -119,22 +119,25 @@ class Database:
     def addTree(self, label, tree, sourceType):
         self.datasets[label]['trees'][sourceType] = tree
 
-    def save(self, label):
+    async def save(self, label, log=logToConsole):
         labelDir = os.path.join(self.dbDir, label)
         for stype in self.datasets[label].keys():
             if stype in shelves:
+                await log('Saving %s shelf: %s' % (label, stype))
                 self.datasets[label][stype].close()
                 # .sync() doesn't actually push all the data to disk (because we're not
                 # using writeback?), so we close + reopen the shelf
                 self.datasets[label][stype] = shelve.open(os.path.join(labelDir, stype))
             elif stype in pickles:
+                await log('Saving %s pickle: %s' % (label, stype))
                 with open(os.path.join(labelDir, stype + '.pickle'), 'wb') as pickleFile:
                     pickle.dump(self.datasets[label][stype], pickleFile)
 
-    def close(self):
-        for dataset in self.datasets.values():
+    async def close(self, log=logToConsole):
+        for label, dataset in self.datasets.items():
             for stype in dataset.keys():
                 if stype in shelves:
+                    await log('Closing %s shelf: %s' % (label, stype))
                     dataset[stype].close()
 
     def processPrimitive(self, label, primitiveName, source=None):
