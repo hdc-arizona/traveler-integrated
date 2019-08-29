@@ -61,6 +61,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       this.newCache = {};
       this.waitingOnIncrementalRender = false;
       const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+        .fail(error => {
+          this.error = error;
+          console.log(error);
+        })
         .node('!.*', function (interval) {
           if (currentStream !== self.stream) {
             // A different stream has been started; abort this one
@@ -90,7 +94,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     return super.isLoading || this.stream !== null;
   }
   get isEmpty () {
-    return this.intervalCount === 0 || this.intervalCount > this.renderCutoff;
+    return this.error || this.intervalCount === 0 || this.intervalCount > this.renderCutoff;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
@@ -158,7 +162,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     if (this.isHidden) {
       return;
     } else if (this.isEmpty) {
-      if (this.intervalCount === 0) {
+      if (this.error) {
+        this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
+      } else if (this.intervalCount === 0) {
         this.emptyStateDiv.html('<p>No data in the current view</p>');
       } else {
         this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');

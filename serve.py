@@ -203,7 +203,7 @@ def histogram(label: str, \
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
     checkLabel(label)
-    if 'intervalIndexes' not in db[label]:
+    if 'intervals' not in db[label] or 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
     if begin is None:
