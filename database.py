@@ -5,6 +5,7 @@ import shutil
 import shelve
 import pickle
 import newick
+import errno
 from blist import sortedlist #pylint: disable=import-error
 from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 
@@ -64,13 +65,15 @@ class Database:
             self.datasets[label] = {}
             labelDir = os.path.join(self.dbDir, label)
             for stype in shelves:
-                spath = os.path.join(labelDir, stype)
-                if os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames
+                spath = os.path.join(labelDir, stype + '.shelf')
+                if os.path.exists(spath):
+                    await log('Loading %s %s...' % (label, stype))
+                    self.datasets[label][stype] = shelve.open(spath)
+                elif os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames on some platforms (but not all); see https://stackoverflow.com/questions/8704728/using-python-shelve-cross-platform
                     await log('Loading %s %s...' % (label, stype))
                     self.datasets[label][stype] = shelve.open(spath)
                 elif stype in requiredShelves:
-                    await log('Creating missing required %s for %s...' % (stype, label))
-                    self.datasets[label][stype] = shelve.open(spath)
+                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), spath)
             for stype in pickles:
                 spath = os.path.join(labelDir, stype + '.pickle')
                 if os.path.exists(spath):
@@ -97,7 +100,7 @@ class Database:
         self.datasets[label] = {}
         os.makedirs(labelDir)
         for stype in requiredShelves:
-            spath = os.path.join(labelDir, stype)
+            spath = os.path.join(labelDir, stype + '.shelf')
             self.datasets[label][stype] = shelve.open(spath)
         for stype in requiredPickleDicts:
             self.datasets[label][stype] = {}
@@ -127,7 +130,7 @@ class Database:
                 self.datasets[label][stype].close()
                 # .sync() doesn't actually push all the data to disk (because we're not
                 # using writeback?), so we close + reopen the shelf
-                self.datasets[label][stype] = shelve.open(os.path.join(labelDir, stype))
+                self.datasets[label][stype] = shelve.open(os.path.join(labelDir, stype + '.shelf'))
             elif stype in pickles:
                 await log('Saving %s pickle: %s' % (label, stype))
                 with open(os.path.join(labelDir, stype + '.pickle'), 'wb') as pickleFile:
@@ -414,7 +417,7 @@ class Database:
         # Set up database files
         labelDir = os.path.join(self.dbDir, label)
         primitives = self.datasets[label]['primitives']
-        intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals'))
+        intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals.shelf'))
         intervalIndexes = self.datasets[label]['intervalIndexes'] = {
             'primitives': {},
             'locations': {},
@@ -422,10 +425,10 @@ class Database:
         }
         self.datasets[label]['meta']['hasGuids'] = parseGuids
         if parseGuids:
-            guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids'))
+            guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
         self.datasets[label]['meta']['hasEvents'] = storeEvents
         if storeEvents:
-            self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events'))
+            self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events.shelf'))
 
         # Temporary counters / lists for sorting
         numEvents = 0

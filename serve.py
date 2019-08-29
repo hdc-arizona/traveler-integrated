@@ -29,6 +29,10 @@ app.mount('/static', StaticFiles(directory='static'), name='static')
 def checkLabel(label):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
+def checkIntervals(label):
+    if 'intervals' not in db[label] or 'intervalIndexes' not in db[label]:
+        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
+
 def iterUploadFile(text):
     for line in text.decode().splitlines():
         yield line
@@ -46,7 +50,7 @@ def get_dataset(label: str):
     checkLabel(label)
     return db[label]['meta']
 @app.post('/datasets/{label}', status_code=201)
-def create_dataset(label: str):
+async def create_dataset(label: str):
     db.createDataset(label)
     await db.save(label)
     return db[label]['meta']
@@ -171,8 +175,7 @@ def histogram(label: str, \
               location: str = None, \
               primitive: str = None):
     checkLabel(label)
-    if 'intervalIndexes' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
+    checkIntervals(label)
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
@@ -203,8 +206,7 @@ def histogram(label: str, \
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
     checkLabel(label)
-    if 'intervals' not in db[label] or 'intervalIndexes' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
+    checkIntervals(label)
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
