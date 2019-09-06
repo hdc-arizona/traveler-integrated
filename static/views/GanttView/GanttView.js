@@ -33,6 +33,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
     GanttView.DOM_COUNT++;
+
+    this.selectedGUID = null;
   }
   getData () {
     // Debounce the start of this expensive process...
@@ -155,6 +157,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Redraw when a new primitive is selected
     // TODO: can probably do this immediately in a more light-weight way?
     this.linkedState.on('primitiveSelected', () => { this.render(); });
+
+
+     this.content.select('.background')
+        .on('click', () => {
+          this.linkedState.selectPrimitive(null);
+          this.selectedGUID = null;
+          this.render();
+        });
   }
   draw () {
     super.draw();
@@ -260,8 +270,18 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
 
     bars.select('.area')
-      .style('fill', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
+      .style('fill', d => {
+        if (d.value.GUID === this.selectedGUID) {
+          return '#a30a29';
+        } else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
+          return this.linkedState.selectionColor;
+        } else {
+          return null;
+        }
+      });
+
     bars.select('.outline')
+    // TODO: make this like the area fill
       .style('stroke', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
     bars
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
@@ -274,6 +294,17 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         } else {
           this.linkedState.selectPrimitive(d.value.Primitive);
         }
+
+        if (!d.value.GUID) {
+          console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
+          if (d.value.enter.GUID) {
+            this.selectedGUID = d.value.enter.GUID;
+          }
+        } else {
+          this.selectedGUID = d.value.GUID;
+        }
+        this.render();
+        console.log("selected GUID: " + this.selectedGUID);
       }).on('mouseenter', function (d) {
         window.controller.tooltip.show({
           content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
