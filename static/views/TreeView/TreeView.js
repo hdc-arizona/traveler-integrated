@@ -8,8 +8,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/TreeView/style.less' },
-      { type: 'text', url: 'views/TreeView/template.html' },
-      { type: 'text', url: 'views/TreeView/shapeKey.html' }
+      { type: 'text', url: 'views/TreeView/template.html' }
     ];
     super(argObj);
 
@@ -38,8 +37,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       left: 20
     };
     this.legendWidth = 300;
-    this.nodeWidth = 50;
-    this.wideNodeWidth = 120;
+    this.nodeWidth = 120;
     this.nodeHeight = 20;
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
     this.horizontalPadding = 40; // px separation between nodes
@@ -47,24 +45,10 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     this.expanderRadius = this.mainGlyphRadius / 2;
 
     this.content.html(this.resources[1]);
-    this.content.select('.key').html(this.resources[2]);
 
     // Redraw when a new primitive is selected
     // TODO: auto-expand and scroll if the selected primitive is collapsed?
     this.linkedState.on('primitiveSelected', () => { this.render(); });
-
-    // Listen for ctrl+f so that all labels are visible when the user is searching
-    this.showAllLabels = false;
-    d3.select('body').on('keydown', () => {
-      // 17, 91 are cmd+ctrl, 13 is enter, 70 is F
-      if (d3.event.keyCode === 17 || d3.event.keyCode === 91 || d3.event.keyCode === 92) { // ctrl & cmd
-        this.showAllLabels = true;
-        this.render();
-      }
-    }).on('click', () => {
-      this.showAllLabels = false;
-      this.render();
-    });
   }
   draw () {
     super.draw();
@@ -74,14 +58,14 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     } else if (this.histogram instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
-      const transition = d3.transition()
-        .duration(1000);
-
       // Compute the new layout
-      this.updateLayout(transition);
+      this.updateLayout();
 
       // Draw the legend (note: this also sets up this.currentColorTimeScale)
       this.drawLegend();
+
+      const transition = d3.transition()
+        .duration(1000);
 
       // Draw the nodes
       this.drawNodes(transition);
@@ -97,13 +81,12 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       delete this._collapsedParent;
     }
   }
-  updateLayout (transition) {
+  updateLayout () {
     // Compute the minimum VERTICAL layout (mbostock's example / the d3 docs are
     // really confusing about this), with fixed node sizes / separation—we'll
     // rotate this later
-    const nodeWidth = this.showAllLabels ? this.wideNodeWidth : this.nodeWidth;
     const layoutGenerator = d3.tree()
-      .nodeSize([this.nodeHeight, nodeWidth + this.horizontalPadding])
+      .nodeSize([this.nodeHeight, this.nodeWidth + this.horizontalPadding])
       .separation(() => this.nodeSeparation);
     layoutGenerator(this.tree);
     const xDomain = d3.extent(this.tree.descendants(), d => d.x);
@@ -119,7 +102,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       // The minimum right-most coordinate (remember the original domain is rotated)
       this.margin.left + yDomain[1] - yDomain[0],
       // How far over it could be if we use the available screen space
-      viewBounds.width - this.scrollBarSize - this.wideNodeWidth - this.margin.right
+      viewBounds.width - this.scrollBarSize - this.nodeWidth - this.margin.right
     )];
     const yRange = [this.margin.top + this.nodeHeight / 2, Math.max(
       // The minimum bottom-most coordinate (remember the original domain is rotated)
@@ -138,8 +121,8 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     }
 
     // Resize our SVG element to the needed size (overrides the default behavior of SvgViewMixin)
-    this.content.transition(transition)
-      .attr('width', xRange[1] + this.wideNodeWidth + this.margin.right)
+    this.content
+      .attr('width', xRange[1] + this.nodeWidth + this.margin.right)
       .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
   }
   drawLegend () {
@@ -252,14 +235,9 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
 
     // Node label
     nodesEnter.append('text')
-      .classed('nodeLabel', true)
       .attr('x', 2 * this.mainGlyphRadius)
       .attr('y', this.mainGlyphRadius)
       .text(d => this.linkedState.getPrimitiveDetails(d.data.name).name);
-    nodes.select('.nodeLabel')
-      .attr('opacity', d => {
-        return this.showAllLabels || d.data.children.length === 0 ? 1 : 0;
-      });
 
     // Collapse / expand glyph
     const expanderGlyphEnter = nodesEnter.append('g').classed('expander', true)
