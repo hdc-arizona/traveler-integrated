@@ -1,9 +1,10 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import LinkedMixin from '../common/LinkedMixin.js';
+import SvgViewMixin from '../common/SvgViewMixin.js';
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
 
-class TreeView extends LinkedMixin(GoldenLayoutView) {
+class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/TreeView/style.less' },
@@ -35,6 +36,7 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       bottom: 20,
       left: 20
     };
+    this.legendWidth = 300;
     this.nodeWidth = 120;
     this.nodeHeight = 20;
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
@@ -118,8 +120,8 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       node.y = xToY(temp);
     }
 
-    // Resize our SVG element to the needed size
-    this.content.select('svg.tree')
+    // Resize our SVG element to the needed size (overrides the default behavior of SvgViewMixin)
+    this.content
       .attr('width', xRange[1] + this.nodeWidth + this.margin.right)
       .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
   }
@@ -145,7 +147,7 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
     // Create a spatial scale + axis based on the color map
     const axisScale = d3.scaleLinear()
       .domain([ticks[0], ticks[ticks.length - 1]])
-      .range([0, 300]);
+      .range([0, this.legendWidth]);
     const axis = d3.axisBottom()
       .scale(axisScale)
       .tickSize(13)
@@ -153,9 +155,10 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       .tickFormat(d => prettyPrintTime(d));
     // This blows away the previous contents (if any), so we can just deal in
     // .enter() calls from here on
-    const g = this.d3el.select('.legend .contents').html('').call(axis);
+    const g = this.d3el.select('.legend').html('').call(axis);
 
     // Patch the d3-generated axis
+    g.attr('transform', `translate(${this.margin.left},${this.margin.top})`);
     g.select('.domain').remove();
     g.selectAll('rect').data(colorMap)
       .enter()

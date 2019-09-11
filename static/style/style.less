@@ -85,3 +85,24 @@ pre, code {
   bottom: 0;
   background: center / 3em no-repeat url('/static/img/spinner.gif'), rgba(255,255,255,0.75);
 }
+
+// TODO: this should probably be moved closer to views/common/SVGMiveMixin.js
+.lm_header .lm_tab.svgTab {
+  padding-right: 36px;
+  .downloadIcon {
+    position: absolute;
+    width: 11px;
+    height: 11px;
+    background-image: data-uri('../img/download.svg');
+    background-position: center center;
+    background-repeat: no-repeat;
+    top: 4px;
+    right: 6px;
+    margin-right: 13px;
+    opacity: 0.4;
+
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
