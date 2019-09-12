@@ -18,13 +18,19 @@ pip3 install -r requirements.txt
 ```
 
 # Running
-Running this comes in two phases; bundling, and serving. The `bundle.py` phase
-combines and indexes data from various sources (e.g. the full STDOUT dump from
-a phylanx run; individual tree, csv, and/or dot files; source code files;
-and/or OTF2 trace files). The `serve.py` phase serves all data that you've
-bundled in an integrated visualization system that you can load in the browser.
+If you only want to visualize trees, you can just run `serve.py` and upload the
+relevant files in the interface.
 
-## Bundling
+If you need to bundle traces, or upload a lot of different datasets, you will
+need to run `bundle.py` before running `serve.py`. See `bundle.py --help` for
+details on how to load different combinations of STDOUT dumps from phylanx runs;
+individual trees; performance CSV files; DOT files; and source code files.
+
+If something goes wrong, `bundle.py` ***should*** behave reasonably
+idempotently, but if you just want to start with a fresh slate anyway, try
+`rm -rf /tmp/traveler-integrated`.
+
+## Bundling Examples
 For details on all of the ways to bundle data:
 ```bash
 ./bundle.py --help
@@ -71,8 +77,8 @@ Bringing it all together:
 ## Serving
 Running `./serve.py` will launch a web server on port 8000
 
-The web server contains a [(work in progress) web interface](https://raw.githubusercontent.com/alex-r-bigelow/traveler-integrated/master/docs/interface.png) for viewing trees and
-traces directly, as well as a [REST API (with a Swagger interface)](https://raw.githubusercontent.com/alex-r-bigelow/traveler-integrated/master/docs/api.png)
+The web server contains a (work in progress) web interface, as well as ReDoc /
+Swagger interfaces to its underlying API.
 
 # Developing
 Anything inside the `static` directory will be served; see its [README](https://github.com/alex-r-bigelow/traveler-integrated/master/static/README.md) for info on developing the web interface.
