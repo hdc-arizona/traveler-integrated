@@ -255,7 +255,11 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       .classed('nodeLabel', true)
       .attr('x', 2 * this.mainGlyphRadius)
       .attr('y', this.mainGlyphRadius)
-      .text(d => this.linkedState.getPrimitiveDetails(d.data.name).name);
+      .text(d => {
+        const details = this.linkedState.getPrimitiveDetails(d.data.name);
+        // Use display_name if available, but if not (e.g. we only have trace data), use its full name
+        return details.display_name || details.name;
+      });
     nodes.select('.nodeLabel')
       .attr('opacity', d => {
         return this.showAllLabels || d.data.children.length === 0 ? 1 : 0;
