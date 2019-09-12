@@ -47,7 +47,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     this.expanderRadius = this.mainGlyphRadius / 2;
 
     this.content.html(this.resources[1]);
-    this.content.select('.key').html(this.resources[2]);
+    // this.content.select('.key').html(this.resources[2]);
 
     // Redraw when a new primitive is selected
     // TODO: auto-expand and scroll if the selected primitive is collapsed?
