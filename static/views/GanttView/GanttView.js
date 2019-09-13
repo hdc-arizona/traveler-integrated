@@ -162,7 +162,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
      this.content.select('.background')
         .on('click', () => {
           this.linkedState.selectPrimitive(null);
-          this.selectedGUID = null;
           this.render();
         });
   }
@@ -295,6 +294,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           this.linkedState.selectPrimitive(d.value.Primitive);
         }
 
+        this.render();
+      }).on('mouseenter', (d) => {
         if (!d.value.GUID) {
           console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.GUID) {
@@ -303,16 +304,20 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         } else {
           this.selectedGUID = d.value.GUID;
         }
-        this.render();
         console.log("selected GUID: " + this.selectedGUID);
-      }).on('mouseenter', function (d) {
-        window.controller.tooltip.show({
-          content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-          targetBounds: this.getBoundingClientRect(),
-          hideAfterMs: null
-        });
+          this.render();
+
+
+      window.controller.tooltip.show({
+        content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
+        targetBounds: DOMRect,
+        hideAfterMs: null
+      });
+
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
+        this.selectedGUID = null;
+        this.render();
       });
   }
   drawLinks (data) {
