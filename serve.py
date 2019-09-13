@@ -75,7 +75,7 @@ def add_newick_tree(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'newick')
         await db.processNewickTree(label, (await file.read()).decode(), logger.log)
-        await db.save(label, logger)
+        await db.save(label, logger.log)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
@@ -86,7 +86,7 @@ def add_performance_csv(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'csv')
         await db.processCsv(label, iterUploadFile(await file.read()), logger.log)
-        await db.save(label, logger)
+        await db.save(label, logger.log)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
@@ -97,7 +97,7 @@ def add_dot_graph(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'dot')
         await db.processDot(label, iterUploadFile(await file.read()), logger.log)
-        await db.save(label, logger)
+        await db.save(label, logger.log)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
@@ -108,7 +108,7 @@ def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
     async def startProcess():
         db.addSourceFile(label, file.filename, 'log')
         await db.processPhylanxLog(label, iterUploadFile(await file.read()), logger.log)
-        await db.save(label, logger)
+        await db.save(label, logger.log)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
