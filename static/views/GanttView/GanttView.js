@@ -155,6 +155,13 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Redraw when a new primitive is selected
     // TODO: can probably do this immediately in a more light-weight way?
     this.linkedState.on('primitiveSelected', () => { this.render(); });
+
+
+     this.content.select('.background')
+        .on('click', () => {
+          this.linkedState.selectPrimitive(null);
+          this.render();
+        });
   }
   draw () {
     super.draw();
@@ -260,8 +267,19 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
 
     bars.select('.area')
-      .style('fill', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
+      .style('fill', d => {
+        if (d.value.GUID === this.linkedState.selectedGUID) {
+          return this.linkedState.mouseHoverSelectionColor;
+        } else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
+          return this.linkedState.selectionColor;
+        } else {
+          return null;
+        }
+      });
+
+    var _self = this;
     bars.select('.outline')
+    // TODO: make this like the area fill
       .style('stroke', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
     bars
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
@@ -274,14 +292,30 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         } else {
           this.linkedState.selectPrimitive(d.value.Primitive);
         }
-      }).on('mouseenter', function (d) {
+
+        this.render();
+      }).on('mouseenter',function(d) {
+        if (!d.value.GUID) {
+          console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
+          if (d.value.enter.GUID) {
+            _self.linkedState.selectGUID(d.value.enter.GUID);
+          }
+        } else {
+          _self.linkedState.selectGUID(d.value.GUID);
+        }
+        _self.render();
+
+
         window.controller.tooltip.show({
           content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
           targetBounds: this.getBoundingClientRect(),
           hideAfterMs: null
         });
+
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
+        this.linkedState.selectGUID(null);
+        this.render();
       });
   }
   drawLinks (data) {
