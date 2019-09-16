@@ -33,8 +33,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
     GanttView.DOM_COUNT++;
-
-    this.selectedGUID = null;
   }
   getData () {
     // Debounce the start of this expensive process...
@@ -270,8 +268,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
     bars.select('.area')
       .style('fill', d => {
-        if (d.value.GUID === this.selectedGUID) {
-          return '#a30a29';
+        if (d.value.GUID === this.linkedState.selectedGUID) {
+          return this.linkedState.mouseHoverSelectionColor;
         } else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
           return this.linkedState.selectionColor;
         } else {
@@ -279,6 +277,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         }
       });
 
+    var _self = this;
     bars.select('.outline')
     // TODO: make this like the area fill
       .style('stroke', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
@@ -295,28 +294,27 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         }
 
         this.render();
-      }).on('mouseenter', (d) => {
+      }).on('mouseenter',function(d) {
         if (!d.value.GUID) {
           console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.GUID) {
-            this.selectedGUID = d.value.enter.GUID;
+            _self.linkedState.selectGUID(d.value.enter.GUID);
           }
         } else {
-          this.selectedGUID = d.value.GUID;
+          _self.linkedState.selectGUID(d.value.GUID);
         }
-        console.log("selected GUID: " + this.selectedGUID);
-          this.render();
+        _self.render();
 
 
-      window.controller.tooltip.show({
-        content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-        targetBounds: DOMRect,
-        hideAfterMs: null
-      });
+        window.controller.tooltip.show({
+          content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
+          targetBounds: this.getBoundingClientRect(),
+          hideAfterMs: null
+        });
 
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
-        this.selectedGUID = null;
+        this.linkedState.selectGUID(null);
         this.render();
       });
   }
