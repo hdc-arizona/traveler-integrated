@@ -522,7 +522,7 @@ class Database:
                         await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['name'])
                         continue
                     intervalId = str(numIntervals)
-                    currentInterval = {'enter': {}, 'leave': {}}
+                    currentInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId }
                     for attr, value in event.items():
                         if attr != 'Timestamp' and value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
                             currentInterval[attr] = value
@@ -595,9 +595,34 @@ class Database:
             intervalIndexes['main'].top_node.begin,
             intervalIndexes['main'].top_node.end
         ]
-
         await log('')
         await log('Finished indexing %i intervals' % count)
+
+        await log('Connecting intervals with the same GUID (.=2500 intervals)')
+        guidCount = 0
+        count = 0
+        missingCount = 0
+        lastGuidIntervals = {}
+        for iv in intervalIndexes['main'].iterOverlap(endOrder=True):
+            intervalId = iv.data
+            intervalObj = intervals[intervalId]
+            if 'GUID' not in intervalObj:
+                missingCount += 1
+            elif intervalObj['GUID'] in lastGuidIntervals:
+                lastId = lastGuidIntervals[intervalObj['GUID']]
+                previousIv = intervals[lastId]
+                intervalObj['lastGuidIntervalId'] = lastId
+                intervalObj['lastGuidLocation'] = previousIv['Location']
+                intervalObj['lastGuidEndTimestamp'] = previousIv['leave']['Timestamp']
+                # Because intervals is a shelf, it needs a copy to know that something changed
+                intervals[intervalId] = intervalObj.copy()
+                count += 1
+            else:
+                lastGuidIntervals[intervalObj['GUID']] = intervalId
+                count += 1
+                guidCount += 1
+        await log('Finished connecting %i intervals' % count)
+        await log('GUIDs used: %i, Intervals without GUIDs: %i' % (guidCount, missingCount))
 
         # Create any missing parent-child primitive relationships based on the GUIDs we've collected
         if parseGuids:
