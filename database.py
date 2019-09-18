@@ -617,6 +617,7 @@ class Database:
                 # Because intervals is a shelf, it needs a copy to know that something changed
                 intervals[intervalId] = intervalObj.copy()
                 count += 1
+                lastGuidIntervals[intervalObj['GUID']] = intervalId
             else:
                 lastGuidIntervals[intervalObj['GUID']] = intervalId
                 count += 1
