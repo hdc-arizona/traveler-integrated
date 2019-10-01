@@ -324,6 +324,26 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
     }
+    let link_data = data.filter(d => d.value.hasOwnProperty('lastGuidEndTimestamp'));
+    console.log(link_data);
+    
+    let links = this.content.select('.links')
+      .selectAll('.link').data(link_data, d => d.key);
+    links.exit().remove();
+    const linksEnter = links.enter().append('g')
+      .classed('link', true);
+    links = links.merge(linksEnter);
+
+    //links.attr('transform', d => `translate(${this.xScale(d.value.lastGuidEndTimestamp)},${this.yScale(d.value.lastGuidLocation)})`);
+    let halfwayOffset = this.yScale.bandwidth() / 2;
+
+    linksEnter.append('line')
+      .classed('line', true);
+    links.selectAll('line')
+      .attr('x1', d => this.xScale(d.value.lastGuidEndTimestamp))
+      .attr('x2', d => this.xScale(d.value.enter.Timestamp))
+      .attr('y1', d => this.yScale(d.value.lastGuidLocation) + halfwayOffset)
+      .attr('y2', d => this.yScale(d.value.Location) + halfwayOffset)
   }
   setupZoomAndPan () {
     this.initialDragState = null;
