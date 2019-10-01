@@ -325,7 +325,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       this.content.select('.links').attr('transform', null);
     }
     let link_data = data.filter(d => d.value.hasOwnProperty('lastGuidEndTimestamp'));
-    console.log(link_data);
     
     let links = this.content.select('.links')
       .selectAll('.link').data(link_data, d => d.key);
