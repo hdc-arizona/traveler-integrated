@@ -156,12 +156,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // TODO: can probably do this immediately in a more light-weight way?
     this.linkedState.on('primitiveSelected', () => { this.render(); });
 
-
-     this.content.select('.background')
-        .on('click', () => {
-          this.linkedState.selectPrimitive(null);
-          this.render();
-        });
+    this.content.select('.background')
+      .on('click', () => {
+        this.linkedState.selectPrimitive(null);
+        this.render();
+      });
   }
   draw () {
     super.draw();
@@ -294,7 +293,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         }
 
         this.render();
-      }).on('mouseenter',function(d) {
+      }).on('mouseenter', function (d) {
         if (!d.value.GUID) {
           console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.GUID) {
@@ -305,13 +304,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         }
         _self.render();
 
-
         window.controller.tooltip.show({
           content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
           targetBounds: this.getBoundingClientRect(),
           hideAfterMs: null
         });
-
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
         this.linkedState.selectGUID(null);
@@ -324,25 +321,25 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
     }
-    let link_data = data.filter(d => d.value.hasOwnProperty('lastGuidEndTimestamp'));
-    
+    let linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
+
     let links = this.content.select('.links')
-      .selectAll('.link').data(link_data, d => d.key);
+      .selectAll('.link').data(linkData, d => d.key);
     links.exit().remove();
     const linksEnter = links.enter().append('g')
       .classed('link', true);
     links = links.merge(linksEnter);
 
-    //links.attr('transform', d => `translate(${this.xScale(d.value.lastGuidEndTimestamp)},${this.yScale(d.value.lastGuidLocation)})`);
+    // links.attr('transform', d => `translate(${this.xScale(d.value.lastGuidEndTimestamp)},${this.yScale(d.value.lastGuidLocation)})`);
     let halfwayOffset = this.yScale.bandwidth() / 2;
 
     linksEnter.append('line')
       .classed('line', true);
     links.selectAll('line')
-      .attr('x1', d => this.xScale(d.value.lastGuidEndTimestamp))
+      .attr('x1', d => this.xScale(d.value.lastParentInterval.endTimestamp))
       .attr('x2', d => this.xScale(d.value.enter.Timestamp))
-      .attr('y1', d => this.yScale(d.value.lastGuidLocation) + halfwayOffset)
-      .attr('y2', d => this.yScale(d.value.Location) + halfwayOffset)
+      .attr('y1', d => this.yScale(d.value.lastParentInterval.location) + halfwayOffset)
+      .attr('y2', d => this.yScale(d.value.Location) + halfwayOffset);
   }
   setupZoomAndPan () {
     this.initialDragState = null;
