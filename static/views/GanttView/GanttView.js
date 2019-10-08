@@ -159,6 +159,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.content.select('.background')
       .on('click', () => {
         this.linkedState.selectPrimitive(null);
+	this.linkedState.selectIntervalId(null);
         this.render();
       });
   }
@@ -286,10 +287,17 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         if (!d.value.Primitive) {
           console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.Primitive) {
-            this.linkedState.selectPrimitive(d.value.enter.Primitive);
+            this.linkedState.selectPrimitive(d.value.enter.Primitive); // Does this ever work? - Kate
           }
         } else {
           this.linkedState.selectPrimitive(d.value.Primitive);
+        }
+        
+	if (!d.value.intervalId) {
+          console.warn(`No (consistent) intervalId for interval: ${JSON.stringify(d.value, null, 2)}`);
+	  this.linkedState.selectIntervalId(null);
+        } else {
+          this.linkedState.selectIntervalId(d.value.intervalId);
         }
 
         this.render();
@@ -316,12 +324,37 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       });
   }
   drawLinks (data) {
-    // TODO
+
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
     }
-    let linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
+    let linkData = [];
+    if (!this.linkedState.selectedIntervalId) {
+      linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
+    } else {
+      // Collect only the links in the back-path of the selected IntervalId
+      // TODO Make me more efficient, this has a lot of passes
+      let workingId = this.linkedState.selectedIntervalId;
+      let inView = true;
+      while (inView) {
+	let interval = data.find( d => d.value.intervalId === workingId );
+	
+	// Only continue if interval is found and has a link backwards
+	if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
+	  linkData.push(interval);
+	} else {
+	  inView = false;
+	  continue;
+	}
+
+	workingId = interval.value.lastParentInterval.id;
+	// Only continue if previous interval is drawn
+	if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
+          inView = false;
+	}
+      }      
+    }
 
     let links = this.content.select('.links')
       .selectAll('.link').data(linkData, d => d.key);

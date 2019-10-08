@@ -15,6 +15,7 @@ class LinkedState extends Model {
     this.cursorPosition = null;
     this.selectedPrimitive = null;
     this.selectedGUID = null;
+    this.selectedIntervalId = null;
     this._mode = 'Inclusive';
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
@@ -66,6 +67,12 @@ class LinkedState extends Model {
     if (guid !== this.selectedGUID) {
       this.selectedGUID = guid;
       this.stickyTrigger('guidSelected', { guid });
+    }
+  }
+  selectIntervalId (intervalId) {
+    if (intervalId !== this.selectedIntervalId) {
+      this.selectedIntervalId = intervalId;
+      this.stickyTrigger('intervalIdSelected', { intervalId });
     }
   }
   moveCursor (position) {
