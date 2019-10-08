@@ -4,15 +4,15 @@ import sys
 import shutil
 import shelve
 import pickle
-import newick
 import errno
+import newick
 from blist import sortedlist #pylint: disable=import-error
 from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 
 # Possible files / metadata structures that we create / open / update
 shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
 requiredShelves = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
+pickles = ['intervalIndexes', 'metricIndexes', 'trees', 'physl', 'python', 'cpp']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
 
@@ -35,14 +35,13 @@ timeParser = re.compile(r'time: ([\d\.]+)')
 eventLineParser = re.compile(r'^(\S+)\s+(\d+)\s+(\d+)\s+(.*)$')
 attrParsers = {
     'ENTER': r'(Region): "([^"]*)"',
-    'LEAVE': r'(Region): "([^"]*)"',
-    'METRIC': r'Value: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)',
-    'MPI_SEND': r'([^:]*): ([^,]*)',
-    'MPI_RECV': r'([^:]*): ([^,]*)'
+    'LEAVE': r'(Region): "([^"]*)"'
 }
 addAttrLineParser = re.compile(r'^\s+ADDITIONAL ATTRIBUTES: (.*)$')
 addAttrSplitter = re.compile(r'\), \(')
 addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
+
+metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d)+\s+Metric:[\s\d,]+Value: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 async def logToConsole(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
@@ -423,6 +422,7 @@ class Database:
             'locations': {},
             'both': {}
         }
+        metricIndexes = self.datasets[label]['metricIndexes'] = {}
         self.datasets[label]['meta']['hasGuids'] = parseGuids
         if parseGuids:
             guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
@@ -433,18 +433,29 @@ class Database:
         # Temporary counters / lists for sorting
         numEvents = 0
         self.sortedEventsByLocation = {}
-
         await log('Parsing events (.=2500 events)')
         newR = seenR = newG = seenG = 0
         currentEvent = None
         for line in file:
             eventLineMatch = eventLineParser.match(line)
             addAttrLineMatch = addAttrLineParser.match(line)
-            if currentEvent is None and eventLineMatch is None:
+            metricLineMatch = metricLineParser.match(line)
+            if currentEvent is None and eventLineMatch is None and metricLineMatch is None:
                 # This is a blank / header line
                 continue
 
-            if eventLineMatch is not None:
+            if metricLineMatch is not None:
+                # This is a metric line
+                location = metricLineMatch.group(1)
+                timestamp = metricLineMatch.group(2)
+                metricType = metricLineMatch.group(3)
+                value = metricLineMatch.group(4)
+                if location not in metricIndexes:
+                    metricIndexes[location] = {}
+                if metricType not in metricIndexes[location]:
+                    metricIndexes[location][metricType] = IntervalTree()
+                # TODO: actually add value + timestamp to mtericIndexes[location][metricType]; I don't remember exactly how it dealt with point events instead of intervals
+            elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:
                     counts = self.processEvent(label, currentEvent, str(numEvents))
@@ -511,7 +522,7 @@ class Database:
                         await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['name'])
                         continue
                     intervalId = str(numIntervals)
-                    currentInterval = {'enter': {}, 'leave': {}}
+                    currentInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId }
                     for attr, value in event.items():
                         if attr != 'Timestamp' and value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
                             currentInterval[attr] = value
@@ -584,9 +595,35 @@ class Database:
             intervalIndexes['main'].top_node.begin,
             intervalIndexes['main'].top_node.end
         ]
-
         await log('')
         await log('Finished indexing %i intervals' % count)
+
+        await log('Connecting intervals with the same GUID (.=2500 intervals)')
+        guidCount = 0
+        count = 0
+        missingCount = 0
+        lastGuidIntervals = {}
+        for iv in intervalIndexes['main'].iterOverlap(endOrder=True):
+            intervalId = iv.data
+            intervalObj = intervals[intervalId]
+            if 'GUID' not in intervalObj:
+                missingCount += 1
+            elif intervalObj['GUID'] in lastGuidIntervals:
+                lastId = lastGuidIntervals[intervalObj['GUID']]
+                previousIv = intervals[lastId]
+                intervalObj['lastGuidIntervalId'] = lastId
+                intervalObj['lastGuidLocation'] = previousIv['Location']
+                intervalObj['lastGuidEndTimestamp'] = previousIv['leave']['Timestamp']
+                # Because intervals is a shelf, it needs a copy to know that something changed
+                intervals[intervalId] = intervalObj.copy()
+                count += 1
+                lastGuidIntervals[intervalObj['GUID']] = intervalId
+            else:
+                lastGuidIntervals[intervalObj['GUID']] = intervalId
+                count += 1
+                guidCount += 1
+        await log('Finished connecting %i intervals' % count)
+        await log('GUIDs used: %i, Intervals without GUIDs: %i' % (guidCount, missingCount))
 
         # Create any missing parent-child primitive relationships based on the GUIDs we've collected
         if parseGuids:

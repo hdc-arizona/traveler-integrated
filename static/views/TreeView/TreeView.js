@@ -1,13 +1,15 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import LinkedMixin from '../common/LinkedMixin.js';
+import SvgViewMixin from '../common/SvgViewMixin.js';
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
 
-class TreeView extends LinkedMixin(GoldenLayoutView) {
+class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/TreeView/style.less' },
-      { type: 'text', url: 'views/TreeView/template.html' }
+      { type: 'text', url: 'views/TreeView/template.html' },
+      { type: 'text', url: 'views/TreeView/shapeKey.html' }
     ];
     super(argObj);
 
@@ -35,7 +37,9 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       bottom: 20,
       left: 20
     };
-    this.nodeWidth = 120;
+    this.legendWidth = 300;
+    this.nodeWidth = 50;
+    this.wideNodeWidth = 120;
     this.nodeHeight = 20;
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
     this.horizontalPadding = 40; // px separation between nodes
@@ -43,10 +47,24 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
     this.expanderRadius = this.mainGlyphRadius / 2;
 
     this.content.html(this.resources[1]);
+    // this.content.select('.key').html(this.resources[2]);
 
     // Redraw when a new primitive is selected
     // TODO: auto-expand and scroll if the selected primitive is collapsed?
     this.linkedState.on('primitiveSelected', () => { this.render(); });
+
+    // Listen for ctrl+f so that all labels are visible when the user is searching
+    this.showAllLabels = false;
+    d3.select('body').on('keydown', () => {
+      // 17, 91 are cmd+ctrl, 13 is enter, 70 is F
+      if (d3.event.keyCode === 17 || d3.event.keyCode === 91 || d3.event.keyCode === 92) { // ctrl & cmd
+        this.showAllLabels = true;
+        this.render();
+      }
+    }).on('click', () => {
+      this.showAllLabels = false;
+      this.render();
+    });
   }
   draw () {
     super.draw();
@@ -56,14 +74,14 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
     } else if (this.histogram instanceof Error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
+      const transition = d3.transition()
+        .duration(1000);
+
       // Compute the new layout
-      this.updateLayout();
+      this.updateLayout(transition);
 
       // Draw the legend (note: this also sets up this.currentColorTimeScale)
       this.drawLegend();
-
-      const transition = d3.transition()
-        .duration(1000);
 
       // Draw the nodes
       this.drawNodes(transition);
@@ -79,12 +97,13 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       delete this._collapsedParent;
     }
   }
-  updateLayout () {
+  updateLayout (transition) {
     // Compute the minimum VERTICAL layout (mbostock's example / the d3 docs are
     // really confusing about this), with fixed node sizes / separation—we'll
     // rotate this later
+    const nodeWidth = this.showAllLabels ? this.wideNodeWidth : this.nodeWidth;
     const layoutGenerator = d3.tree()
-      .nodeSize([this.nodeHeight, this.nodeWidth + this.horizontalPadding])
+      .nodeSize([this.nodeHeight, nodeWidth + this.horizontalPadding])
       .separation(() => this.nodeSeparation);
     layoutGenerator(this.tree);
     const xDomain = d3.extent(this.tree.descendants(), d => d.x);
@@ -100,7 +119,7 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       // The minimum right-most coordinate (remember the original domain is rotated)
       this.margin.left + yDomain[1] - yDomain[0],
       // How far over it could be if we use the available screen space
-      viewBounds.width - this.scrollBarSize - this.nodeWidth - this.margin.right
+      viewBounds.width - this.scrollBarSize - this.wideNodeWidth - this.margin.right
     )];
     const yRange = [this.margin.top + this.nodeHeight / 2, Math.max(
       // The minimum bottom-most coordinate (remember the original domain is rotated)
@@ -118,9 +137,9 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       node.y = xToY(temp);
     }
 
-    // Resize our SVG element to the needed size
-    this.content.select('svg.tree')
-      .attr('width', xRange[1] + this.nodeWidth + this.margin.right)
+    // Resize our SVG element to the needed size (overrides the default behavior of SvgViewMixin)
+    this.content.transition(transition)
+      .attr('width', xRange[1] + this.wideNodeWidth + this.margin.right)
       .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
   }
   drawLegend () {
@@ -145,7 +164,7 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
     // Create a spatial scale + axis based on the color map
     const axisScale = d3.scaleLinear()
       .domain([ticks[0], ticks[ticks.length - 1]])
-      .range([0, 300]);
+      .range([0, this.legendWidth]);
     const axis = d3.axisBottom()
       .scale(axisScale)
       .tickSize(13)
@@ -153,9 +172,10 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
       .tickFormat(d => prettyPrintTime(d));
     // This blows away the previous contents (if any), so we can just deal in
     // .enter() calls from here on
-    const g = this.d3el.select('.legend .contents').html('').call(axis);
+    const g = this.d3el.select('.legend').html('').call(axis);
 
     // Patch the d3-generated axis
+    g.attr('transform', `translate(${this.margin.left},${this.margin.top})`);
     g.select('.domain').remove();
     g.selectAll('rect').data(colorMap)
       .enter()
@@ -232,9 +252,18 @@ class TreeView extends LinkedMixin(GoldenLayoutView) {
 
     // Node label
     nodesEnter.append('text')
+      .classed('nodeLabel', true)
       .attr('x', 2 * this.mainGlyphRadius)
       .attr('y', this.mainGlyphRadius)
-      .text(d => this.linkedState.getPrimitiveDetails(d.data.name).name);
+      .text(d => {
+        const details = this.linkedState.getPrimitiveDetails(d.data.name);
+        // Use display_name if available, but if not (e.g. we only have trace data), use its full name
+        return details.display_name || details.name;
+      });
+    nodes.select('.nodeLabel')
+      .attr('opacity', d => {
+        return this.showAllLabels || d.data.children.length === 0 ? 1 : 0;
+      });
 
     // Collapse / expand glyph
     const expanderGlyphEnter = nodesEnter.append('g').classed('expander', true)
