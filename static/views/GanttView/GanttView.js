@@ -156,12 +156,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // TODO: can probably do this immediately in a more light-weight way?
     this.linkedState.on('primitiveSelected', () => { this.render(); });
 
-
-     this.content.select('.background')
-        .on('click', () => {
-          this.linkedState.selectPrimitive(null);
-          this.render();
-        });
+    this.content.select('.background')
+      .on('click', () => {
+        this.linkedState.selectPrimitive(null);
+        this.render();
+      });
   }
   draw () {
     super.draw();
@@ -277,56 +276,39 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         }
       });
 
+    var _self = this;
     bars.select('.outline')
     // TODO: make this like the area fill
       .style('stroke', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
     bars
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
       .on('click', d => {
-
-          // if(this.linkedState.selectedPrimitive !== null) {
-          //     this.linkedState.selectPrimitive(null);
-          // }
-          // else
-          if (!d.value.Primitive) {
-              console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
-              if (d.value.enter.Primitive) {
-                  if (this.linkedState.selectedPrimitive !== d.value.enter.Primitive) {
-                      this.linkedState.selectPrimitive(d.value.enter.Primitive);
-                  } else {
-                      this.linkedState.selectPrimitive(null);
-                  }
-
-              }
-          } else {
-              if (this.linkedState.selectedPrimitive !== d.value.Primitive) {
-                  this.linkedState.selectPrimitive(d.value.Primitive);
-              } else {
-                  this.linkedState.selectPrimitive(null);
-              }
+        if (!d.value.Primitive) {
+          console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
+          if (d.value.enter.Primitive) {
+            this.linkedState.selectPrimitive(d.value.enter.Primitive);
           }
+        } else {
+          this.linkedState.selectPrimitive(d.value.Primitive);
+        }
 
-          this.render();
-
-      }).on("dblclick",function(d) {
-        console.log("double clciked");
-        window.controller.tooltip.show({
-            content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-            targetBounds: this.getBoundingClientRect(),
-            hideAfterMs: null
-        });
-
-      }).on('mouseenter',d => {
+        this.render();
+      }).on('mouseenter', function (d) {
         if (!d.value.GUID) {
           console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.GUID) {
-            this.linkedState.selectGUID(d.value.enter.GUID);
+            _self.linkedState.selectGUID(d.value.enter.GUID);
           }
         } else {
-          this.linkedState.selectGUID(d.value.GUID);
+          _self.linkedState.selectGUID(d.value.GUID);
         }
-        this.render();
+        _self.render();
 
+        window.controller.tooltip.show({
+          content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
+          targetBounds: this.getBoundingClientRect(),
+          hideAfterMs: null
+        });
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
         this.linkedState.selectGUID(null);
@@ -339,6 +321,25 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
     }
+    let linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
+
+    let links = this.content.select('.links')
+      .selectAll('.link').data(linkData, d => d.key);
+    links.exit().remove();
+    const linksEnter = links.enter().append('g')
+      .classed('link', true);
+    links = links.merge(linksEnter);
+
+    // links.attr('transform', d => `translate(${this.xScale(d.value.lastGuidEndTimestamp)},${this.yScale(d.value.lastGuidLocation)})`);
+    let halfwayOffset = this.yScale.bandwidth() / 2;
+
+    linksEnter.append('line')
+      .classed('line', true);
+    links.selectAll('line')
+      .attr('x1', d => this.xScale(d.value.lastParentInterval.endTimestamp))
+      .attr('x2', d => this.xScale(d.value.enter.Timestamp))
+      .attr('y1', d => this.yScale(d.value.lastParentInterval.location) + halfwayOffset)
+      .attr('y2', d => this.yScale(d.value.Location) + halfwayOffset);
   }
   setupZoomAndPan () {
     this.initialDragState = null;

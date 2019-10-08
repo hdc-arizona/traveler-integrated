@@ -361,7 +361,7 @@ class Database:
         await log('Finished parsing %s code' % codeType)
 
     def processEvent(self, label, event, eventId):
-        newR = seenR = newG = seenG = 0
+        newR = seenR = 0
 
         if 'Region' in event:
             # Identify the primitive (and add to its counter)
@@ -374,29 +374,6 @@ class Database:
                 if 'eventCount' not in primitive:
                     primitive['eventCount'] = 0
                 primitive['eventCount'] += 1
-
-            # Add to GUID / Parent GUID relationships
-            if self.datasets[label]['meta']['hasGuids'] and 'GUID' in event and 'Parent GUID' in event:
-                if 'guids' not in primitive:
-                    primitive['guids'] = [event['GUID']]
-                elif event['GUID'] not in primitive['guids']:
-                    # TODO: list lookups instead of set lookups aren't as optimal...
-                    # but storing sets may or may not be supported
-                    primitive['guids'].append(event['GUID'])
-                guid = self.datasets[label]['guids'].get(event['GUID'], None)
-                if guid is None:
-                    newG += 1
-                    guid = {
-                        'primitives': [primitiveName],
-                        'parent': event['Parent GUID']
-                    }
-                else:
-                    seenG += 1
-                    if primitiveName not in guid['primitives']:
-                        guid['primitives'].append(primitiveName)
-                    assert guid['parent'] == event['Parent GUID']
-                self.datasets[label]['guids'][event['GUID']] = guid
-
             self.datasets[label]['primitives'][primitiveName] = primitive
         # Add enter / leave events to per-location lists
         if event['Event'] == 'ENTER' or event['Event'] == 'LEAVE':
@@ -405,12 +382,12 @@ class Database:
                 # all this up in memory could be a problem...
                 self.sortedEventsByLocation[event['Location']] = sortedlist(key=lambda i: i[0])
             self.sortedEventsByLocation[event['Location']].add((event['Timestamp'], event))
-        # Add the event
-        if self.datasets[label]['meta']['hasEvents']:
+        # Store the event, if we're collecting them:
+        if self.datasets[label]['meta']['storedEvents']:
             self.datasets[label]['events'][eventId] = event
-        return (newR, seenR, newG, seenG)
+        return (newR, seenR)
 
-    async def processOtf2(self, label, file, parseGuids=False, storeEvents=False, log=logToConsole):
+    async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
         self.addSourceFile(label, file.name, 'otf2')
 
         # Set up database files
@@ -423,18 +400,16 @@ class Database:
             'both': {}
         }
         metricIndexes = self.datasets[label]['metricIndexes'] = {}
-        self.datasets[label]['meta']['hasGuids'] = parseGuids
-        if parseGuids:
-            guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
-        self.datasets[label]['meta']['hasEvents'] = storeEvents
+        guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
+        self.datasets[label]['meta']['storedEvents'] = storeEvents
         if storeEvents:
             self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events.shelf'))
 
         # Temporary counters / lists for sorting
         numEvents = 0
         self.sortedEventsByLocation = {}
-        await log('Parsing events (.=2500 events)')
-        newR = seenR = newG = seenG = 0
+        await log('Parsing OTF2 events (.=2500 events)')
+        newR = seenR = 0
         currentEvent = None
         for line in file:
             eventLineMatch = eventLineParser.match(line)
@@ -468,8 +443,6 @@ class Database:
                     # Add to primitive / guid counts
                     newR += counts[0]
                     seenR += counts[1]
-                    newG += counts[2]
-                    seenG += counts[3]
                 currentEvent = {}
                 currentEvent['Event'] = eventLineMatch.group(1)
                 currentEvent['Location'] = eventLineMatch.group(2)
@@ -490,21 +463,16 @@ class Database:
             counts = self.processEvent(label, currentEvent, str(numEvents))
             newR += counts[0]
             seenR += counts[1]
-            newG += counts[2]
-            seenG += counts[3]
         await log('')
         await log('Finished processing %i events' % numEvents)
         await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
-        if parseGuids:
-            await log('New GUIDs: %d, Number of GUID references: %d' % (newG, seenG))
 
         # Now that we've seen all the locations, store that list in our metadata
         locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
 
-        # Combine the sorted enter / leave events into intervals, and then index
-        # the intervals
+        # Combine the sorted enter / leave events into intervals
         await log('Combining enter / leave events into intervals (.=2500 intervals)')
-        numIntervals = 0
+        numIntervals = mismatchedIntervals = 0
         for location, eventList in self.sortedEventsByLocation.items():
             lastEvent = None
             for _, event in eventList:
@@ -522,13 +490,23 @@ class Database:
                         await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['name'])
                         continue
                     intervalId = str(numIntervals)
-                    currentInterval = {'enter': {}, 'leave': {}}
-                    for attr, value in event.items():
-                        if attr != 'Timestamp' and value == lastEvent[attr]: #pylint: disable=unsubscriptable-object
-                            currentInterval[attr] = value
+                    currentInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId}
+                    # Copy all of the attributes from the OTF2 events into the interval object. If the values
+                    # differ (or it's the timestamp), put them in nested enter / leave objects. Otherwise, put
+                    # them directly in the interval object
+                    for attr in set(event.keys()).union(lastEvent.keys()):
+                        if attr not in event:
+                            currentInterval['enter'][attr] = lastEvent[attr]
+                        elif attr not in lastEvent:
+                            currentInterval['leave'][attr] = event[attr]
+                        elif attr != 'Timestamp' and event[attr] == lastEvent[attr]: #pylint: disable=unsubscriptable-object
+                            currentInterval[attr] = event[attr]
                         else:
                             currentInterval['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
-                            currentInterval['leave'][attr] = value
+                            currentInterval['leave'][attr] = event[attr]
+                    # Count whether the primitive attribute differed between enter / leave
+                    if 'Primitive' not in currentInterval:
+                        mismatchedIntervals += 1
                     intervals[intervalId] = currentInterval
 
                     # Log that we've finished the finished interval
@@ -542,8 +520,9 @@ class Database:
             if lastEvent is not None:
                 # TODO: fibonacci data triggers this... why?
                 await log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
+        del self.sortedEventsByLocation
         await log('')
-        await log('Finished creating %i intervals' % numIntervals)
+        await log('Finished creating %i intervals; %i refer to mismatching primitives' % (numIntervals, mismatchedIntervals))
 
         # Now for indexing: we want per-location indexes, per-primitive indexes,
         # as well as both filters at the same time (we key by locations first)
@@ -595,27 +574,64 @@ class Database:
             intervalIndexes['main'].top_node.begin,
             intervalIndexes['main'].top_node.end
         ]
-
         await log('')
         await log('Finished indexing %i intervals' % count)
 
-        # Create any missing parent-child primitive relationships based on the GUIDs we've collected
-        if parseGuids:
-            await log('Creating primitive links based on GUIDs (.=2500 GUIDs processed)')
-            newL = seenL = 0
-            for nGuid, guid in enumerate(guids.values()):
-                if guid['parent'] != '0':
-                    parentGuid = guids.get(guid['parent'], None)
-                    assert parentGuid is not None
-                    for parentPrimitive in parentGuid['primitives']:
-                        for childPrimitive in guid['primitives']:
-                            l = self.addPrimitiveChild(label, parentPrimitive, childPrimitive, 'otf2')[1]
-                            newL += l
-                            seenL += 1 if newL == 0 else 0
-                if nGuid > 0 and nGuid % 250 == 0:
-                    await log('.', end='')
-                if nGuid > 0 and nGuid % 10000 == 0:
-                    await log('scanned %i GUIDs' % nGuid)
-            await log('')
-            await log('Finished scanning %d GUIDs' % len(guids))
-            await log('New links: %d, Observed existing links: %d' % (newL, seenL))
+        await log('Connecting intervals with the same GUID (.=2500 intervals)')
+        intervalCount = missingCount = newLinks = seenLinks = 0
+        for iv in intervalIndexes['main'].iterOverlap(endOrder=True):
+            intervalId = iv.data
+            intervalObj = intervals[intervalId]
+
+            # Parent GUIDs refer to the one in the enter event, not the leave event
+            guid = intervalObj.get('GUID', intervalObj['enter'].get('GUID', None))
+            if guid is None:
+                missingCount += 1
+                continue
+
+            # Connect to most recent interval with the parent GUID
+            parentGuid = intervalObj.get('Parent GUID', intervalObj['enter'].get('Parent GUID', None))
+            if parentGuid is not None and parentGuid in guids:
+                foundPrior = False
+                for parentIntervalId in reversed(guids[parentGuid]):
+                    parentInterval = intervals[parentIntervalId]
+                    if parentInterval['leave']['Timestamp'] <= intervalObj['enter']['Timestamp']:
+                        foundPrior = True
+                        intervalCount += 1
+                        # Store metadata about the most recent interval
+                        intervalObj['lastParentInterval'] = {
+                            'id': parentIntervalId,
+                            'location': parentInterval['Location'],
+                            'endTimestamp': parentInterval['leave']['Timestamp']
+                        }
+                        # Because intervals is a shelf, it needs a copy to know that something changed
+                        intervals[intervalId] = intervalObj.copy()
+
+                        # While we're here, note the parent-child link in the primitive graph
+                        # (for now, only assume links from the parent's leave interval to the
+                        # child's enter when primitive names are mismatched)
+                        child = intervalObj.get('Primitive', intervalObj['enter'].get('Primitive', None))
+                        parent = parentInterval.get('Primitive', intervalObj['leave'].get('Primitive', None))
+                        if child is not None and parent is not None:
+                            l = self.addPrimitiveChild(label, parent, child, 'otf2')[1]
+                            newLinks += l
+                            seenLinks += 1 if l == 0 else 0
+                        break
+                if not foundPrior:
+                    missingCount += 1
+            else:
+                missingCount += 1
+
+            # Store this interval by its leave GUID
+            if guid not in guids:
+                guids[guid] = []
+            guids[guid] = guids[guid] + [intervalId]
+
+            if (missingCount + intervalCount) % 2500 == 0:
+                await log('.', end='')
+            if (missingCount + intervalCount) % 100000 == 0:
+                await log('processed %i intervals' % (missingCount + intervalCount))
+
+        await log('Finished connecting intervals')
+        await log('Interval links created: %i, Intervals without prior parent GUIDs: %i' % (intervalCount, missingCount))
+        await log('New primitive links based on GUIDs: %d, Observed existing links: %d' % (newLinks, seenLinks))
