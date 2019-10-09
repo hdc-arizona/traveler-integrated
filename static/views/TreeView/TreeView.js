@@ -318,9 +318,18 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
             targetBounds: this.getBoundingClientRect(),
             hideAfterMs: null
           });
+          d3.selectAll('.hoveredLinks').filter(link => {
+            if ((d.x == link.x) && (d.y == link.y)) {
+              console.log("match");
+              return true;
+            }
+            return false;
+          }).style("stroke", "#ffd92f")
+            .style("opacity", 0.75);
         }
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
+        d3.selectAll('.hoveredLinks').style("opacity", 0);
       });
   }
   drawLinks (transition) {
@@ -419,7 +428,6 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
 
     // Now any source node in allNodes has the attribute source.myMatches
     //console.log(allNodes[3].myMatches);
-
     
     let hoveredLinks = this.content.select('.nodeLayer').selectAll('.node')
       .data(allNodes, d => d.myMatches);
@@ -428,14 +436,15 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
 
     // Helper function for computing the paths
     const pathToMatches = listOfCoords => {
-      var path = 'M ' + listOfCoords[0].x + ' ' + listOfCoords[0].y + ' ';
-      for (var i=1; i<listOfCoords.length; i++) {
+      var path = '';
+      for (var i=0; i<listOfCoords.length; i++) {
         if (i % 2 == 1) path += 'L ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
         if (i % 2 == 0) path += 'M ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
       }
       return path;
     }
     hLinksEnter
+    .attr("class", "hoveredLinks")
     .style("stroke", "#ffd92f")
     .style("stroke-width", "3px")
     .style("opacity", 0.25)
