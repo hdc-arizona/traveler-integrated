@@ -286,34 +286,47 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         if (!d.value.Primitive) {
           console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.Primitive) {
-            this.linkedState.selectPrimitive(d.value.enter.Primitive);
+            if (this.linkedState.selectedPrimitive !== d.value.enter.Primitive) {
+              this.linkedState.selectPrimitive(d.value.enter.Primitive);
+            } else {
+              this.linkedState.selectPrimitive(null);
+            }
+
           }
         } else {
-          this.linkedState.selectPrimitive(d.value.Primitive);
+          if (this.linkedState.selectedPrimitive !== d.value.Primitive) {
+            this.linkedState.selectPrimitive(d.value.Primitive);
+          } else {
+            this.linkedState.selectPrimitive(null);
+          }
         }
 
         this.render();
-      }).on('mouseenter', function (d) {
-        if (!d.value.GUID) {
-          console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
-          if (d.value.enter.GUID) {
-            _self.linkedState.selectGUID(d.value.enter.GUID);
-          }
-        } else {
-          _self.linkedState.selectGUID(d.value.GUID);
-        }
-        _self.render();
 
+      }).on("dblclick",function(d) {
+        console.log("double clciked");
         window.controller.tooltip.show({
           content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
           targetBounds: this.getBoundingClientRect(),
           hideAfterMs: null
         });
-      }).on('mouseleave', () => {
-        window.controller.tooltip.hide();
-        this.linkedState.selectGUID(null);
-        this.render();
-      });
+
+    }).on('mouseenter',d => {
+      if (!d.value.GUID) {
+        console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
+        if (d.value.enter.GUID) {
+          this.linkedState.selectGUID(d.value.enter.GUID);
+        }
+      } else {
+        this.linkedState.selectGUID(d.value.GUID);
+      }
+      this.render();
+
+    }).on('mouseleave', () => {
+      window.controller.tooltip.hide();
+      this.linkedState.selectGUID(null);
+      this.render();
+    });
   }
   drawLinks (data) {
     // TODO
