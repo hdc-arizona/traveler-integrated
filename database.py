@@ -41,7 +41,7 @@ addAttrLineParser = re.compile(r'^\s+ADDITIONAL ATTRIBUTES: (.*)$')
 addAttrSplitter = re.compile(r'\), \(')
 addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
-metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d)+\s+Metric:[\s\d,]+Value: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
+metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 async def logToConsole(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
@@ -411,6 +411,7 @@ class Database:
         await log('Parsing OTF2 events (.=2500 events)')
         newR = seenR = 0
         currentEvent = None
+
         for line in file:
             eventLineMatch = eventLineParser.match(line)
             addAttrLineMatch = addAttrLineParser.match(line)
@@ -422,14 +423,15 @@ class Database:
             if metricLineMatch is not None:
                 # This is a metric line
                 location = metricLineMatch.group(1)
-                timestamp = metricLineMatch.group(2)
+                timestamp = int(metricLineMatch.group(2))
                 metricType = metricLineMatch.group(3)
-                value = metricLineMatch.group(4)
+                value = int(float(metricLineMatch.group(4)))
                 if location not in metricIndexes:
                     metricIndexes[location] = {}
                 if metricType not in metricIndexes[location]:
                     metricIndexes[location][metricType] = IntervalTree()
-                # TODO: actually add value + timestamp to mtericIndexes[location][metricType]; I don't remember exactly how it dealt with point events instead of intervals
+                miv = Interval(timestamp, timestamp+1, value)
+                metricIndexes[location][metricType].add(miv)
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:
@@ -579,7 +581,7 @@ class Database:
 
         await log('Connecting intervals with the same GUID (.=2500 intervals)')
         intervalCount = missingCount = newLinks = seenLinks = 0
-        for iv in intervalIndexes['main'].iterOverlap(endOrder=True):
+        for iv in intervalIndexes['main'].iterOverlap():
             intervalId = iv.data
             intervalObj = intervals[intervalId]
 
