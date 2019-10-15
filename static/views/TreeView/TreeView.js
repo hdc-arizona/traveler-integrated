@@ -447,7 +447,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     .attr("class", "hoveredLinks")
     .style("stroke", "#ffd92f")
     .style("stroke-width", "3px")
-    .style("opacity", 0.25)
+    .style("opacity", 0)
     .attr("d", link => {
       return pathToMatches(link.myMatches);
     });
