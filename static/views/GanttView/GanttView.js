@@ -313,7 +313,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .style('stroke', d => {
 	console.log(d.value.Primitive, this.linkedState.selectedPrimitive, d.value.inTraceBack);
 	if (d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack) {
-	  return 'black';
+	  return this.linkedState.traceBackColor;
 	} else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
 	  return this.linkedState.selectionColor;
         } else {

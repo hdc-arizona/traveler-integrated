@@ -92,6 +92,9 @@ class LinkedState extends Model {
   get mouseHoverSelectionColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].mouseHoverSelectionColor;
   }
+  get traceBackColor () {
+    return LinkedState.COLOR_SCHEMES[this.mode].traceBackColor;
+  }
   getPossibleViews () {
     const views = {};
     for (const { fileType } of this.metadata.sourceFiles) {
@@ -115,16 +118,19 @@ LinkedState.COLOR_SCHEMES = {
   Inclusive: {
     mouseHoverSelectionColor : '#a30012', // red
     selectionColor: '#e6ab02', // yellow
+    traceBackColor: '#000000', // black
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple
   },
   Exclusive: {
     mouseHoverSelectionColor : '#a30012', // red
     selectionColor: '#7570b3', // purple
+    traceBackColor: '#000000', // black
     timeScale: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'] // green
   },
   Difference: {
     mouseHoverSelectionColor : '#a30012', // red
     selectionColor: '#4daf4a', // green
+    traceBackColor: '#000000', // black
     timeScale: ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0'] // diverging red blue
   }
 };
