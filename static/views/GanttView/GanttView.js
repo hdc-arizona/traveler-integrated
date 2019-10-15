@@ -159,6 +159,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.content.select('.background')
       .on('click', () => {
         this.linkedState.selectPrimitive(null);
+	this.linkedState.selectIntervalId(null);
         this.render();
       });
   }
@@ -190,9 +191,38 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.drawClip();
     // Update the axes (also updates scales)
     this.drawAxes();
+
+
+    if (this.linkedState.selectedIntervalId) {
+      // This is partial clone code from drawLinks
+      // Collect only the links in the back-path of the selected IntervalId
+      // TODO Make me more efficient, this has a lot of passes
+      let workingId = this.linkedState.selectedIntervalId;
+      let inView = true;
+      while (inView) {
+	let interval = data.find( d => d.value.intervalId === workingId );
+	
+	// Only continue if interval is found and has a link backwards
+	if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
+	  interval.value.inTraceBack = true;
+	} else {
+	  inView = false;
+	  continue;
+	}
+
+	workingId = interval.value.lastParentInterval.id;
+	// Only continue if previous interval is drawn
+	if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
+          inView = false;
+	}
+      }      
+    } else {
+	data.map(d => { d.value.inTraceBack = false; return d; });	
+    }
+
     // Update the bars
     this.drawBars(data);
-    // TODO: Update the links
+    // Update the links
     this.drawLinks(data);
 
     // Update the incremental flag so that we can call render again if needed
@@ -248,6 +278,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Remove temporarily patched transformations
       this.content.select('.bars').attr('transform', null);
     }
+
     let bars = this.content.select('.bars')
       .selectAll('.bar').data(data, d => d.key);
     bars.exit().remove();
@@ -279,18 +310,37 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     var _self = this;
     bars.select('.outline')
     // TODO: make this like the area fill
-      .style('stroke', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
+      .style('stroke', d => {
+	console.log(d.value.Primitive, this.linkedState.selectedPrimitive, d.value.inTraceBack);
+	if (d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack) {
+	  return this.linkedState.traceBackColor;
+	} else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
+	  return this.linkedState.selectionColor;
+        } else {
+	  return null;
+	}
+      });
     bars
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
       .on('click', d => {
         if (!d.value.Primitive) {
           console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.Primitive) {
-            this.linkedState.selectPrimitive(d.value.enter.Primitive);
+            this.linkedState.selectPrimitive(d.value.enter.Primitive); // Does this ever work? - Kate
           }
         } else {
           this.linkedState.selectPrimitive(d.value.Primitive);
         }
+	
+	if (!d.value.intervalId) {
+          console.warn(`No (consistent) intervalId for interval: ${JSON.stringify(d.value, null, 2)}`);
+	  this.linkedState.selectIntervalId(null);
+	} else if (d.value.intervalId === this.linkedState.selectedIntervalId) {
+	  this.linkedState.selectIntervalId(null);
+        } else {
+          this.linkedState.selectIntervalId(d.value.intervalId);
+        }
+
 
         this.render();
       }).on('mouseenter', function (d) {
@@ -316,12 +366,17 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       });
   }
   drawLinks (data) {
-    // TODO
+
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
     }
-    let linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
+    let linkData = [];
+    if (!this.linkedState.selectedIntervalId) {
+      linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
+    } else {
+      linkData = data.filter(d => d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack);
+    }
 
     let links = this.content.select('.links')
       .selectAll('.link').data(linkData, d => d.key);
