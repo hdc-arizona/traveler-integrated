@@ -310,8 +310,16 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     var _self = this;
     bars.select('.outline')
     // TODO: make this like the area fill
-      .classed('traceback', d => d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack)
-      .style('stroke', d => d.value.Primitive === this.linkedState.selectedPrimitive ? this.linkedState.selectionColor : null);
+      .style('stroke', d => {
+	console.log(d.value.Primitive, this.linkedState.selectedPrimitive, d.value.inTraceBack);
+	if (d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack) {
+	  return 'black';
+	} else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
+	  return this.linkedState.selectionColor;
+        } else {
+	  return null;
+	}
+      });
     bars
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
       .on('click', d => {
@@ -367,27 +375,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     if (!this.linkedState.selectedIntervalId) {
       linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
     } else {
-      // Collect only the links in the back-path of the selected IntervalId
-      // TODO Make me more efficient, this has a lot of passes
-      let workingId = this.linkedState.selectedIntervalId;
-      let inView = true;
-      while (inView) {
-	let interval = data.find( d => d.value.intervalId === workingId );
-	
-	// Only continue if interval is found and has a link backwards
-	if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
-	  linkData.push(interval);
-	} else {
-	  inView = false;
-	  continue;
-	}
-
-	workingId = interval.value.lastParentInterval.id;
-	// Only continue if previous interval is drawn
-	if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
-          inView = false;
-	}
-      }      
+      linkData = data.filter(d => d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack);
     }
 
     let links = this.content.select('.links')
