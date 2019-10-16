@@ -90,7 +90,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       this.drawLinks(transition);
 
       // Draw any hovered links
-      this.drawHoveredLinks();
+      this.drawHoveredLinks(transition);
 
       // Trash any interaction placeholders now that we've used them
       delete this._expandedParentCoords;
@@ -318,9 +318,17 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
             targetBounds: this.getBoundingClientRect(),
             hideAfterMs: null
           });
+          d3.selectAll('.hoveredLinks').filter(hlink => {
+            if ((d.x == hlink.x) && (d.y == hlink.y)) {
+              return true;
+            }
+            return false;
+          }).style("stroke", "#ffd92f")
+            .style("opacity", 0.75);
         }
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
+        d3.selectAll('.hoveredLinks').style("opacity", 0);
       });
   }
   drawLinks (transition) {
@@ -334,9 +342,9 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     const computePath = (source, target) => {
       const curveX = target.x - this.horizontalPadding / 2;
       return `\
-M${source.x + 2 * this.mainGlyphRadius},${source.y}\
-L${source.x + this.nodeWidth},${source.y}\
-C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
+        M${source.x + 2 * this.mainGlyphRadius},${source.y}\
+        L${source.x + this.nodeWidth},${source.y}\
+        C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
     };
     linksEnter
       .attr('opacity', 0)
@@ -366,10 +374,87 @@ C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
         return computePath(link.source, link.target);
       });
   }
-  drawHoveredLinks () {
-    // TODO
+
+  drawHoveredLinks (transition) {
+    var state = this.linkedState;
+    var allNodes = this.tree.descendants();
+
+    d3.selectAll('.hoveredLinks').remove();
+
+    // Find each node's matches and add the coordinates to the list myMatches
+    var allMatches = allNodes.forEach(function(source){
+        source.myMatches = [];
+        var startx = source.x;
+        var starty = source.y; 
+        source.myMatches.push({x: startx, y: starty});
+
+        // Helper function to get important part of the variable/function/primitive's name
+        const getImportantName = displayName => {
+          var name = "";
+          if ((displayName) && (
+            (displayName.includes("define-variable")) ||
+            (displayName.includes("variable")) ||
+            (displayName.includes("access-variable")) ||
+            (displayName.includes("access-argument")) ||
+            (displayName.includes("access-function")))) {
+            name = displayName.split("/")[1].split("(")[0];
+          }
+          return name;
+        }
+
+        if (source.data.name) {
+
+          var importantName = "";
+          const displayName = state.getPrimitiveDetails(source.data.name).display_name;
+          if (displayName) importantName = getImportantName(displayName);
+
+          // Find the nodes that match my name
+          allNodes.forEach(function(dest){
+
+            var otherImportantName = "";
+            const otherDisplayName = state.getPrimitiveDetails(dest.data.name).display_name;
+            if (otherDisplayName) otherImportantName = getImportantName(otherDisplayName);
+
+            if (importantName && (importantName == otherImportantName) ){
+              var edge_data = {x: dest.x, y: dest.y};
+              source.myMatches.push(edge_data);
+              source.myMatches.push({x: startx, y: starty});
+            }  
+          })
+        }
+        return source.myMatches;
+    });
+
+    // Now any source node in allNodes has the attribute source.myMatches
+    //console.log(allNodes[3].myMatches);
+    
+    let hoveredLinks = this.content.select('.nodeLayer').selectAll('.node')
+      .data(allNodes, d => d.myMatches);
+    const hLinksEnter = hoveredLinks.enter().append('path').classed('hoveredLinks', true);
+    const hLinksExit = hoveredLinks.exit();
+
+    // Helper function for computing the paths
+    const pathToMatches = listOfCoords => {
+      var path = '';
+      for (var i=0; i<listOfCoords.length; i++) {
+        if (i % 2 == 1) path += 'L ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
+        if (i % 2 == 0) path += 'M ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
+      }
+      return path;
+    }
+    hLinksEnter
+    .attr("class", "hoveredLinks")
+    .style("stroke", "#ffd92f")
+    .style("stroke-width", "3px")
+    .style("opacity", 0)
+    .attr("d", link => {
+      return pathToMatches(link.myMatches);
+    });
   }
 }
+
+
+
 TreeView.COLOR_MAPS = {
   INCLUSIVE: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'], // purple
   EXCLUSIVE: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'], // green
