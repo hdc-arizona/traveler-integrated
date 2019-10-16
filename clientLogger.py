@@ -7,7 +7,7 @@ class ClientLogger:
 
     async def log(self, value, end='\n'):
         self.message += value + end
-        await asyncio.sleep(1)
+        await asyncio.sleep(0)
 
     def finish(self):
         self.finished = True
@@ -17,6 +17,6 @@ class ClientLogger:
         while not self.finished:
             yield self.message
             self.message = ''
-            await asyncio.sleep(1)
+            await asyncio.sleep(0)
         yield self.message
         self.message = ''

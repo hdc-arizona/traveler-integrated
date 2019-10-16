@@ -28,8 +28,6 @@ parser.add_argument('-c', '--cpp', dest='cpp', type=str, metavar='path', nargs='
                     help='Input C++ source code file')
 parser.add_argument('-s', '--debug', dest='debug', action='store_true',
                     help='Store additional information for debugging source files, etc.')
-parser.add_argument('-u', '--guids', dest='guids', action='store_true',
-                    help='Collect GUIDs')
 parser.add_argument('-e', '--events', dest='events', action='store_true',
                     help='Collect all events, not just intervals')
 
@@ -131,7 +129,7 @@ async def main():
 
             # Handle otf2
             if 'otf2' in paths:
-                await db.processOtf2(label, FakeFile(paths['otf2']), args['guids'], args['events'])
+                await db.processOtf2(label, FakeFile(paths['otf2']), args['events'])
 
             # Save all the data
             await db.save(label)
