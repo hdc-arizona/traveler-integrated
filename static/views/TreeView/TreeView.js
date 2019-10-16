@@ -318,9 +318,8 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
             targetBounds: this.getBoundingClientRect(),
             hideAfterMs: null
           });
-          d3.selectAll('.hoveredLinks').filter(link => {
-            if ((d.x == link.x) && (d.y == link.y)) {
-              console.log("match");
+          d3.selectAll('.hoveredLinks').filter(hlink => {
+            if ((d.x == hlink.x) && (d.y == hlink.y)) {
               return true;
             }
             return false;
