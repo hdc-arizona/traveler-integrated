@@ -581,7 +581,7 @@ class Database:
 
         await log('Connecting intervals with the same GUID (.=2500 intervals)')
         intervalCount = missingCount = newLinks = seenLinks = 0
-        for iv in intervalIndexes['main'].iterOverlap():
+        for iv in intervalIndexes['main'].iterOverlap(endOrder=True):
             intervalId = iv.data
             intervalObj = intervals[intervalId]
 
