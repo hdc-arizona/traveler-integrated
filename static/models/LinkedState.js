@@ -15,6 +15,7 @@ class LinkedState extends Model {
     this.cursorPosition = null;
     this.selectedPrimitive = null;
     this.selectedGUID = null;
+    this.selectedIntervalId = null;
     this._mode = 'Inclusive';
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
@@ -68,6 +69,12 @@ class LinkedState extends Model {
       this.stickyTrigger('guidSelected', { guid });
     }
   }
+  selectIntervalId (intervalId) {
+    if (intervalId !== this.selectedIntervalId) {
+      this.selectedIntervalId = intervalId;
+      this.stickyTrigger('intervalIdSelected', { intervalId });
+    }
+  }
   moveCursor (position) {
     this.cursorPosition = position;
     this.trigger('moveCursor');
@@ -84,6 +91,9 @@ class LinkedState extends Model {
   }
   get mouseHoverSelectionColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].mouseHoverSelectionColor;
+  }
+  get traceBackColor () {
+    return LinkedState.COLOR_SCHEMES[this.mode].traceBackColor;
   }
   getPossibleViews () {
     const views = {};
@@ -108,16 +118,19 @@ LinkedState.COLOR_SCHEMES = {
   Inclusive: {
     mouseHoverSelectionColor : '#a30012', // red
     selectionColor: '#e6ab02', // yellow
+    traceBackColor: '#000000', // black
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple
   },
   Exclusive: {
     mouseHoverSelectionColor : '#a30012', // red
     selectionColor: '#7570b3', // purple
+    traceBackColor: '#000000', // black
     timeScale: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'] // green
   },
   Difference: {
     mouseHoverSelectionColor : '#a30012', // red
     selectionColor: '#4daf4a', // green
+    traceBackColor: '#000000', // black
     timeScale: ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0'] // diverging red blue
   }
 };
