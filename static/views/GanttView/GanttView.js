@@ -159,7 +159,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.content.select('.background')
       .on('click', () => {
         this.linkedState.selectPrimitive(null);
-	this.linkedState.selectIntervalId(null);
+        this.linkedState.selectIntervalId(null);
         this.render();
       });
   }
@@ -192,7 +192,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Update the axes (also updates scales)
     this.drawAxes();
 
-
     if (this.linkedState.selectedIntervalId) {
       // This is partial clone code from drawLinks
       // Collect only the links in the back-path of the selected IntervalId
@@ -200,24 +199,24 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       let workingId = this.linkedState.selectedIntervalId;
       let inView = true;
       while (inView) {
-	let interval = data.find( d => d.value.intervalId === workingId );
-	
-	// Only continue if interval is found and has a link backwards
-	if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
-	  interval.value.inTraceBack = true;
-	} else {
-	  inView = false;
-	  continue;
-	}
+        let interval = data.find(d => d.value.intervalId === workingId);
 
-	workingId = interval.value.lastParentInterval.id;
-	// Only continue if previous interval is drawn
-	if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
+        // Only continue if interval is found and has a link backwards
+        if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
+          interval.value.inTraceBack = true;
+        } else {
           inView = false;
-	}
-      }      
+          continue;
+        }
+
+        workingId = interval.value.lastParentInterval.id;
+        // Only continue if previous interval is drawn
+        if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
+          inView = false;
+        }
+      }
     } else {
-	data.map(d => { d.value.inTraceBack = false; return d; });	
+      data.map(d => { d.value.inTraceBack = false; return d; });
     }
 
     // Update the bars
@@ -307,18 +306,16 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         }
       });
 
-    var _self = this;
     bars.select('.outline')
     // TODO: make this like the area fill
       .style('stroke', d => {
-	console.log(d.value.Primitive, this.linkedState.selectedPrimitive, d.value.inTraceBack);
-	if (d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack) {
-	  return this.linkedState.traceBackColor;
-	} else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
-	  return this.linkedState.selectionColor;
+        if (d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack) {
+          return this.linkedState.traceBackColor;
+        } else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
+          return this.linkedState.selectionColor;
         } else {
-	  return null;
-	}
+          return null;
+        }
       });
     bars
       .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
@@ -326,39 +323,44 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         if (!d.value.Primitive) {
           console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
           if (d.value.enter.Primitive) {
-            this.linkedState.selectPrimitive(d.value.enter.Primitive); // Does this ever work? - Kate
+            if (this.linkedState.selectedPrimitive !== d.value.enter.Primitive) {
+              this.linkedState.selectPrimitive(d.value.enter.Primitive);
+            } else {
+              this.linkedState.selectPrimitive(null);
+            }
           }
         } else {
-          this.linkedState.selectPrimitive(d.value.Primitive);
+          if (this.linkedState.selectedPrimitive !== d.value.Primitive) {
+            this.linkedState.selectPrimitive(d.value.Primitive);
+          } else {
+            this.linkedState.selectPrimitive(null);
+          }
         }
-	
-	if (!d.value.intervalId) {
-          console.warn(`No (consistent) intervalId for interval: ${JSON.stringify(d.value, null, 2)}`);
-	  this.linkedState.selectIntervalId(null);
-	} else if (d.value.intervalId === this.linkedState.selectedIntervalId) {
-	  this.linkedState.selectIntervalId(null);
+
+        if (!d.value.intervalId) {
+          this.linkedState.selectIntervalId(null);
+        } else if (d.value.intervalId === this.linkedState.selectedIntervalId) {
+          this.linkedState.selectIntervalId(null);
         } else {
           this.linkedState.selectIntervalId(d.value.intervalId);
         }
-
-
         this.render();
-      }).on('mouseenter', function (d) {
-        if (!d.value.GUID) {
-          console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
-          if (d.value.enter.GUID) {
-            _self.linkedState.selectGUID(d.value.enter.GUID);
-          }
-        } else {
-          _self.linkedState.selectGUID(d.value.GUID);
-        }
-        _self.render();
-
+      }).on('dblclick', function (d) {
         window.controller.tooltip.show({
           content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
           targetBounds: this.getBoundingClientRect(),
           hideAfterMs: null
         });
+      }).on('mouseenter', d => {
+        if (!d.value.GUID) {
+          console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
+          if (d.value.enter.GUID) {
+            this.linkedState.selectGUID(d.value.enter.GUID);
+          }
+        } else {
+          this.linkedState.selectGUID(d.value.GUID);
+        }
+        this.render();
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
         this.linkedState.selectGUID(null);
@@ -366,7 +368,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       });
   }
   drawLinks (data) {
-
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
