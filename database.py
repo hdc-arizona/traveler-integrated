@@ -399,7 +399,12 @@ class Database:
             'locations': {},
             'both': {}
         }
-        metricIndexes = self.datasets[label]['metricIndexes'] = {}
+        metricIndexes = self.datasets[label]['metricIndexes'] = {
+            'main': IntervalTree(),
+            'metric': {},
+            'locations': {},
+            'both': {}
+        }
         guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
         self.datasets[label]['meta']['storedEvents'] = storeEvents
         if storeEvents:
@@ -426,12 +431,22 @@ class Database:
                 timestamp = int(metricLineMatch.group(2))
                 metricType = metricLineMatch.group(3)
                 value = int(float(metricLineMatch.group(4)))
-                if location not in metricIndexes:
-                    metricIndexes[location] = {}
-                if metricType not in metricIndexes[location]:
-                    metricIndexes[location][metricType] = IntervalTree()
+
+                if location not in metricIndexes['both']:
+                    metricIndexes['both'][location] = {}
+                if location not in metricIndexes['locations']:
+                    metricIndexes['locations'][location] = IntervalTree()
+                if metricType not in metricIndexes['both'][location]:
+                    metricIndexes['both'][location][metricType] = IntervalTree()
+                if metricType not in metricIndexes['metric']:
+                    metricIndexes['metric'][metricType] = IntervalTree()
+
                 miv = Interval(timestamp, timestamp+1, value)
-                metricIndexes[location][metricType].add(miv)
+                metricIndexes['both'][location][metricType].add(miv)
+                metricIndexes['locations'][location].add(miv)
+                metricIndexes['metric'][metricType].add(miv)
+                metricIndexes['main'].add(miv)
+
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:

@@ -204,7 +204,7 @@ def histogram(label: str, \
     return modeHelper(db[label]['intervalIndexes']['main'])
 
 @app.get('/datasets/{label}/metrichistogram')
-def histogram(label: str, \
+def metrichistogram(label: str, \
               mode: HistogramMode = HistogramMode.utilization, \
               begin: float = None, \
               end: float = None, \
@@ -217,24 +217,28 @@ def histogram(label: str, \
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
-    bins = 100
+    bins = 1
 
     def modeHelper(indexObj):
         # TODO: respond with a 204 when the histogram is empty
         # (d3.js doesn't have a good way to handle 204 error codes)
-        # if indexObj.is_empty():
-        #    raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
+        if indexObj.is_empty():
+           raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
         return getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
 
     if location is not None:
-        if location not in db[label]['metricIndexes']:
+        if location not in db[label]['metricIndexes']['locations']:
             raise HTTPException(status_code=404, detail='No index for location: %s' % location)
         if metric is not None:
-            if metric not in db[label]['metricIndexes'][location]:
-                raise HTTPException(status_code=404, detail='No index for location, primitive combination: %s, %s' % (location, metric))
-            return modeHelper(db[label]['metricIndexes'][location][metric])
-        return modeHelper(db[label]['metricIndexes'][location])
-    return modeHelper(db[label]['intervalIndexes'])
+            if metric not in db[label]['metricIndexes']['both'][location]:
+                raise HTTPException(status_code=404, detail='No index for location, metric combination: %s, %s' % (location, metric))
+            return modeHelper(db[label]['metricIndexes']['both'][location][metric])
+        return modeHelper(db[label]['metricIndexes']['locations'][location])
+    if metric is not None:
+        if metric not in db[label]['metricIndexes']['metric']:
+            raise HTTPException(status_code=404, detail='No index for metric: %s' % metric)
+        return modeHelper(db[label]['metricIndexes']['metric'][metric])
+    return modeHelper(db[label]['metricIndexes']['main'])
 
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
