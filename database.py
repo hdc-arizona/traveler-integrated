@@ -195,25 +195,30 @@ class Database:
 
     def processNewickNode(self, label, node):
         # Create the hashed primitive object
-        if node.name is None:
-            primitiveName = ''
-        else:
-            primitiveName = node.name.strip()
+        primitiveName = node.name.strip()
         newR = self.processPrimitive(label, primitiveName, 'newick')[1]
         seenR = 1 if newR == 0 else 0
         tree = {'name': primitiveName, 'children': []}
         newL = seenL = 0
 
         # Create the tree hierarchy
-        if node.descendants:
-            for child in node.descendants:
-                childTree, nr, sr, nl, sl = self.processNewickNode(label, child)
-                tree['children'].append(childTree)
-                newR += nr
-                seenR += sr
-                l = self.addPrimitiveChild(label, primitiveName, childTree['name'], 'newick')[1]
-                newL += nl + l
-                seenL += sl + (1 if l == 0 else 0)
+        def handleChildren(childList):
+            nonlocal newR, seenR, newL, seenL
+            if not childList:
+                return
+            for child in childList:
+                if child.name is None:
+                    # Skip nodes with no names, and connect to their children instead
+                    handleChildren(child.descendants)
+                else:
+                    childTree, nr, sr, nl, sl = self.processNewickNode(label, child)
+                    tree['children'].append(childTree)
+                    newR += nr
+                    seenR += sr
+                    l = self.addPrimitiveChild(label, primitiveName, childTree['name'], 'newick')[1]
+                    newL += nl + l
+                    seenL += sl + (1 if l == 0 else 0)
+        handleChildren(node.descendants)
         return (tree, newR, seenR, newL, seenL)
     async def processNewickTree(self, label, newickText, log=logToConsole):
         tree, newR, seenR, newL, seenL = self.processNewickNode(label, newick.loads(newickText)[0])
