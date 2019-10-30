@@ -203,13 +203,8 @@ def histogram(label: str, \
         return modeHelper(db[label]['intervalIndexes']['primitives'][primitive])
     return modeHelper(db[label]['intervalIndexes']['main'])
 
-@app.get('/datasets/{label}/metrichistogram')
-def metrichistogram(label: str, \
-              mode: HistogramMode = HistogramMode.utilization, \
-              begin: float = None, \
-              end: float = None, \
-              location: str = None, \
-              metric: str = None):
+@app.get('/datasets/{label}/intervals')
+def intervals(label: str, begin: float = None, end: float = None):
     checkLabel(label)
     checkIntervals(label)
 
@@ -217,7 +212,33 @@ def metrichistogram(label: str, \
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
-    bins = 1
+
+    def intervalGenerator():
+        yield '['
+        firstItem = True
+        for i in db[label]['intervalIndexes']['main'].iterOverlap(begin, end):
+            if not firstItem:
+                yield ','
+            yield json.dumps(db[label]['intervals'][i.data])
+            firstItem = False
+        yield ']'
+    return StreamingResponse(intervalGenerator(), media_type='application/json')
+
+@app.get('/datasets/{label}/metrichistogram')
+def metrichistogram(label: str, \
+                mode: HistogramMode = HistogramMode.utilization, \
+                bins: int = 100, \
+                begin: float = None, \
+                end: float = None, \
+                location: str = None, \
+                metric: str = None):
+    checkLabel(label)
+    checkIntervals(label)
+
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
 
     def modeHelper(indexObj):
         # TODO: respond with a 204 when the histogram is empty
@@ -240,8 +261,8 @@ def metrichistogram(label: str, \
         return modeHelper(db[label]['metricIndexes']['metric'][metric])
     return modeHelper(db[label]['metricIndexes']['main'])
 
-@app.get('/datasets/{label}/intervals')
-def intervals(label: str, begin: float = None, end: float = None):
+@app.get('/datasets/{label}/metrices')
+def metrices(label: str, begin: float = None, end: float = None):
     checkLabel(label)
     checkIntervals(label)
 
@@ -253,10 +274,10 @@ def intervals(label: str, begin: float = None, end: float = None):
     def intervalGenerator():
         yield '['
         firstItem = True
-        for i in db[label]['intervalIndexes']['main'].iterOverlap(begin, end):
+        for i in db[label]['metricIndexes']['metric']['PAPI_TOT_CYC'].iterOverlap(begin, end):
             if not firstItem:
                 yield ','
-            yield json.dumps(db[label]['intervals'][i.data])
+            yield json.dumps({str(i.begin): i.data})
             firstItem = False
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')
