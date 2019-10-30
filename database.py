@@ -26,7 +26,7 @@ dotLineParser = re.compile(r'"([^"]*)" -- "([^"]*)";')
 
 # Tools for handling the performance csv
 perfModeParser = re.compile(r'primitive_instance,display_name,count,time,eval_direct')
-perfLineParser = re.compile(r'"([^"]*)","([^"]*)",(\d+),(\d+),(-?1)')
+perfLineParser = re.compile(r'"([^"]*)","([^"]*)",(\d+),(\d+),(-?\d)')
 
 # Tools for handling the inclusive time line
 timeParser = re.compile(r'time: ([\d\.]+)')
