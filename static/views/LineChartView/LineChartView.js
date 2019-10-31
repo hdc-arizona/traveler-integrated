@@ -45,6 +45,8 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       // of just saying "Too much data; scroll to zoom in?")
       const curMetric = 'PAPI_TOT_CYC';
       const curLocation = 1;
+      var binSize = 100;
+      binSize = parseInt(binSize, 10);
       this.histogram = await d3.json(`/datasets/${label}/metrichistogram?bins=1&metric=${curMetric}&location=${curLocation}&mode=count&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
       this.intervalCount = this.histogram[0][2];
       console.log("metric histogram count: " + this.intervalCount);
@@ -61,8 +63,9 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       // old intervals from disappearing from incremental refreshes
       this.newCache = {};
       this.waitingOnIncrementalRender = false;
-      // const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
-      const currentStream = this.stream = oboe(`/datasets/${label}/metrices?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+      var maxY = 1;
+      // const currentStream = this.stream = oboe(`/datasets/${label}/metrices?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+      const currentStream = this.stream = oboe(`/datasets/${label}/metrichistogram?bins=${binSize}&metric=${curMetric}&location=${curLocation}&mode=count&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
           .fail(error => {
             this.error = error;
             console.log(error);
@@ -73,9 +76,9 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
               this.abort();
             } else {
               // Store the interval
-              const keys = Object.keys(interval)[0];
-              const vals = interval[keys] / 1000000;
-              self.newCache[keys] = vals;
+              // console.log(interval[2]);
+              self.newCache[interval[0]] = interval[2];
+              maxY = Math.max(maxY, interval[2]);
               if (!self.waitingOnIncrementalRender) {
                 // self.render() is debounced; this converts it to throttling,
                 // rate-limiting incremental refreshes by this.debounceWait
@@ -88,8 +91,10 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
             this.stream = null;
             this.cache = this.newCache;
             this.newCache = null;
+            this.yScale.domain([maxY+1, 0]);
             this.render();
           });
+      this.yScale.domain([maxY+1, 0]);
       this.render();
     }, 100);
   }
@@ -141,13 +146,13 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     // Update scales whenever something changes the brush
     this.linkedState.on('newIntervalWindow', () => {
       this.xScale.domain(this.linkedState.intervalWindow);
-      this.yScale.domain([200, 100]);
+      // this.yScale.domain([200, 100]);
       // Abort + re-start the stream
       this.getData();
     });
     // Initialize the scales / stream
     this.xScale.domain(this.linkedState.intervalWindow);
-    this.yScale.domain([200, 100]);
+    // this.yScale.domain([200, 100]);
     this.getData();
 
     // Draw the axes right away (because we have a longer debounceWait than
@@ -259,7 +264,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
   drawLines (data) {
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
-      this.content.select('.bars').attr('transform', null);
+      this.content.select('.dots').attr('transform', null);
     }
 
     let cirlces = this.content.select('.dots')
@@ -272,24 +277,48 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     cirlces.attr('class','dot')
         .attr('cx', d => this.xScale(d.key))
         .attr('cy', d => this.yScale(d.value))
-        .attr('r', 1);
-    // bars.attr('transform', d => `translate(${this.xScale(d.value.enter.Timestamp)},${this.yScale(d.value.Location)})`);
-    //
-    // bars.selectAll('rect')
-    //     .attr('height', this.yScale.bandwidth())
-    //     .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
-    //
-    // bars.select('.area')
-    //     .style('fill', d => {
-    //       if (d.value.GUID === this.linkedState.selectedGUID) {
-    //         return this.linkedState.mouseHoverSelectionColor;
-    //       } else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
-    //         return this.linkedState.selectionColor;
-    //       } else {
-    //         return null;
-    //       }
-    //     });
+        .attr('r', 2);
 
+
+
+    let lines = this.content.select('.lines')
+        .selectAll('.line').data(data, d => d.key);
+    lines.exit().remove();
+    const linesEnter = lines.enter().append('line')
+        .classed('line', true);
+    lines = lines.merge(linesEnter);
+
+    // links.attr('transform', d => `translate(${this.xScale(d.value.lastGuidEndTimestamp)},${this.yScale(d.value.lastGuidLocation)})`);
+    // let halfwayOffset = this.yScale.bandwidth() / 2;
+
+    var _self = this;
+    lines.attr('class','line')
+        .attr('x1', function(d,i){
+          if(i>0) {
+            var prevData = lines.data()[i-1];
+            return _self.xScale(prevData.key);
+          }
+          return _self.xScale(0);
+        })
+        .attr('x2', function(d,i){
+          if(i>0) {
+            return _self.xScale(d.key);
+          }
+          return _self.xScale(0);
+        })
+        .attr('y1', function(d,i){
+          if(i>0) {
+            var prevData = lines.data()[i-1];
+            return _self.yScale(prevData.value);
+          }
+          return _self.yScale(0);
+        })
+        .attr('y2', function(d,i){
+          if(i>0) {
+            return _self.yScale(d.value);
+          }
+          return _self.yScale(0);
+        });
   }
   setupZoomAndPan () {
     this.initialDragState = null;
@@ -332,12 +361,12 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
 
           // Patch a temporary scale transform to the bars / links layers (this
           // gets removed by full drawBars() / drawLinks() calls)
-          if (!this.content.select('.bars').attr('transform')) {
+          if (!this.content.select('.dots').attr('transform')) {
             latentWidth = originalWidth;
           }
           const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
           const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-          this.content.selectAll('.bars, .links')
+          this.content.selectAll('.dots')
               .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
           // Show the small spinner to indicate that some of the stuff the user
           // sees may be inaccurate (will be hidden once the full draw() call
@@ -371,7 +400,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
               this.initialDragState.scale(actualBounds.begin);
-          this.content.selectAll('.bars, .links')
+          this.content.selectAll('.dots')
               .attr('transform', `translate(${shift}, 0)`);
 
           // Show the small spinner to indicate that some of the stuff the user
