@@ -226,4 +226,4 @@ def intervals(label: str, begin: float = None, end: float = None):
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())
-    uvicorn.run(app)
+    uvicorn.run(app, host='0.0.0.0')
