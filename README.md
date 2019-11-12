@@ -80,6 +80,17 @@ Swagger interfaces to its underlying API.
 # Developing
 Anything inside the `static` directory will be served; see its [README](https://github.com/alex-r-bigelow/traveler-integrated/master/static/README.md) for info on developing the web interface.
 
+## Deploying
+Things to run if you want to mess with the docker setup (will only work
+after changes are pushed to master, because the Dockerfile pulls from
+github):
+
+```bash
+docker build ./docker -t alex-r-bigelow/traveler-integrated
+docker run -p 8000:8000 -p 8789:8789 alex-r-bigelow/traveler-integrated
+```
+
+
 On the server side, one of the big priorities at the moment is that we're using
 a [hacked version](https://github.com/alex-r-bigelow/intervaltree) of [intervaltree](https://github.com/chaimleib/intervaltree)
 as a poor man's index into the data (that allows for fast histogram computations).
