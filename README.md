@@ -84,13 +84,21 @@ Anything inside the `static` directory will be served; see its [README](https://
 
 ## Docker
 
-Regular build / run:
+### Regular build / run
 ```bash
 docker build . -t alex-r-bigelow/traveler-integrated
 docker run -p 8000:8000 -p 8789:8789 alex-r-bigelow/traveler-integrated
 ```
 
-Developing:
+### Developing
+A couple notes with this approach:
+- This command "mounts" this directory as `/traveler-dev`; *don't* use
+  `/traveler-integrated` inside the docker container, as it won't contain any
+  changes that you make
+- If your using WSL, it's pretty dumb about paths; you need to use an absolute
+  path in place of `"$(pwd)"` that actually references drive letters, like
+  `/mnt/d/Repositories/traveler-integrated`
+
 (note: if you're using WSL, you'll need to follow [these instructions](https://github.com/docker/for-win/issues/2620#issuecomment-434913857) first)
 ```bash
 docker run \
