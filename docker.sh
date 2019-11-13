@@ -1,8 +1,7 @@
-# Launch traveler-wrangler
+# Launch traveler-integrated in the background
 python3 serve.py &
 
-
-# Jupyter stuff...
+# Launch jupyter
 PORT=8789
 SECRET_TOKEN=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;)
 echo

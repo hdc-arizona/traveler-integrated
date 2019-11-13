@@ -1,0 +1,41 @@
+<style type="text/css">
+  .uploadLogs {
+    display: flex;
+  }
+  .uploadLogs > * + * {
+    margin-left: 1em;
+  }
+  .uploadLogs > div {
+    height: 15em;
+    flex-grow: 1;
+    border: 1px solid #eee;
+    overflow: auto;
+  }
+  .uploadButton {
+    margin-top: 1em;
+  }
+</style>
+
+<details>
+  <summary>Upload details</summary>
+  <div class="uploadLogs">
+    <div class="treeData"></div>
+    <div class="dotData"></div>
+    <div class="csvData"></div>
+    <div class="pythonCode"></div>
+  </div>
+</details>
+<button class="uploadButton" disabled>Uploading performance data...</button>
+
+<script type="application/javascript">
+  (function () {
+    const container = document.currentScript.parentNode;
+    let currentLogs = {};
+    container.recieveObject = function (obj) {
+      Object.assign(currentLogs, obj);
+
+      // TODO: render...
+      console.log(currentLogs);
+    };
+  })();
+</script>

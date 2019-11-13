@@ -69,7 +69,7 @@ def get_tree(label: str, source: TreeSource = TreeSource.newick):
         raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
     return db[label]['trees'][source]
 @app.post('/datasets/{label}/tree')
-def add_newick_tree(label: str, file: UploadFile = File(...)):
+def add_newick_tree(label: str, file: UploadFile = File(...), content: str = None):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
@@ -80,7 +80,7 @@ def add_newick_tree(label: str, file: UploadFile = File(...)):
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.post('/datasets/{label}/csv')
-def add_performance_csv(label: str, file: UploadFile = File(...)):
+def add_performance_csv(label: str, file: UploadFile = File(...), content: str = None):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
@@ -91,7 +91,7 @@ def add_performance_csv(label: str, file: UploadFile = File(...)):
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.post('/datasets/{label}/dot')
-def add_dot_graph(label: str, file: UploadFile = File(...)):
+def add_dot_graph(label: str, file: UploadFile = File(...), content: str = None):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
@@ -102,7 +102,7 @@ def add_dot_graph(label: str, file: UploadFile = File(...)):
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.post('/datasets/{label}/log')
-def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
+def add_full_phylanx_log(label: str, file: UploadFile = File(...), content: str = None):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
@@ -128,7 +128,7 @@ def get_physl(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not include physl source code')
     return db[label]['physl']
 @app.post('/datasets/{label}/physl')
-async def add_physl(label: str, file: UploadFile = File(...)):
+async def add_physl(label: str, file: UploadFile = File(...), content: str = None):
     checkLabel(label)
     db.addSourceFile(label, file.filename, 'physl')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'physl')
@@ -140,7 +140,7 @@ def get_python(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not include python source code')
     return db[label]['python']
 @app.post('/datasets/{label}/python')
-async def add_python(label: str, file: UploadFile = File(...)):
+async def add_python(label: str, file: UploadFile = File(...), content: str = None):
     checkLabel(label)
     db.addSourceFile(label, file.filename, 'python')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'python')
@@ -152,7 +152,7 @@ def get_cpp(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not include C++ source code')
     return db[label]['cpp']
 @app.post('/datasets/{label}/cpp')
-async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
+async def add_c_plus_plus(label: str, file: UploadFile = File(...), content: str = None):
     checkLabel(label)
     db.addSourceFile(label, file.filename, 'cpp')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
