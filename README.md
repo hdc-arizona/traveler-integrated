@@ -6,6 +6,8 @@ aggregate expression trees
 
 # Setup
 
+***TODO: write an end-to-end walkthrough with docker***
+
 ## OTF2
 If you plan to bundle otf2 traces, [otf2](https://www.vi-hps.org/projects/score-p/)
 needs to be installed and its binaries need to be in your `PATH`
@@ -80,17 +82,32 @@ Swagger interfaces to its underlying API.
 # Developing
 Anything inside the `static` directory will be served; see its [README](https://github.com/alex-r-bigelow/traveler-integrated/master/static/README.md) for info on developing the web interface.
 
-## Deploying
-Things to run if you want to mess with the docker setup (will only work
-after changes are pushed to master, because the Dockerfile pulls from
-github):
+## Docker
 
+Regular build / run:
 ```bash
-docker build ./docker -t alex-r-bigelow/traveler-integrated
+docker build . -t alex-r-bigelow/traveler-integrated
 docker run -p 8000:8000 -p 8789:8789 alex-r-bigelow/traveler-integrated
 ```
 
+Developing:
+(note: if you're using WSL, you'll need to follow [these instructions](https://github.com/docker/for-win/issues/2620#issuecomment-434913857) first)
+```bash
+docker run \
+  -it \
+  -p 8000:8000 \
+  -p 8789:8789 \
+  --mount type=bind,source="$(pwd)",target=/traveler-dev \
+  alex-r-bigelow/traveler-integrated \
+  /bin/bash
 
+# To start jupyter and traveler-integrated:
+cd /traveler-dev
+bash docker.sh
+```
+
+
+## About the poor man's database indexes
 On the server side, one of the big priorities at the moment is that we're using
 a [hacked version](https://github.com/alex-r-bigelow/intervaltree) of [intervaltree](https://github.com/chaimleib/intervaltree)
 as a poor man's index into the data (that allows for fast histogram computations).
