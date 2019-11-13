@@ -5,6 +5,7 @@ from TwoWayWebView import TwoWayWebView
 def visualizeInTraveler(fun):
     widget = TwoWayWebView(filename='uploadWidget.html')
     display(widget)
+    return widget
     '''
     with open('uploadTemplate.html' as
         html.escape(fun.__perfdata__[0]), \

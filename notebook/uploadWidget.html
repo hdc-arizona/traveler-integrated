@@ -16,8 +16,10 @@
   }
 </style>
 
+<span class="uploadButton">Uploading performance data...</span>
+<a href="http://localhost:8000/static/interface.html" target="_blank">Show visualization</a>
 <details>
-  <summary>Upload details</summary>
+  <summary>Details</summary>
   <div class="uploadLogs">
     <div class="treeData"></div>
     <div class="dotData"></div>
@@ -25,13 +27,11 @@
     <div class="pythonCode"></div>
   </div>
 </details>
-<button class="uploadButton" disabled>Uploading performance data...</button>
 
 <script type="application/javascript">
   (function () {
-    const container = document.currentScript.parentNode;
     let currentLogs = {};
-    container.recieveObject = function (obj) {
+    window.__currentContainer.receiveObject = function (obj) {
       Object.assign(currentLogs, obj);
 
       // TODO: render...

@@ -2,49 +2,53 @@ import json
 from IPython import get_ipython
 from IPython.core.display import HTML
 
-nextId = 0
+nextPyInstanceId = 0
 wrapperTemplate = '''
-    <div data-two-way-id="%i">
+    <div data-py-instance-id="%i" data-js-rendered-id="%i">
+        <script type="application/javascript">
+            window.__currentContainer = document.querySelector('[data-py-instance-id="%i"][data-js-rendered-id="%i"]');
+        </script>
         %s
         <script type="application/javascript">
-            document.currentScript.parentNode.sendObject = function (obj) {
+            window.__currentContainer.sendObject = function (obj) {
                 // TODO: figure out how to identify twoWayInstance
                 throw new Error('unimplemented');
-                IPython.notebook.kernel.execute(`twoWayInstance._recieveObject(${JSON.stringify(obj)})`);
+                IPython.notebook.kernel.execute(`twoWayInstance._receiveObject(${JSON.stringify(obj)})`);
             };
-            document.__TwoWayLinks = document.__TwoWayLinks || [];
-            document.__TwoWayLinks.push(function (jsonString) {
-                if (document.currentScript &&
-                    document.currentScript.parentNode
-                    document.currentScript.parentNode.recieveObject) {
-                    document.currentScript.parentNode.recieveObject(JSON.parse(jsonString));
-                }
-            });
         </script>
     </div>
+'''
+finderTemplate = '''
+    const container = document.querySelector('[data-py-instance-id="%i"][data-js-rendered-id="%i"]');
+    console.log('firing finder', container, container.receiveObject);
+    if (container && container.receiveObject) {
+        container.receiveObject(%s);
+    }
 '''
 
 class TwoWayWebView(HTML):
     def __init__(self, *args, **kwargs):
-        self._jsCallbackIds = []
+        global nextPyInstanceId
+        self._pyInstanceId = nextPyInstanceId
+        nextPyInstanceId += 1
+
+        self._numJsRenders = 0
         super(TwoWayWebView, self).__init__(*args, **kwargs)
 
     def _repr_html_(self):
-        global nextId
         data = super(TwoWayWebView, self)._repr_html_()
-        data = wrapperTemplate % (nextId, data)
-        self._jsCallbackIds.append(nextId)
-        nextId += 1
+        data = wrapperTemplate % (self._pyInstanceId, self._numJsRenders, self._pyInstanceId, self._numJsRenders, data)
+        self._numJsRenders += 1
         return data
 
     def sendObject(self, obj):
         ipython = get_ipython()
-        for callbackId in self._jsCallbackIds:
-            js = 'window.__TwoWayLinks[%i](%s)' % (callbackId, json.dumps(obj))
+        for jsRenderedId in range(self._numJsRenders):
+            js = finderTemplate % (self._pyInstanceId, jsRenderedId, json.dumps(obj))
             ipython.run_cell_magic('javascript', '', js)
 
-    def _recieveObject(self, jsonString):
-        self.recieveObject(json.loads(jsonString))
+    def _receiveObject(self, jsonString):
+        self.receiveObject(json.loads(jsonString))
 
-    def recieveObject(self, obj):
+    def receiveObject(self, obj):
         pass
