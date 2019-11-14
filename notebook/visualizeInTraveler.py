@@ -10,11 +10,15 @@ def visualizeInTraveler(fun):
     display(widget)
 
     label = 'Jupyter@' + datetime.now().isoformat()
-    response = requests.post('http://localhost:8000/datasets/%s' % quote_plus(label), json={
+    widget.sendObject({'datasetLabel': label})
+    url = 'http://localhost:8000/datasets/%s' % quote_plus(label)
+    response = requests.post(url, stream=True, json={
         'csv': fun.__perfdata__[0],
         'newick': fun.__perfdata__[1],
         'dot': fun.__perfdata__[2],
         'physl': fun.__src__,
         'python': inspect.getsource(fun.backend.wrapped_function)
     })
-    return response
+    for line in response.iter_lines(decode_unicode=True):
+        widget.sendObject({'messageChunk': line})
+    widget.sendObject({'done': True})

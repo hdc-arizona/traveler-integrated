@@ -11,44 +11,40 @@
   .showHandle[open] summary::before {
     content: '-';
   }
-  .uploadLogs {
-    display: flex;
-  }
-  .uploadLogs > * + * {
-    margin-left: 1em;
-  }
-  .uploadLogs > div {
-    height: 15em;
-    flex-grow: 1;
-    border: 1px solid #eee;
-    overflow: auto;
+  .uploadLog {
+    max-height: 15em;
   }
   .uploadButton {
     margin-top: 1em;
   }
 </style>
 
-<span class="uploadButton">Uploading performance data...</span>
-<a href="http://localhost:8000/static/interface.html" target="_blank">Show visualization</a>
+<span class="spinner">
+  Uploading performance data...
+</span>
+<a class="visLink" target="_blank" style="display:none">Show visualization</a>
 <details class="showHandle">
   <summary>Details</summary>
-  <div class="uploadLogs">
-    <div class="treeData"></div>
-    <div class="dotData"></div>
-    <div class="csvData"></div>
-    <div class="pythonCode"></div>
-  </div>
+  <pre class="uploadLog"></pre>
 </details>
 
 <script type="application/javascript">
   (function () {
     const currentContainer = window.__currentContainer;
-    let currentLogs = {};
+    let currentLog = '';
     currentContainer.receiveObject = function (obj) {
-      Object.assign(currentLogs, obj);
-
-      // TODO: render...
-      console.log(currentLogs);
+      if (obj.datasetLabel) {
+        currentContainer.querySelector('.visLink')
+          .setAttribute('href', 'http://localhost:8000/static/interface.html#' + window.encodeURIComponent(obj.datasetLabel))
+      } else if (obj.messageChunk) {
+        currentLog += obj.messageChunk + '\n';
+        currentContainer.querySelector('.uploadLog').innerText = currentLog;
+      } else if (obj.done) {
+        currentContainer.querySelector('.spinner')
+          .setAttribute('style', 'display:none');
+        currentContainer.querySelector('.visLink')
+          .removeAttribute('style');
+      }
     };
   })();
 </script>
