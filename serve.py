@@ -5,6 +5,7 @@ import asyncio
 from enum import Enum
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
+from pydantic import BaseModel #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
@@ -49,11 +50,38 @@ def list_datasets():
 def get_dataset(label: str):
     checkLabel(label)
     return db[label]['meta']
+class BasicDataset(BaseModel):
+    newick: str = None
+    csv: str = None
+    dot: str = None
+    physl: str = None
+    python: str = None
+    cpp: str = None
 @app.post('/datasets/{label}', status_code=201)
-async def create_dataset(label: str):
-    db.createDataset(label)
-    await db.save(label)
-    return db[label]['meta']
+def create_dataset(label: str, dataset: BasicDataset = None):
+    if label in db:
+        raise HTTPException(status_code=409, detail='Dataset with label %s already exists' % label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.createDataset(label)
+        if dataset:
+            if dataset.newick:
+                await db.processNewickTree(label, dataset.newick, logger.log)
+            if dataset.csv:
+                await db.processCsv(label, iter(dataset.csv.splitlines()), logger.log)
+            if dataset.dot:
+                await db.processDot(label, iter(dataset.dot.splitlines()), logger.log)
+            if dataset.physl:
+                db.processCode(label, 'noname.physl', dataset.physl.splitlines(), 'physl')
+                await logger.log('Loaded physl code')
+            if dataset.python:
+                db.processCode(label, 'noname.py', dataset.python.splitlines(), 'python')
+                await logger.log('Loaded python code')
+            if dataset.cpp:
+                db.processCode(label, 'noname.cpp', dataset.cpp.splitlines(), 'cpp')
+                await logger.log('Loaded C++ code')
+        await db.save(label)
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 @app.delete('/datasets/{label}')
 def delete_dataset(label: str):
     db.purgeDataset(label)
@@ -69,44 +97,40 @@ def get_tree(label: str, source: TreeSource = TreeSource.newick):
         raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
     return db[label]['trees'][source]
 @app.post('/datasets/{label}/tree')
-def add_newick_tree(label: str, file: UploadFile = File(...), content: str = None):
+def add_newick_tree(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'newick')
         await db.processNewickTree(label, (await file.read()).decode(), logger.log)
         await db.save(label, logger.log)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.post('/datasets/{label}/csv')
-def add_performance_csv(label: str, file: UploadFile = File(...), content: str = None):
+def add_performance_csv(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'csv')
         await db.processCsv(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.post('/datasets/{label}/dot')
-def add_dot_graph(label: str, file: UploadFile = File(...), content: str = None):
+def add_dot_graph(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'dot')
         await db.processDot(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.post('/datasets/{label}/log')
-def add_full_phylanx_log(label: str, file: UploadFile = File(...), content: str = None):
+def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'log')
         await db.processPhylanxLog(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
         logger.finish()
@@ -128,9 +152,8 @@ def get_physl(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not include physl source code')
     return db[label]['physl']
 @app.post('/datasets/{label}/physl')
-async def add_physl(label: str, file: UploadFile = File(...), content: str = None):
+async def add_physl(label: str, file: UploadFile = File(...)):
     checkLabel(label)
-    db.addSourceFile(label, file.filename, 'physl')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'physl')
     await db.save(label)
 @app.get('/datasets/{label}/python')
@@ -140,9 +163,8 @@ def get_python(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not include python source code')
     return db[label]['python']
 @app.post('/datasets/{label}/python')
-async def add_python(label: str, file: UploadFile = File(...), content: str = None):
+async def add_python(label: str, file: UploadFile = File(...)):
     checkLabel(label)
-    db.addSourceFile(label, file.filename, 'python')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'python')
     await db.save(label)
 @app.get('/datasets/{label}/cpp')
@@ -152,9 +174,8 @@ def get_cpp(label: str):
         raise HTTPException(status_code=404, detail='Dataset does not include C++ source code')
     return db[label]['cpp']
 @app.post('/datasets/{label}/cpp')
-async def add_c_plus_plus(label: str, file: UploadFile = File(...), content: str = None):
+async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
     checkLabel(label)
-    db.addSourceFile(label, file.filename, 'cpp')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
     await db.save(label)
 

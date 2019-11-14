@@ -20,7 +20,6 @@ wrapperTemplate = '''
 '''
 finderTemplate = '''
     const container = document.querySelector('[data-py-instance-id="%i"][data-js-rendered-id="%i"]');
-    console.log('firing finder', container, container.receiveObject);
     if (container && container.receiveObject) {
         container.receiveObject(%s);
     }

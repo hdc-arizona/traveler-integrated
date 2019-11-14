@@ -1,4 +1,16 @@
 <style type="text/css">
+  .showHandle summary::before {
+    content: '+';
+    display: inline-block;
+    width: 1.2em;
+    line-height: 1em;
+    border: 1px solid black;
+    text-align: center;
+    margin-right: 0.5em;
+  }
+  .showHandle[open] summary::before {
+    content: '-';
+  }
   .uploadLogs {
     display: flex;
   }
@@ -18,7 +30,7 @@
 
 <span class="uploadButton">Uploading performance data...</span>
 <a href="http://localhost:8000/static/interface.html" target="_blank">Show visualization</a>
-<details>
+<details class="showHandle">
   <summary>Details</summary>
   <div class="uploadLogs">
     <div class="treeData"></div>
@@ -30,8 +42,9 @@
 
 <script type="application/javascript">
   (function () {
+    const currentContainer = window.__currentContainer;
     let currentLogs = {};
-    window.__currentContainer.receiveObject = function (obj) {
+    currentContainer.receiveObject = function (obj) {
       Object.assign(currentLogs, obj);
 
       // TODO: render...
