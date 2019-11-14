@@ -37,6 +37,16 @@ class Controller {
       this.datasets[label] = metas[index];
     }
     this.renderAllViews();
+    if (!this.attemptedAutoHashOpen) {
+      // The first time we get the list of datasets, do a check to see if the
+      // URL is telling us to navigate to a specific one
+      this.attemptedAutoHashOpen = true;
+      const hashedLabel = window.decodeURIComponent(window.location.hash).substring(1);
+      const state = this.getLinkedState(hashedLabel);
+      if (state) {
+        this.assembleViews(state);
+      }
+    }
   }
   getLinkedState (label) {
     // Get a linkedState object from an existing view that this new one

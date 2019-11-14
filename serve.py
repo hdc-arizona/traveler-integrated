@@ -66,19 +66,22 @@ def create_dataset(label: str, dataset: BasicDataset = None):
         db.createDataset(label)
         if dataset:
             if dataset.newick:
+                db.addSourceFile(label, label + '.newick', 'newick')
                 await db.processNewickTree(label, dataset.newick, logger.log)
             if dataset.csv:
+                db.addSourceFile(label, label + '.csv', 'csv')
                 await db.processCsv(label, iter(dataset.csv.splitlines()), logger.log)
             if dataset.dot:
+                db.addSourceFile(label, label + '.dot', 'dot')
                 await db.processDot(label, iter(dataset.dot.splitlines()), logger.log)
             if dataset.physl:
-                db.processCode(label, 'noname.physl', dataset.physl.splitlines(), 'physl')
+                db.processCode(label, label + '.physl', dataset.physl.splitlines(), 'physl')
                 await logger.log('Loaded physl code')
             if dataset.python:
-                db.processCode(label, 'noname.py', dataset.python.splitlines(), 'python')
+                db.processCode(label, label + '.py', dataset.python.splitlines(), 'python')
                 await logger.log('Loaded python code')
             if dataset.cpp:
-                db.processCode(label, 'noname.cpp', dataset.cpp.splitlines(), 'cpp')
+                db.processCode(label, label + '.cpp', dataset.cpp.splitlines(), 'cpp')
                 await logger.log('Loaded C++ code')
         await db.save(label, logger.log)
         logger.finish()
@@ -102,6 +105,7 @@ def add_newick_tree(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
+        db.addSourceFile(label, file.filename, 'newick')
         await db.processNewickTree(label, (await file.read()).decode(), logger.log)
         await db.save(label, logger.log)
         logger.finish()
@@ -112,6 +116,7 @@ def add_performance_csv(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
+        db.addSourceFile(label, file.filename, 'csv')
         await db.processCsv(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
         logger.finish()
@@ -122,6 +127,7 @@ def add_dot_graph(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
+        db.addSourceFile(label, file.filename, 'dot')
         await db.processDot(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
         logger.finish()
@@ -132,6 +138,7 @@ def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
     checkLabel(label)
     logger = ClientLogger()
     async def startProcess():
+        db.addSourceFile(label, file.filename, 'log')
         await db.processPhylanxLog(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
         logger.finish()

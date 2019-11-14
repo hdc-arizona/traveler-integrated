@@ -9,7 +9,7 @@ echo "To access the notebook, open this file in a browser copy and paste this UR
 echo
 echo " http://localhost:${PORT}/?token=${SECRET_TOKEN}"
 echo
-jupyter notebook --ip=0.0.0.0 --port=${PORT} --no-browser --NotebookApp.token="${SECRET_TOKEN}" --allow-root
+jupyter notebook -y --ip=0.0.0.0 --port=${PORT} --no-browser --NotebookApp.token="${SECRET_TOKEN}" --allow-root
 
 # One can also create a custom URL
 # jupyter notebook --ip=0.0.0.0 --port=${PORT} --no-browser --NotebookApp.custom_display_url="http://localhost:8003"
