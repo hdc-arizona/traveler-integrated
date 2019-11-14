@@ -8,6 +8,7 @@ WORKDIR /
 # RUN git clone https://github.com/alex-r-bigelow/traveler-integrated
 COPY . /traveler-integrated
 WORKDIR /traveler-integrated
+RUN find . | xargs chown jovyan
 RUN pip3 install -r requirements.txt
 EXPOSE 8000
 
@@ -16,7 +17,6 @@ RUN pip3 install jupyter requests
 EXPOSE 8789
 
 USER jovyan
-WORKDIR /home/jovyan
 
 # Default container command is to launch both traveler-integrated and jupyter
 CMD ["bash", "/traveler-integrated/docker.sh"]
