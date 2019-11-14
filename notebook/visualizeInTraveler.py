@@ -22,3 +22,4 @@ def visualizeInTraveler(fun):
     for line in response.iter_lines(decode_unicode=True):
         widget.sendObject({'messageChunk': line})
     widget.sendObject({'done': True})
+    return response

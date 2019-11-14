@@ -80,7 +80,8 @@ def create_dataset(label: str, dataset: BasicDataset = None):
             if dataset.cpp:
                 db.processCode(label, 'noname.cpp', dataset.cpp.splitlines(), 'cpp')
                 await logger.log('Loaded C++ code')
-        await db.save(label)
+        await db.save(label, logger.log)
+        logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 @app.delete('/datasets/{label}')
 def delete_dataset(label: str):

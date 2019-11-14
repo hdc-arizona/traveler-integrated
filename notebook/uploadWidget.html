@@ -17,6 +17,9 @@
   .uploadButton {
     margin-top: 1em;
   }
+  .uploadOutputArea .output_area + .output_area {
+    display: none;
+  }
 </style>
 
 <span class="spinner">
@@ -31,6 +34,10 @@
 <script type="application/javascript">
   (function () {
     const currentContainer = window.__currentContainer;
+    // Jupyter adds some weird empty .output_area elements after this one, so
+    // this is an ugly patch to hide them
+    currentContainer.parentNode.parentNode.parentNode.className += ' uploadOutputArea';
+
     let currentLog = '';
     currentContainer.receiveObject = function (obj) {
       if (obj.datasetLabel) {
