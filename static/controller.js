@@ -99,6 +99,11 @@ class Controller {
       this.goldenLayout.updateSize();
       this.renderAllViews();
     });
+    window.addEventListener('focus', () => {
+      // If the user is coming in from another window (e.g. linked from Jupyter,
+      // the list of datasets is likely to have changed)
+      this.getDatasets();
+    });
     window.addEventListener('load', async () => {
       // Don't actually add our image recoloring hacks or initialize
       // GoldenLayout until LESS has finished (the 'load' event sometimes fires

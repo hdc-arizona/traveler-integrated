@@ -5,7 +5,6 @@ RUN echo jovyan:fishfood77 | chpasswd
 
 # Set up traveler-integrated
 WORKDIR /
-# RUN git clone https://github.com/alex-r-bigelow/traveler-integrated
 COPY . /traveler-integrated
 WORKDIR /traveler-integrated
 RUN find . | xargs chown jovyan
