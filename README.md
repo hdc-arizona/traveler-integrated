@@ -68,15 +68,20 @@ A couple notes with this approach:
   load data from the command line using `bundle.py` (see
   [below](#bundling-data)); it won't actually start Jupyter or
   traveler-integrated. For that, run `bash /traveler-dev/develop.sh`
-- If your using WSL, it's pretty dumb about paths; you need to use an absolute
-  path in place of `"$(pwd)"` that actually references drive letters, like
-  `/mnt/d/Repositories/traveler-integrated`
+- This launches Jupyter and traveler-integrated together. Jupyter doesn't like
+  to exit without confirmation, but the prompt may be buried in the log when you
+  hit `Ctrl-C`; to actually get it to terminate, you need to hit `Ctrl-C` twice.
+  Or if it really refuses to exit, run `docker ps -a` and `docker stop
+  container_name` in another terminal.
+- If your using WSL, it's not very smart about paths; you need to use an
+  absolute path in place of `"$(pwd)"` that actually references drive letters,
+  like `/mnt/d/Repositories/traveler-integrated`
 
 Alternatively, with this setup, you can auto-launch Jupyter and
 traveler-integrated with this command:
 
 ```bash
-docker run -p 8000:8000 -p 8789:8789 alex-r-bigelow/traveler-integrated
+docker run -p 8000:8000 -p 8789:8789 your-dockerhub-username/traveler-integrated
 ```
 
 ## Moving data in and out of the docker container
