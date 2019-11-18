@@ -56,6 +56,7 @@ docker run \
   -it \
   -p 8000:8000 \
   -p 8789:8789 \
+  -w /traveler/dev \
   --mount type=bind,source="$(pwd)",target=/traveler-dev \
   your-dockerhub-username/traveler-integrated \
   /bin/bash
