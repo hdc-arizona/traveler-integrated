@@ -274,7 +274,7 @@ def metrices(label: str, begin: float = None, end: float = None):
     def intervalGenerator():
         yield '['
         firstItem = True
-        for i in db[label]['metricIndexes']['metric']['PAPI_TOT_CYC'].iterOverlap(begin, end):
+        for i in db[label]['metricIndexes']['both']['1']['PAPI_TOT_CYC'].iterOverlap(begin, end):
             if not firstItem:
                 yield ','
             yield json.dumps({str(i.begin): i.data})

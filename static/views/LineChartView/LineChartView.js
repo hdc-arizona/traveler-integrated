@@ -63,9 +63,9 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       // old intervals from disappearing from incremental refreshes
       this.newCache = {};
       this.waitingOnIncrementalRender = false;
-      var maxY = 1;
-      // const currentStream = this.stream = oboe(`/datasets/${label}/metrices?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
-      const currentStream = this.stream = oboe(`/datasets/${label}/metrichistogram?bins=${binSize}&metric=${curMetric}&location=${curLocation}&mode=count&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+      var maxY = 4;
+      const currentStream = this.stream = oboe(`/datasets/${label}/metrices?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+      // const currentStream = this.stream = oboe(`/datasets/${label}/metrichistogram?bins=${binSize}&metric=${curMetric}&location=${curLocation}&mode=count&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
           .fail(error => {
             this.error = error;
             console.log(error);
@@ -76,9 +76,13 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
               this.abort();
             } else {
               // Store the interval
-              // console.log(interval[2]);
-              self.newCache[interval[0]] = interval[2];
-              maxY = Math.max(maxY, interval[2]);
+              const inv = d3.entries(interval);
+              // console.log(interval);
+              // console.log(inv);
+              // console.log(inv[0].key + " " + inv[0].value);
+              // self.newCache.push(inv[0].key + " " + inv[0].value);
+              self.newCache[inv[0].key] = inv[0].value;
+              // maxY = Math.max(maxY, inv[0].value);
               if (!self.waitingOnIncrementalRender) {
                 // self.render() is debounced; this converts it to throttling,
                 // rate-limiting incremental refreshes by this.debounceWait
@@ -274,51 +278,76 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         .classed('dot', true);
     cirlces = cirlces.merge(cirlcesEnter);
 
+    var calcRate = function (d, i) {
+      var Xi = 0;
+      var Ti  = 0;
+      if(i>0) {
+        var dd = cirlces.data()[i-1];
+        Xi = dd.value;
+        Ti = dd.key;
+      }
+      var Xj = d.value;
+      var Tj = d.key;
+      var ret = Math.abs(Xj - Xi) / Math.abs(Tj - Ti);
+
+      var Xh = 0;
+      var Th = 0;
+      if(i>2) {
+        var pred = cirlces.data()[i-2];
+        Xh = pred.value;
+        Th = pred.key;
+      }
+      ret += Math.abs(Xi - Xh) / Math.abs(Ti - Th);
+      return ret;
+    };
+
+    var _self = this;
     cirlces.attr('class','dot')
         .attr('cx', d => this.xScale(d.key))
-        .attr('cy', d => this.yScale(d.value))
+        // .attr('cy', d => this.yScale(d.value))
+        .attr('cy', function (d, i) {
+          return _self.yScale(calcRate(d, i));
+        })
         .attr('r', 2);
 
 
 
-    let lines = this.content.select('.lines')
-        .selectAll('.line').data(data, d => d.key);
-    lines.exit().remove();
-    const linesEnter = lines.enter().append('line')
-        .classed('line', true);
-    lines = lines.merge(linesEnter);
+    // let lines = this.content.select('.lines')
+    //     .selectAll('.line').data(data, d => d.key);
+    // lines.exit().remove();
+    // const linesEnter = lines.enter().append('line')
+    //     .classed('line', true);
+    // lines = lines.merge(linesEnter);
 
     // links.attr('transform', d => `translate(${this.xScale(d.value.lastGuidEndTimestamp)},${this.yScale(d.value.lastGuidLocation)})`);
     // let halfwayOffset = this.yScale.bandwidth() / 2;
 
-    var _self = this;
-    lines.attr('class','line')
-        .attr('x1', function(d,i){
-          if(i>0) {
-            var prevData = lines.data()[i-1];
-            return _self.xScale(prevData.key);
-          }
-          return _self.xScale(0);
-        })
-        .attr('x2', function(d,i){
-          if(i>0) {
-            return _self.xScale(d.key);
-          }
-          return _self.xScale(0);
-        })
-        .attr('y1', function(d,i){
-          if(i>0) {
-            var prevData = lines.data()[i-1];
-            return _self.yScale(prevData.value);
-          }
-          return _self.yScale(0);
-        })
-        .attr('y2', function(d,i){
-          if(i>0) {
-            return _self.yScale(d.value);
-          }
-          return _self.yScale(0);
-        });
+    // var _self = this;
+    // lines.attr('class','line')
+    //     .attr('x1', function(d,i){
+    //       if(i>0) {
+    //         var prevData = lines.data()[i-1];
+    //         return _self.xScale(prevData.key);
+    //       }
+    //       return _self.xScale(0);
+    //     })
+    //     .attr('x2', function(d,i){
+    //       if(i>0) {
+    //         return _self.xScale(d.key);
+    //       }
+    //       return _self.xScale(0);
+    //     })
+    //     .attr('y1', function(d,i){
+    //       var prevData;
+    //       if(i>0) {
+    //         prevData = lines.data()[i-1];
+    //         return _self.yScale(_self.yScale(calcRate(prevData, i-1)));
+    //       }
+    //       return _self.yScale(0);
+    //     })
+    //     .attr('y2', function(d,i){
+    //       return _self.yScale(_self.yScale(calcRate(d, i)));
+    //     });
   }
   setupZoomAndPan () {
     this.initialDragState = null;
