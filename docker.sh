@@ -1,4 +1,5 @@
 # Launch traveler-integrated in the background
+cd /traveler-integrated
 python3 serve.py &
 
 # Launch jupyter
