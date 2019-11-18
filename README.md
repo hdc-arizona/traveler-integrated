@@ -45,8 +45,9 @@ git clone https://github.com/alex-r-bigelow/traveler-integrated
 cd traveler-integrated
 docker build . -t your-dockerhub-username/traveler-integrated
 ```
-If you make any changes to `Dockerfile`, or you add python or other
-dependencies, you'll need to repeat this step.
+If you make any changes to `Dockerfile`, or if you add python or other
+dependencies, or if there are upstream updates to HPX / Phylanx that you want to
+incorporate, you'll need to repeat this step.
 
 
 ## Starting the container
@@ -61,18 +62,26 @@ docker run \
 ```
 
 A couple notes with this approach:
-- This command "mounts" your host `traveler-integrated` directory as
-  `/traveler-dev`; *don't* use `/traveler-integrated` inside the docker
-  container, as it won't contain any changes that you make
+- This command "mounts" your host `traveler-integrated` directory in the
+  container's root `/` directory as `/traveler-dev`. *Don't* use
+  `/traveler-integrated` inside the docker container, as it won't contain any
+  changes that you make
 - This will just give you a `bash` terminal inside the container, where you can
   load data from the command line using `bundle.py` (see
   [below](#bundling-data)); it won't actually start Jupyter or
-  traveler-integrated. For that, run `bash /traveler-dev/develop.sh`
-- This launches Jupyter and traveler-integrated together. Jupyter doesn't like
-  to exit without confirmation, but the prompt may be buried in the log when you
-  hit `Ctrl-C`; to actually get it to terminate, you need to hit `Ctrl-C` twice.
-  Or if it really refuses to exit, run `docker ps -a` and `docker stop
-  container_name` in another terminal.
+  traveler-integrated. For that, run `bash /traveler-dev/develop.sh`.
+- `/traveler-dev/develop.sh` launches Jupyter and traveler-integrated together.
+  Jupyter doesn't like to exit without confirmation, but the prompt may be
+  buried in the log when you hit `Ctrl-C`; to actually get it to terminate, you
+  need to hit `Ctrl-C` twice. Remember that you will still be inside the docker
+  container after terminating; you will still need to type `exit` to return to a
+  normal terminal outside of the container.
+- In the event that something really refuses to exit, in another terminal, run
+  `docker container ls` to see which container is still running, and then
+  `docker stop container_name` in another terminal to shut it down.
+- Other docker commands that you might need: `docker ps -a` lists all
+  containers, including ones that you've stopped; to clean these, run
+  `docker container prune`.
 - If your using WSL, it's not very smart about paths; you need to use an
   absolute path in place of `"$(pwd)"` that actually references drive letters,
   like `/mnt/d/Repositories/traveler-integrated`
