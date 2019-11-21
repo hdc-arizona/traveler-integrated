@@ -2,6 +2,7 @@
 import argparse
 import json
 import asyncio
+import queue
 from enum import Enum
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
@@ -230,8 +231,7 @@ def metrichistogram(label: str, \
                 bins: int = 100, \
                 begin: float = None, \
                 end: float = None, \
-                location: str = None, \
-                metric: str = None):
+                location: str = None):
     checkLabel(label)
     checkIntervals(label)
 
@@ -250,15 +250,7 @@ def metrichistogram(label: str, \
     if location is not None:
         if location not in db[label]['metricIndexes']['locations']:
             raise HTTPException(status_code=404, detail='No index for location: %s' % location)
-        if metric is not None:
-            if metric not in db[label]['metricIndexes']['both'][location]:
-                raise HTTPException(status_code=404, detail='No index for location, metric combination: %s, %s' % (location, metric))
-            return modeHelper(db[label]['metricIndexes']['both'][location][metric])
         return modeHelper(db[label]['metricIndexes']['locations'][location])
-    if metric is not None:
-        if metric not in db[label]['metricIndexes']['metric']:
-            raise HTTPException(status_code=404, detail='No index for metric: %s' % metric)
-        return modeHelper(db[label]['metricIndexes']['metric'][metric])
     return modeHelper(db[label]['metricIndexes']['main'])
 
 @app.get('/datasets/{label}/metrices')
@@ -274,10 +266,11 @@ def metrices(label: str, begin: float = None, end: float = None):
     def intervalGenerator():
         yield '['
         firstItem = True
-        for i in db[label]['metricIndexes']['both']['1']['PAPI_TOT_CYC'].iterOverlap(begin, end):
+        for i in db[label]['metricIndexes']['main'].iterOverlap(begin, end):
             if not firstItem:
                 yield ','
-            yield json.dumps({str(i.begin): i.data})
+            yield json.dumps(db[label]['metrices'][i.data])
+            # yield json.dumps({str(i.begin): i.data})
             firstItem = False
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')

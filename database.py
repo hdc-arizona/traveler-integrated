@@ -10,7 +10,7 @@ from blist import sortedlist #pylint: disable=import-error
 from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 
 # Possible files / metadata structures that we create / open / update
-shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
+shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'metrices']
 requiredShelves = ['meta', 'primitives', 'primitiveLinks']
 pickles = ['intervalIndexes', 'metricIndexes', 'trees', 'physl', 'python', 'cpp']
 requiredMetaLists = ['sourceFiles']
@@ -394,6 +394,8 @@ class Database:
         labelDir = os.path.join(self.dbDir, label)
         primitives = self.datasets[label]['primitives']
         intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals.shelf'))
+        metrices = self.datasets[label]['metrices'] = shelve.open(os.path.join(labelDir, 'metrices.shelf'))
+
         intervalIndexes = self.datasets[label]['intervalIndexes'] = {
             'primitives': {},
             'locations': {},
@@ -401,9 +403,7 @@ class Database:
         }
         metricIndexes = self.datasets[label]['metricIndexes'] = {
             'main': IntervalTree(),
-            'metric': {},
-            'locations': {},
-            'both': {}
+            'locations': {}
         }
         guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
         self.datasets[label]['meta']['storedEvents'] = storeEvents
@@ -411,6 +411,7 @@ class Database:
             self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events.shelf'))
 
         # Temporary counters / lists for sorting
+        numMetrices = -1
         numEvents = 0
         self.sortedEventsByLocation = {}
         await log('Parsing OTF2 events (.=2500 events)')
@@ -432,20 +433,31 @@ class Database:
                 metricType = metricLineMatch.group(3)
                 value = int(float(metricLineMatch.group(4)))
 
-                if location not in metricIndexes['both']:
-                    metricIndexes['both'][location] = {}
                 if location not in metricIndexes['locations']:
                     metricIndexes['locations'][location] = IntervalTree()
-                if metricType not in metricIndexes['both'][location]:
-                    metricIndexes['both'][location][metricType] = IntervalTree()
-                if metricType not in metricIndexes['metric']:
-                    metricIndexes['metric'][metricType] = IntervalTree()
 
-                miv = Interval(timestamp, timestamp+1, value)
-                metricIndexes['both'][location][metricType].add(miv)
-                metricIndexes['locations'][location].add(miv)
-                metricIndexes['metric'][metricType].add(miv)
-                metricIndexes['main'].add(miv)
+                metricKeys = str(numMetrices)
+                if metricKeys in metrices and metrices[metricKeys]['timestamp'] == timestamp and metrices[metricKeys]['location'] == location:
+                    dicts = metrices[metricKeys]
+                    dicts.update({metricType: value})
+                    metrices[metricKeys] = dicts
+                else:
+                    numMetrices += 1
+                    metricKeys = str(numMetrices)
+                    miv = Interval(timestamp, timestamp+1, metricKeys)
+                    metricIndexes['locations'][location].add(miv)
+                    metricIndexes['main'].add(miv)
+                    metricObj = {
+                        'metricId': metricKeys,
+                        'location': location,
+                        'timestamp': timestamp,
+                        metricType: value
+                    }
+                    metrices[metricKeys] = metricObj
+                    # if numMetrices % 2500 == 0:
+                    #     await log('.', end='')
+                    # if numMetrices % 100000 == 0:
+                    #     await log('processed %i metrices' % numMetrices)
 
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
