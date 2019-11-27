@@ -5,6 +5,7 @@ import asyncio
 from enum import Enum
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
+from pydantic import BaseModel #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
@@ -49,11 +50,42 @@ def list_datasets():
 def get_dataset(label: str):
     checkLabel(label)
     return db[label]['meta']
+class BasicDataset(BaseModel):
+    newick: str = None
+    csv: str = None
+    dot: str = None
+    physl: str = None
+    python: str = None
+    cpp: str = None
 @app.post('/datasets/{label}', status_code=201)
-async def create_dataset(label: str):
-    db.createDataset(label)
-    await db.save(label)
-    return db[label]['meta']
+def create_dataset(label: str, dataset: BasicDataset = None):
+    if label in db:
+        raise HTTPException(status_code=409, detail='Dataset with label %s already exists' % label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.createDataset(label)
+        if dataset:
+            if dataset.newick:
+                db.addSourceFile(label, label + '.newick', 'newick')
+                await db.processNewickTree(label, dataset.newick, logger.log)
+            if dataset.csv:
+                db.addSourceFile(label, label + '.csv', 'csv')
+                await db.processCsv(label, iter(dataset.csv.splitlines()), logger.log)
+            if dataset.dot:
+                db.addSourceFile(label, label + '.dot', 'dot')
+                await db.processDot(label, iter(dataset.dot.splitlines()), logger.log)
+            if dataset.physl:
+                db.processCode(label, label + '.physl', dataset.physl.splitlines(), 'physl')
+                await logger.log('Loaded physl code')
+            if dataset.python:
+                db.processCode(label, label + '.py', dataset.python.splitlines(), 'python')
+                await logger.log('Loaded python code')
+            if dataset.cpp:
+                db.processCode(label, label + '.cpp', dataset.cpp.splitlines(), 'cpp')
+                await logger.log('Loaded C++ code')
+        await db.save(label, logger.log)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 @app.delete('/datasets/{label}')
 def delete_dataset(label: str):
     db.purgeDataset(label)
@@ -130,7 +162,6 @@ def get_physl(label: str):
 @app.post('/datasets/{label}/physl')
 async def add_physl(label: str, file: UploadFile = File(...)):
     checkLabel(label)
-    db.addSourceFile(label, file.filename, 'physl')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'physl')
     await db.save(label)
 @app.get('/datasets/{label}/python')
@@ -142,7 +173,6 @@ def get_python(label: str):
 @app.post('/datasets/{label}/python')
 async def add_python(label: str, file: UploadFile = File(...)):
     checkLabel(label)
-    db.addSourceFile(label, file.filename, 'python')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'python')
     await db.save(label)
 @app.get('/datasets/{label}/cpp')
@@ -154,7 +184,6 @@ def get_cpp(label: str):
 @app.post('/datasets/{label}/cpp')
 async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
     checkLabel(label)
-    db.addSourceFile(label, file.filename, 'cpp')
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
     await db.save(label)
 

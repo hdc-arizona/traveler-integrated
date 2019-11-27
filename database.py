@@ -16,6 +16,10 @@ pickles = ['intervalIndexes', 'metricIndexes', 'trees', 'physl', 'python', 'cpp'
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
 
+# Silly file extensions that sometimes get added to shelve, depending on the
+# platform; see: https://stackoverflow.com/questions/16171833/why-does-the-shelve-module-in-python-sometimes-create-files-with-different-exten
+shelfExtensions = ['', 'db', 'dat']
+
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')
 unflaggedTreeParser = re.compile(r'\(\(\(\(\(.*;')  # assume a line beginning with at least 5 parens is the tree
@@ -65,13 +69,14 @@ class Database:
             labelDir = os.path.join(self.dbDir, label)
             for stype in shelves:
                 spath = os.path.join(labelDir, stype + '.shelf')
-                if os.path.exists(spath):
-                    await log('Loading %s %s...' % (label, stype))
-                    self.datasets[label][stype] = shelve.open(spath)
-                elif os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames on some platforms (but not all); see https://stackoverflow.com/questions/8704728/using-python-shelve-cross-platform
-                    await log('Loading %s %s...' % (label, stype))
-                    self.datasets[label][stype] = shelve.open(spath)
-                elif stype in requiredShelves:
+                found = False
+                for ext in shelfExtensions:
+                    if os.path.exists(spath + '.' + ext):
+                        await log('Loading %s %s...' % (label, stype))
+                        self.datasets[label][stype] = shelve.open(spath)
+                        found = True
+                        break
+                if not found and stype in requiredShelves:
                     raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), spath)
             for stype in pickles:
                 spath = os.path.join(labelDir, stype + '.pickle')
