@@ -384,6 +384,13 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           }
           return _self.yScale(calcRate(d, i));
         })
+        .style('stroke', d => {
+          if (d.value.location === _self.selectedLocation) {
+            return 'blue';
+          }
+          return 'black';
+        })
+        .style('stroke-width', 3)
         .style('opacity', d => {
           if (d.value.location === _self.selectedLocation) {
             return 1.0;
