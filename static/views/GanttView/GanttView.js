@@ -18,17 +18,22 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .paddingInner(0.2)
       .paddingOuter(0.1);
 
-    this.stream = null;
-    this.cache = {};
-    this.newCache = null;
+    this.intervalStream = null;
+    this.intervalCache = {};
+    this.newIntervalCache = null;
     this.intervalCount = 0;
 
-    // Don't bother drawing bars if there are more than 10000 visible intervals
-    this.renderCutoff = 10000;
+    this.tracebackStream = null;
+    this.tracebackCache = {
+      visibleIds: [],
+      rightEndpoint: null,
+      leftEndpoint: null
+    };
+    this.newTracebackCache = null;
+    this.lastTracebackTarget = null;
 
-    // Override uki's default .1 second debouncing of render() because we want
-    // to throttle incremental updates to at most once per second
-    this.debounceWait = 1000;
+    // Don't bother drawing bars if there are more than 7000 visible intervals
+    this.renderCutoff = 7000;
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
@@ -36,9 +41,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
   }
   getData () {
     // Debounce the start of this expensive process...
-    // (but flag that we're loading)
-    window.clearTimeout(this._resizeTimeout);
-    this._resizeTimeout = window.setTimeout(async () => {
+    window.clearTimeout(this._getDataTimeout);
+    this._getDataTimeout = window.setTimeout(async () => {
       const label = encodeURIComponent(this.layoutState.label);
       const intervalWindow = this.linkedState.intervalWindow;
       const self = this;
@@ -49,49 +53,95 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       this.intervalCount = this.histogram[0][2];
       if (this.isEmpty) {
         // Empty out whatever we were looking at before and bail immediately
-        this.stream = null;
-        this.cache = {};
-        this.newCache = null;
+        this.intervalStream = null;
+        this.intervalCache = {};
+        this.newIntervalCache = null;
         this.render();
         return;
       }
 
-      // Okay, start the stream, and collect it in a separate cache to avoid
+      // Start the interval stream, and collect it in a separate cache to avoid
       // old intervals from disappearing from incremental refreshes
-      this.newCache = {};
-      this.waitingOnIncrementalRender = false;
-      const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+      this.newIntervalCache = {};
+      const intervalStreamUrl = `/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`;
+      const currentIntervalStream = this.intervalStream = oboe(intervalStreamUrl)
         .fail(error => {
           this.error = error;
           console.log(error);
         })
         .node('!.*', function (interval) {
-          if (currentStream !== self.stream) {
+          if (currentIntervalStream !== self.intervalStream) {
             // A different stream has been started; abort this one
             this.abort();
           } else {
             // Store the interval
-            const key = interval.enter.Timestamp + '_' + interval.leave.Timestamp + '_' + interval.Location;
-            self.newCache[key] = interval;
-            if (!self.waitingOnIncrementalRender) {
-              // self.render() is debounced; this converts it to throttling,
-              // rate-limiting incremental refreshes by this.debounceWait
-              self.render();
-              self.waitingOnIncrementalRender = true;
-            }
+            self.newIntervalCache[interval.intervalId] = interval;
+            self.renderThrottled();
           }
         })
         .done(() => {
-          this.stream = null;
-          this.cache = this.newCache;
-          this.newCache = null;
+          this.intervalStream = null;
+          this.intervalCache = this.newIntervalCache;
+          this.newIntervalCache = null;
           this.render();
         });
+
+      // Start the traceback stream (if something is selected), using the same
+      // separate cacheing trick. TODO: we're doing this in conjunction with the
+      // rest of the data collection, only because panning / zooming could
+      // necessitate requesting a longer traceback; ideally changing the selected
+      // interval shouldn't trigger a full data request. Maybe the selection
+      // interaction could be faster if we did this separately?
+      if (this.linkedState.selectedIntervalId === undefined) {
+        this.tracebackStream = null;
+        this.tracebackCache = {
+          visibleIds: [],
+          rightEndpoint: null,
+          leftEndpoint: null
+        };
+        this.newTracebackCache = null;
+        this.lastTracebackTarget = null;
+      } else {
+        this.newTracebackCache = [];
+        const tracebackTarget = this.linkedState.selectedIntervalId;
+        const tracebackStreamUrl = `/datasets/${label}/intervals/${tracebackTarget}?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`;
+        const currentTracebackStream = this.tracebackStream = oboe(tracebackStreamUrl)
+          .fail(error => {
+            this.error = error;
+            console.log(error);
+          })
+          .node('!.*', function (idOrMetadata) {
+            if (currentTracebackStream !== self.tracebackStream) {
+              this.abort();
+              return;
+            } else if (typeof idOrMetadata === 'string') {
+              this.newTracebackCache.visibleIds.push(idOrMetadata);
+            } else if (idOrMetadata.beginTimestamp !== undefined) {
+              this.newTracebackCache.rightEndpoint = idOrMetadata;
+            } else if (idOrMetadata.endTimestamp !== undefined) {
+              this.newTracebackCache.leftEndpoint = idOrMetadata;
+            }
+            this.renderThrottled();
+          })
+          .done(() => {
+            this.tracebackStream = null;
+            this.tracebackCache = this.newTracebackCache;
+            this.newTracebackCache = null;
+            this.lastTracebackTarget = tracebackTarget;
+            this.render();
+          });
+      }
+
+      // We need a render call here as the streams have just started up, mostly
+      // to show the spinner
       this.render();
     }, 100);
   }
+  renderThrottled () {
+    // TODO
+  }
   get isLoading () {
-    return super.isLoading || this.stream !== null;
+    return super.isLoading || this.intervalStream !== null || this.tracebackStream !== null;
   }
   get isEmpty () {
     return this.error || this.intervalCount === 0 || this.intervalCount > this.renderCutoff;
@@ -182,50 +232,39 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // scrolling / panning)
     this._bounds = this.getChartBounds();
 
-    // Combine old data with any new data that's streaming in
-    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
+    // Combine old intervals with any new ones that are streaming in for more
+    // seamless zooming / panning
+    const intervals = Object.assign({}, this.intervalCache, this.newIntervalCache || {});
+    // Do the same with the traceback, but only if the target is the same as
+    // the last time that we fetched data
+    let traceback;
+    if (this.linkedState.selectedIntervalId === this.lastTracebackTarget) {
+      // Combine the list of visibleIds, but only include the left / right
+      // endpoints of newTracebackCache (in the event that the target interval
+      // was just scrolled back into view, don't draw any lines beyond it)
+      traceback = {
+        visibleIds: this.newTracebackCache.visibleIds.length > this.tracebackCache.visibleIds.length
+          ? this.newTracebackCache.visibleIds : this.tracebackCache.visibleIds,
+        leftEndpoint: this.newTracebackCache.leftEndpoint,
+        rightEndpoint: this.newTracebackCache.rightEndpoint
+      };
+    } else {
+      // Need to make a copy, because otherwise this.drawLinks() could
+      // potentially mutate this.newTracebackCache
+      traceback = Object.assign({}, this.newTracebackCache);
+    }
 
-    // Hide the small spinner
-    this.content.select('.small.spinner').style('display', 'none');
+    // Update whether we're showing the spinner
+    this.content.select('.small.spinner').style('display', this.isLoading ? null : 'none');
     // Update the clip rect
     this.drawClip();
     // Update the axes (also updates scales)
     this.drawAxes();
 
-    if (this.linkedState.selectedIntervalId) {
-      // This is partial clone code from drawLinks
-      // Collect only the links in the back-path of the selected IntervalId
-      // TODO Make me more efficient, this has a lot of passes
-      let workingId = this.linkedState.selectedIntervalId;
-      let inView = true;
-      while (inView) {
-        let interval = data.find(d => d.value.intervalId === workingId);
-
-        // Only continue if interval is found and has a link backwards
-        if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
-          interval.value.inTraceBack = true;
-        } else {
-          inView = false;
-          continue;
-        }
-
-        workingId = interval.value.lastParentInterval.id;
-        // Only continue if previous interval is drawn
-        if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
-          inView = false;
-        }
-      }
-    } else {
-      data.map(d => { d.value.inTraceBack = false; return d; });
-    }
-
     // Update the bars
-    this.drawBars(data);
+    this.drawBars(intervals);
     // Update the links
-    this.drawLinks(data);
-
-    // Update the incremental flag so that we can call render again if needed
-    this.waitingOnIncrementalRender = false;
+    this.drawLinks(intervals, traceback);
   }
   drawClip () {
     this.content.select('clipPath rect')
@@ -272,14 +311,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.content.select('.yAxisLabel')
       .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
   }
-  drawBars (data) {
+  drawBars (intervals) {
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.bars').attr('transform', null);
     }
 
     let bars = this.content.select('.bars')
-      .selectAll('.bar').data(data, d => d.key);
+      .selectAll('.bar').data(d3.entries(intervals), d => d.key);
     bars.exit().remove();
     const barsEnter = bars.enter().append('g')
       .classed('bar', true);
@@ -367,20 +406,54 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         this.render();
       });
   }
-  drawLinks (data) {
+  drawLinks (intervals, traceback) {
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
     }
+
+    // Derive a list of intervals from the streamed list of IDs
     let linkData = [];
-    if (!this.linkedState.selectedIntervalId) {
-      linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
-    } else {
-      linkData = data.filter(d => d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack);
+    for (const intervalId of traceback.visibleIds) {
+      if (intervals[intervalId]) {
+        linkData.push(intervalId);
+      } else {
+        // The list of IDs came back faster than the intervals themselves, we
+        // should cut off the line at this point (should only happen during
+        // incremental rendering)
+        delete traceback.leftEndpoint;
+        break;
+      }
+    }
+
+    if (traceback.leftEndpoint && linkData.length > 0) {
+      // Copy the important parts of the first interval object, overriding
+      // lastParentInterval
+      linkData[0] = {
+        intervalId: linkData[0].intervalId,
+        Location: linkData[0].Location,
+        enter: { Timestamp: linkData[0].enter.Timestamp },
+        lastParentInterval: traceback.leftEndpoint
+      };
+    }
+    if (traceback.rightEndpoint && linkData.length > 0) {
+      // Construct a fake "interval" for the right endpoint, because we draw
+      // lines to the left
+      const parent = linkData[linkData.length - 1];
+      linkData.push({
+        intervalId: traceback.rightEndpoint.id,
+        Location: traceback.rightEndpoint.location,
+        enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
+        lastParentInterval: {
+          id: parent.intervalId,
+          endTimestamp: parent.leave.Timestamp,
+          location: parent.Location
+        }
+      });
     }
 
     let links = this.content.select('.links')
-      .selectAll('.link').data(linkData, d => d.key);
+      .selectAll('.link').data(linkData, d => d.intervalId);
     links.exit().remove();
     const linksEnter = links.enter().append('g')
       .classed('link', true);
@@ -392,10 +465,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     linksEnter.append('line')
       .classed('line', true);
     links.selectAll('line')
-      .attr('x1', d => this.xScale(d.value.lastParentInterval.endTimestamp))
-      .attr('x2', d => this.xScale(d.value.enter.Timestamp))
-      .attr('y1', d => this.yScale(d.value.lastParentInterval.location) + halfwayOffset)
-      .attr('y2', d => this.yScale(d.value.Location) + halfwayOffset);
+      .attr('x1', d => this.xScale(d.lastParentInterval.endTimestamp))
+      .attr('x2', d => this.xScale(d.enter.Timestamp))
+      .attr('y1', d => this.yScale(d.lastParentInterval.location) + halfwayOffset)
+      .attr('y2', d => this.yScale(d.Location) + halfwayOffset);
   }
   setupZoomAndPan () {
     this.initialDragState = null;
