@@ -92,7 +92,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // necessitate requesting a longer traceback; ideally changing the selected
       // interval shouldn't trigger a full data request. Maybe the selection
       // interaction could be faster if we did this separately?
-      if (this.linkedState.selectedIntervalId === undefined) {
+      if (!this.linkedState.selectedIntervalId) {
         this.tracebackStream = null;
         this.tracebackCache = {
           visibleIds: [],
@@ -238,7 +238,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Do the same with the traceback, but only if the target is the same as
     // the last time that we fetched data
     let traceback;
-    if (this.linkedState.selectedIntervalId === this.lastTracebackTarget) {
+    if (this.linkedState.selectedIntervalId !== null &&
+        this.linkedState.selectedIntervalId === this.lastTracebackTarget) {
       // Combine the list of visibleIds, but only include the left / right
       // endpoints of newTracebackCache (in the event that the target interval
       // was just scrolled back into view, don't draw any lines beyond it)
@@ -248,10 +249,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         leftEndpoint: this.newTracebackCache.leftEndpoint,
         rightEndpoint: this.newTracebackCache.rightEndpoint
       };
-    } else {
+    } else if (this.newTracebackCache !== null) {
       // Need to make a copy, because otherwise this.drawLinks() could
       // potentially mutate this.newTracebackCache
       traceback = Object.assign({}, this.newTracebackCache);
+    } else {
+      // Need to make a copy, because otherwise this.drawLinks() could
+      // potentially mutate this.tracebackCache
+      traceback = Object.assign({}, this.tracebackCache);
     }
 
     // Update whether we're showing the spinner
