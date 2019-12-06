@@ -280,6 +280,8 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
 
         if 'lastParentInterval' not in intervalObj:
             # We reached the beginning with no intersections; terminate early
+            if intervalObj['enter']['Timestamp'] <= end and intervalObj['leave']['Timestamp'] >= begin:
+                yield '"%s"' % intervalObj['intervalId']
             yield ']'
             return
         if targetInterval != intervalObj:
