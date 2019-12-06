@@ -441,21 +441,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     }
 
     if (linkData.length > 0) {
-      if (traceback.leftEndpoint) {
-        // Copy the important parts of the leftmost interval object, overriding
-        // lastParentInterval (remember the order is right-to-left)
-        const firstInterval = linkData[linkData.length - 1];
-        linkData[linkData.length - 1] = {
-          intervalId: firstInterval.intervalId,
-          Location: firstInterval.Location,
-          enter: { Timestamp: firstInterval.enter.Timestamp },
-          lastParentInterval: traceback.leftEndpoint
-        };
-      } else if (!linkData[linkData.length - 1].lastParentInterval) {
-        // In cases where an interval with no parent is at the beginning of the
-        // traceback, there's no line to draw to the left; we can just omit it
-        linkData.splice(-1);
-      }
       if (traceback.rightEndpoint) {
         // Construct a fake "interval" for the right endpoint, because we draw
         // lines to the left
@@ -470,6 +455,21 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
             location: parent.Location
           }
         });
+      }
+      if (traceback.leftEndpoint) {
+        // Copy the important parts of the leftmost interval object, overriding
+        // lastParentInterval (remember the order is right-to-left)
+        const firstInterval = linkData[linkData.length - 1];
+        linkData[linkData.length - 1] = {
+          intervalId: firstInterval.intervalId,
+          Location: firstInterval.Location,
+          enter: { Timestamp: firstInterval.enter.Timestamp },
+          lastParentInterval: traceback.leftEndpoint
+        };
+      } else if (!linkData[linkData.length - 1].lastParentInterval) {
+        // In cases where an interval with no parent is at the beginning of the
+        // traceback, there's no line to draw to the left; we can just omit it
+        linkData.splice(-1);
       }
     }
 

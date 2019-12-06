@@ -278,12 +278,6 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
             parentId = intervalObj['lastParentInterval']['id']
             intervalObj = db[label]['intervals'][parentId]
 
-        if 'lastParentInterval' not in intervalObj:
-            # We reached the beginning with no intersections; terminate early
-            if intervalObj['enter']['Timestamp'] <= end and intervalObj['leave']['Timestamp'] >= begin:
-                yield '"%s"' % intervalObj['intervalId']
-            yield ']'
-            return
         if targetInterval != intervalObj:
             # Because the target interval isn't in the query window, yield some
             # metadata about the interval beyond the end boundary, so the client
