@@ -240,12 +240,27 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // scrolling / panning)
     this._bounds = this.getChartBounds();
 
-    // Combine old intervals with any new ones that are streaming in for more
+    // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
     const intervals = Object.assign({}, this.intervalCache, this.newIntervalCache || {});
-    // Do the same with the traceback, but only if the target is the same as
-    // the last time that we fetched data
+    const linkData = this.getLinkData(intervals);
+
+    // Update whether we're showing the spinner
+    this.content.select('.small.spinner').style('display', this.isLoading ? null : 'none');
+    // Update the clip rect
+    this.drawClip();
+    // Update the axes (also updates scales)
+    this.drawAxes();
+
+    // Update the bars
+    this.drawBars(intervals);
+    // Update the links
+    this.drawLinks(linkData);
+  }
+  getLinkData (intervals) {
     let traceback;
+    // Combine old and new data, only if the target is the same as the last time
+    // that we fetched data
     if (this.newTracebackCache !== null &&
         this.linkedState.selectedIntervalId !== null &&
         this.linkedState.selectedIntervalId === this.lastTracebackTarget) {
@@ -268,17 +283,53 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       traceback = Object.assign({}, this.tracebackCache);
     }
 
-    // Update whether we're showing the spinner
-    this.content.select('.small.spinner').style('display', this.isLoading ? null : 'none');
-    // Update the clip rect
-    this.drawClip();
-    // Update the axes (also updates scales)
-    this.drawAxes();
+    // Derive a list of intervals from the streamed list of IDs
+    let linkData = [];
+    for (const intervalId of traceback.visibleIds) {
+      if (intervals[intervalId]) {
+        linkData.push(intervals[intervalId]);
+      } else {
+        // The list of IDs came back faster than the intervals themselves, we
+        // should cut off the line at this point (should only happen during
+        // incremental rendering)
+        delete traceback.leftEndpoint;
+        break;
+      }
+    }
 
-    // Update the bars
-    this.drawBars(intervals);
-    // Update the links
-    this.drawLinks(intervals, traceback);
+    if (linkData.length > 0) {
+      if (traceback.rightEndpoint) {
+        // Construct a fake "interval" for the right endpoint, because we draw
+        // lines to the left
+        const parent = linkData[0];
+        linkData.unshift({
+          intervalId: traceback.rightEndpoint.id,
+          Location: traceback.rightEndpoint.location,
+          enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
+          lastParentInterval: {
+            id: parent.intervalId,
+            endTimestamp: parent.leave.Timestamp,
+            location: parent.Location
+          }
+        });
+      }
+      if (traceback.leftEndpoint) {
+        // Copy the important parts of the leftmost interval object, overriding
+        // lastParentInterval (remember the order is right-to-left)
+        const firstInterval = linkData[linkData.length - 1];
+        linkData[linkData.length - 1] = {
+          intervalId: firstInterval.intervalId,
+          Location: firstInterval.Location,
+          enter: { Timestamp: firstInterval.enter.Timestamp },
+          lastParentInterval: traceback.leftEndpoint
+        };
+      } else if (!linkData[linkData.length - 1].lastParentInterval) {
+        // In cases where an interval with no parent is at the beginning of the
+        // traceback, there's no line to draw to the left; we can just omit it
+        linkData.splice(-1);
+      }
+    }
+    return linkData;
   }
   drawClip () {
     this.content.select('clipPath rect')
@@ -420,57 +471,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         this.render();
       });
   }
-  drawLinks (intervals, traceback) {
+  drawLinks (linkData) {
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
-    }
-
-    // Derive a list of intervals from the streamed list of IDs
-    let linkData = [];
-    for (const intervalId of traceback.visibleIds) {
-      if (intervals[intervalId]) {
-        linkData.push(intervals[intervalId]);
-      } else {
-        // The list of IDs came back faster than the intervals themselves, we
-        // should cut off the line at this point (should only happen during
-        // incremental rendering)
-        delete traceback.leftEndpoint;
-        break;
-      }
-    }
-
-    if (linkData.length > 0) {
-      if (traceback.rightEndpoint) {
-        // Construct a fake "interval" for the right endpoint, because we draw
-        // lines to the left
-        const parent = linkData[0];
-        linkData.unshift({
-          intervalId: traceback.rightEndpoint.id,
-          Location: traceback.rightEndpoint.location,
-          enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
-          lastParentInterval: {
-            id: parent.intervalId,
-            endTimestamp: parent.leave.Timestamp,
-            location: parent.Location
-          }
-        });
-      }
-      if (traceback.leftEndpoint) {
-        // Copy the important parts of the leftmost interval object, overriding
-        // lastParentInterval (remember the order is right-to-left)
-        const firstInterval = linkData[linkData.length - 1];
-        linkData[linkData.length - 1] = {
-          intervalId: firstInterval.intervalId,
-          Location: firstInterval.Location,
-          enter: { Timestamp: firstInterval.enter.Timestamp },
-          lastParentInterval: traceback.leftEndpoint
-        };
-      } else if (!linkData[linkData.length - 1].lastParentInterval) {
-        // In cases where an interval with no parent is at the beginning of the
-        // traceback, there's no line to draw to the left; we can just omit it
-        linkData.splice(-1);
-      }
     }
 
     let links = this.content.select('.links')
