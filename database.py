@@ -607,7 +607,7 @@ class Database:
                 foundPrior = False
                 for parentIntervalId in reversed(guids[parentGuid]):
                     parentInterval = intervals[parentIntervalId]
-                    if parentInterval['leave']['Timestamp'] <= intervalObj['enter']['Timestamp']:
+                    if parentInterval['enter']['Timestamp'] <= intervalObj['enter']['Timestamp']:
                         foundPrior = True
                         intervalCount += 1
                         # Store metadata about the most recent interval
@@ -635,9 +635,11 @@ class Database:
                 missingCount += 1
 
             # Store this interval by its leave GUID
-            if guid not in guids:
-                guids[guid] = []
-            guids[guid] = guids[guid] + [intervalId]
+            guid = intervalObj.get('GUID', intervalObj['leave'].get('GUID', None))
+            if guid is not None:
+                if guid not in guids:
+                    guids[guid] = []
+                guids[guid] = guids[guid] + [intervalId]
 
             if (missingCount + intervalCount) % 2500 == 0:
                 await log('.', end='')

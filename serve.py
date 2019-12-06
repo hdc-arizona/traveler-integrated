@@ -325,6 +325,14 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
         yield ']'
     return StreamingResponse(intervalIdGenerator(), media_type='application/json')
 
+@app.get('/datasets/{label}/guids/{guid}/intervalIds')
+def guidIntervalIds(label: str, guid: str):
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+    if guid not in db[label]['guids']:
+        raise HTTPException(status_code=404, detail='GUID %s not found' % guid)
+    return db[label]['guids'][guid]
+
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())
     uvicorn.run(app, host='0.0.0.0')

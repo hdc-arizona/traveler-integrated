@@ -441,13 +441,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     }
 
     if (linkData.length > 0) {
-      if (traceback.leftEndpoint && linkData.length > 0) {
-        // Copy the important parts of the first interval object, overriding
-        // lastParentInterval
-        linkData[0] = {
-          intervalId: linkData[0].intervalId,
-          Location: linkData[0].Location,
-          enter: { Timestamp: linkData[0].enter.Timestamp },
+      if (traceback.leftEndpoint) {
+        // Copy the important parts of the leftmost interval object, overriding
+        // lastParentInterval (remember the order is right-to-left)
+        const firstInterval = linkData[linkData.length - 1];
+        linkData[linkData.length - 1] = {
+          intervalId: firstInterval.intervalId,
+          Location: firstInterval.Location,
+          enter: { Timestamp: firstInterval.enter.Timestamp },
           lastParentInterval: traceback.leftEndpoint
         };
       } else if (!linkData[linkData.length - 1].lastParentInterval) {
@@ -455,11 +456,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         // traceback, there's no line to draw to the left; we can just omit it
         linkData.splice(-1);
       }
-      if (traceback.rightEndpoint && linkData.length > 0) {
+      if (traceback.rightEndpoint) {
         // Construct a fake "interval" for the right endpoint, because we draw
         // lines to the left
-        const parent = linkData[linkData.length - 1];
-        linkData.push({
+        const parent = linkData[0];
+        linkData.unshift({
           intervalId: traceback.rightEndpoint.id,
           Location: traceback.rightEndpoint.location,
           enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
