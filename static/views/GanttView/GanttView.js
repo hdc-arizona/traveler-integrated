@@ -258,30 +258,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.drawLinks(linkData);
   }
   getLinkData (intervals) {
-    let traceback;
-    // Combine old and new data, only if the target is the same as the last time
-    // that we fetched data
-    if (this.newTracebackCache !== null &&
-        this.linkedState.selectedIntervalId !== null &&
-        this.linkedState.selectedIntervalId === this.lastTracebackTarget) {
-      // Combine the list of visibleIds, but only include the left / right
-      // endpoints of newTracebackCache (in the event that the target interval
-      // was just scrolled back into view, don't draw any lines beyond it)
-      traceback = {
-        visibleIds: this.newTracebackCache.visibleIds.length > this.tracebackCache.visibleIds.length
-          ? this.newTracebackCache.visibleIds : this.tracebackCache.visibleIds,
-        leftEndpoint: this.newTracebackCache.leftEndpoint,
-        rightEndpoint: this.newTracebackCache.rightEndpoint
-      };
-    } else if (this.newTracebackCache !== null) {
-      // Need to make a copy, because otherwise this.drawLinks() could
-      // potentially mutate this.newTracebackCache
-      traceback = Object.assign({}, this.newTracebackCache);
-    } else {
-      // Need to make a copy, because otherwise this.drawLinks() could
-      // potentially mutate this.tracebackCache
-      traceback = Object.assign({}, this.tracebackCache);
-    }
+    // Make a copy of the newest available cache, because otherwise
+    // this.drawLinks() could potentially mutate the original
+    const traceback = Object.assign({}, this.newTracebackCache || this.tracebackCache);
 
     // Derive a list of intervals from the streamed list of IDs
     let linkData = [];
@@ -300,7 +279,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     if (linkData.length > 0) {
       if (traceback.rightEndpoint) {
         // Construct a fake "interval" for the right endpoint, because we draw
-        // lines to the left
+        // lines to the left (linkData is right-to-left)
         const parent = linkData[0];
         linkData.unshift({
           intervalId: traceback.rightEndpoint.id,
@@ -315,7 +294,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       }
       if (traceback.leftEndpoint) {
         // Copy the important parts of the leftmost interval object, overriding
-        // lastParentInterval (remember the order is right-to-left)
+        // lastParentInterval (linkData is right-to-left)
         const firstInterval = linkData[linkData.length - 1];
         linkData[linkData.length - 1] = {
           intervalId: firstInterval.intervalId,
