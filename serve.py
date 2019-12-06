@@ -270,6 +270,7 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
         yield '['
         targetInterval = intervalObj = db[label]['intervals'][intervalId]
         lastInterval = None
+        yieldComma = False
 
         # First phase: from the targetInterval, step backward until we encounter
         # an interval in the queried range (or we run out of intervals)
@@ -289,12 +290,14 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
                 'location': lastInterval['Location'],
                 'beginTimestamp': lastInterval['enter']['Timestamp']
             })
+            yieldComma = True
 
         # Second phase: yield interval ids until we encounter an interval beyond
         # the queried range (or we run out)
         while 'lastParentInterval' in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
-            if intervalObj != targetInterval:
+            if yieldComma:
                 yield ','
+            yieldComma = True
             yield '"%s"' % intervalObj['intervalId']
             lastInterval = intervalObj
             parentId = intervalObj['lastParentInterval']['id']
@@ -303,12 +306,18 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
         if 'lastParentInterval' not in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
             # We ran out of intervals, and the last one was in range; just yield
             # its id (no beyondLeft metadata needed)
-            yield ',"%s"' % intervalObj['intervalId']
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield '"%s"' % intervalObj['intervalId']
         elif lastInterval and lastInterval['leave']['Timestamp'] >= begin:
             # Yield some metadata about the interval beyond the begin boundary,
             # so the client can draw lines beyond the window (and won't need
             # access to the interval itself)
-            yield ',' + json.dumps({
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield json.dumps({
                 'type': 'beyondLeft',
                 'id': intervalObj['intervalId'],
                 'location': intervalObj['Location'],
