@@ -83,7 +83,7 @@ A couple notes with this approach:
 - Other docker commands that you might need: `docker ps -a` lists all
   containers, including ones that you've stopped; to clean these, run
   `docker container prune`.
-- If your using WSL, it's not very smart about paths; you need to use an
+- If you're using WSL, it's not very smart about paths; you need to use an
   absolute path in place of `"$(pwd)"` that actually references drive letters,
   like `/mnt/d/Repositories/traveler-integrated`
 

@@ -42,9 +42,11 @@ class Controller {
       // URL is telling us to navigate to a specific one
       this.attemptedAutoHashOpen = true;
       const hashedLabel = window.decodeURIComponent(window.location.hash).substring(1);
-      const state = this.getLinkedState(hashedLabel);
-      if (state) {
-        this.assembleViews(state);
+      if (hashedLabel) {
+        const state = this.getLinkedState(hashedLabel);
+        if (state) {
+          this.assembleViews(state);
+        }
       }
     }
   }
