@@ -1,4 +1,4 @@
-/* globals d3 */
+/* globals d3, oboe */
 import { Model } from '/static/node_modules/uki/dist/uki.esm.js';
 
 class LinkedState extends Model {
@@ -16,9 +16,14 @@ class LinkedState extends Model {
     this.selectedPrimitive = null;
     this.selectedGUID = null;
     this.selectedIntervalId = null;
+    this.intervalCount = null;
+    this._intervalCache = {};
+    this._tracebackCache = {};
     this._mode = 'Inclusive';
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
+      this.startStreamingIntervals();
+      this.startStreamingTraceback();
     })();
   }
   get begin () {
@@ -53,6 +58,8 @@ class LinkedState extends Model {
     begin = Math.max(this.beginLimit, begin);
     end = Math.min(this.endLimit, end);
     this.intervalWindow = [begin, end];
+    this.startStreamingIntervals();
+    this.startStreamingTraceback();
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalWindow', { begin, end });
     }
@@ -72,6 +79,7 @@ class LinkedState extends Model {
   selectIntervalId (intervalId) {
     if (intervalId !== this.selectedIntervalId) {
       this.selectedIntervalId = intervalId;
+      this.startStreamingTraceback();
       this.stickyTrigger('intervalIdSelected', { intervalId });
     }
   }
@@ -112,6 +120,110 @@ class LinkedState extends Model {
       }
     }
     return views;
+  }
+  startStreamingIntervals () {
+    // Debounce the start of this expensive process...
+    window.clearTimeout(this._intervalTimeout);
+    this._intervalTimeout = window.setTimeout(async () => {
+      const label = encodeURIComponent(this.label);
+      // First check whether we're asking for too much data by getting a
+      // histogram with a single bin (TODO: draw per-location histograms instead
+      // of just saying "Too much data; scroll to zoom in?")
+      const histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`);
+      this.intervalCount = histogram[0][2];
+      if (this.isEmpty) {
+        // Empty out whatever we were looking at before and bail immediately
+        this._intervalStream = null;
+        this._intervalCache = {};
+        this._newIntervalCache = null;
+        this.trigger('intervalsReady', this.intervalCache);
+        return;
+      }
+
+      // Start the interval stream, and collect it in a separate cache to avoid
+      // old intervals from disappearing from incremental refreshes
+      this._newIntervalCache = {};
+      const self = this;
+      const intervalStreamUrl = `/datasets/${label}/intervals?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
+      const currentIntervalStream = this._intervalStream = oboe(intervalStreamUrl)
+        .fail(error => {
+          this._intervalError = error;
+          console.warn(error);
+        })
+        .node('!.*', function (interval) {
+          delete this._intervalError;
+          if (currentIntervalStream !== self._intervalStream) {
+            // A different stream has been started; abort this one
+            this.abort();
+          } else {
+            // Store the interval
+            self._newIntervalCache[interval.intervalId] = interval;
+            self.renderThrottled();
+          }
+        })
+        .done(() => {
+          this._intervalStream = null;
+          this._intervalCache = this.newIntervalCache;
+          this._newIntervalCache = null;
+          this.trigger('intervalsReady', this.intervalCache);
+        });
+    }, 100);
+  }
+  startStreamingTraceback () {
+      // Start the traceback stream (if something is selected), using the same
+      // separate cacheing trick. TODO: we're doing this in conjunction with the
+      // rest of the data collection, only because panning / zooming could
+      // necessitate requesting a longer traceback; ideally changing the selected
+      // interval shouldn't trigger a full data request. Maybe the selection
+      // interaction could be faster if we did this separately?
+      if (!this.linkedState.selectedIntervalId) {
+        this.tracebackStream = null;
+        this.tracebackCache = {
+          visibleIds: [],
+          rightEndpoint: null,
+          leftEndpoint: null
+        };
+        this.newTracebackCache = null;
+        this.lastTracebackTarget = null;
+      } else {
+        this.newTracebackCache = {
+          visibleIds: [],
+          rightEndpoint: null,
+          leftEndpoint: null
+        };
+        const tracebackTarget = this.linkedState.selectedIntervalId;
+        const tracebackStreamUrl = `/datasets/${label}/intervals/${tracebackTarget}/trace?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`;
+        const currentTracebackStream = this.tracebackStream = oboe(tracebackStreamUrl)
+          .fail(error => {
+            this.error = error;
+            console.log(error);
+          })
+          .node('!.*', function (idOrMetadata) {
+            if (currentTracebackStream !== self.tracebackStream) {
+              this.abort();
+              return;
+            } else if (typeof idOrMetadata === 'string') {
+              self.newTracebackCache.visibleIds.push(idOrMetadata);
+            } else if (idOrMetadata.beginTimestamp !== undefined) {
+              self.newTracebackCache.rightEndpoint = idOrMetadata;
+            } else if (idOrMetadata.endTimestamp !== undefined) {
+              self.newTracebackCache.leftEndpoint = idOrMetadata;
+            }
+            self.renderThrottled();
+          })
+          .done(() => {
+            this.tracebackStream = null;
+            this.tracebackCache = this.newTracebackCache;
+            this.newTracebackCache = null;
+            this.lastTracebackTarget = tracebackTarget;
+            this.render();
+          });
+      }
+
+      // We need a render call here as the streams have just started up, mostly
+      // to show the spinner
+      this.render();
+    }, 100);
   }
 }
 LinkedState.COLOR_SCHEMES = {
