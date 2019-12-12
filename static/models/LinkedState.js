@@ -11,19 +11,19 @@ class LinkedState extends Model {
     if (this.metadata.locationNames) {
       this.metadata.locationNames.sort();
     }
+    // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
+    this.intervalCutoff = 7000;
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
     this.cursorPosition = null;
     this.selectedPrimitive = null;
     this.selectedGUID = null;
     this.selectedIntervalId = null;
-    this.intervalCount = null;
-    this._intervalCache = {};
-    this._tracebackCache = {};
+    this.streamCaches = {};
     this._mode = 'Inclusive';
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
-      this.startStreamingIntervals();
-      this.startStreamingTraceback();
+      this.startIntervalStream();
+      this.startTracebackStream();
     })();
   }
   get begin () {
@@ -58,8 +58,8 @@ class LinkedState extends Model {
     begin = Math.max(this.beginLimit, begin);
     end = Math.min(this.endLimit, end);
     this.intervalWindow = [begin, end];
-    this.startStreamingIntervals();
-    this.startStreamingTraceback();
+    this.startIntervalStream();
+    this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalWindow', { begin, end });
     }
@@ -67,20 +67,20 @@ class LinkedState extends Model {
   selectPrimitive (primitive) {
     if (primitive !== this.selectedPrimitive) {
       this.selectedPrimitive = primitive;
-      this.stickyTrigger('primitiveSelected', { primitive });
+      this.trigger('primitiveSelected', { primitive });
     }
   }
   selectGUID (guid) {
     if (guid !== this.selectedGUID) {
       this.selectedGUID = guid;
-      this.stickyTrigger('guidSelected', { guid });
+      this.trigger('guidSelected', { guid });
     }
   }
   selectIntervalId (intervalId) {
     if (intervalId !== this.selectedIntervalId) {
       this.selectedIntervalId = intervalId;
-      this.startStreamingTraceback();
-      this.stickyTrigger('intervalIdSelected', { intervalId });
+      this.startTracebackStream();
+      this.trigger('intervalIdSelected', { intervalId });
     }
   }
   moveCursor (position) {
@@ -121,7 +121,88 @@ class LinkedState extends Model {
     }
     return views;
   }
-  startStreamingIntervals () {
+  get isLoadingIntervals () {
+    return !!this.streamCaches.intervalStream;
+  }
+  get loadedIntervalCount () {
+    return Object.keys(this.streamCaches.intervals || {}).length +
+      Object.keys(this.streamCache.newIntervals || {}).length;
+  }
+  get tooManyIntervals () {
+    return !!this.streamCaches.intervalOverflow;
+  }
+  get isLoadingTraceback () {
+    return !!this.streamCaches.intervalStream;
+  }
+  getCurrentIntervals () {
+    // Combine old data with any new data that's streaming in for more
+    // seamless zooming / panning
+    const oldIntervals = this.streamCaches.intervals || {};
+    const newIntervals = this.streamCaches.newIntervals || {};
+    return Object.assign({}, oldIntervals, newIntervals);
+  }
+  getCurrentTraceback () {
+    // Returns a right-to-left list of intervals
+    let traceback = this.streamCaches.traceback ||
+      this.streamCaches.newTraceback;
+
+    if (traceback === undefined) {
+      return [];
+    }
+
+    // Make a copy of the traceback so we don't mutate the cache
+    traceback = Object.assign({}, traceback);
+
+    // Derive a list of intervals from the streamed list of IDs
+    const intervals = this.getCurrentIntervals();
+    let linkData = [];
+    for (const intervalId of traceback.visibleIds) {
+      if (intervals[intervalId]) {
+        linkData.push(intervals[intervalId]);
+      } else {
+        // The list of IDs came back faster than the intervals themselves, we
+        // should cut off the line at this point (should only happen during
+        // incremental rendering)
+        delete traceback.leftEndpoint;
+        break;
+      }
+    }
+
+    if (linkData.length > 0) {
+      if (traceback.rightEndpoint) {
+        // Construct a fake "interval" for the right endpoint, because we draw
+        // lines to the left (linkData is right-to-left)
+        const parent = linkData[0];
+        linkData.unshift({
+          intervalId: traceback.rightEndpoint.id,
+          Location: traceback.rightEndpoint.location,
+          enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
+          lastParentInterval: {
+            id: parent.intervalId,
+            endTimestamp: parent.leave.Timestamp,
+            location: parent.Location
+          }
+        });
+      }
+      if (traceback.leftEndpoint) {
+        // Copy the important parts of the leftmost interval object, overriding
+        // lastParentInterval (linkData is right-to-left)
+        const firstInterval = linkData[linkData.length - 1];
+        linkData[linkData.length - 1] = {
+          intervalId: firstInterval.intervalId,
+          Location: firstInterval.Location,
+          enter: { Timestamp: firstInterval.enter.Timestamp },
+          lastParentInterval: traceback.leftEndpoint
+        };
+      } else if (!linkData[linkData.length - 1].lastParentInterval) {
+        // In cases where an interval with no parent is at the beginning of the
+        // traceback, there's no line to draw to the left; we can just omit it
+        linkData.splice(-1);
+      }
+    }
+    return linkData;
+  }
+  startIntervalStream () {
     // Debounce the start of this expensive process...
     window.clearTimeout(this._intervalTimeout);
     this._intervalTimeout = window.setTimeout(async () => {
@@ -130,99 +211,98 @@ class LinkedState extends Model {
       // histogram with a single bin (TODO: draw per-location histograms instead
       // of just saying "Too much data; scroll to zoom in?")
       const histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`);
-      this.intervalCount = histogram[0][2];
-      if (this.isEmpty) {
+      const intervalCount = histogram[0][2];
+      if (intervalCount === 0 || intervalCount > this.intervalCutoff) {
         // Empty out whatever we were looking at before and bail immediately
-        this._intervalStream = null;
-        this._intervalCache = {};
-        this._newIntervalCache = null;
-        this.trigger('intervalsReady', this.intervalCache);
+        delete this.streamCaches.intervals;
+        delete this.streamCaches.newIntervals;
+        delete this.streamCaches.intervalStream;
+        delete this.streamCaches.intervalError;
+        this.streamCaches.intervalOverflow = intervalCount > this.intervalCutoff;
+        this.trigger('intervalStreamFinished');
         return;
       }
 
       // Start the interval stream, and collect it in a separate cache to avoid
       // old intervals from disappearing from incremental refreshes
-      this._newIntervalCache = {};
+      this.trigger('intervalStreamStarted');
+      this.streamCaches.newIntervals = {};
+      this.streamCaches.intervalOverflow = false;
       const self = this;
       const intervalStreamUrl = `/datasets/${label}/intervals?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
-      const currentIntervalStream = this._intervalStream = oboe(intervalStreamUrl)
+      const currentIntervalStream = this.streamCaches.intervalStream = oboe(intervalStreamUrl)
         .fail(error => {
-          this._intervalError = error;
+          this.streamCaches.intervalError = error;
           console.warn(error);
         })
         .node('!.*', function (interval) {
-          delete this._intervalError;
-          if (currentIntervalStream !== self._intervalStream) {
+          delete self.streamCaches.intervalError;
+          if (currentIntervalStream !== self.streamCaches.intervalStream) {
             // A different stream has been started; abort this one
             this.abort();
           } else {
             // Store the interval
-            self._newIntervalCache[interval.intervalId] = interval;
-            self.renderThrottled();
+            self.streamCaches.newIntervals[interval.intervalId] = interval;
+            self.trigger('intervalsUpdated');
           }
         })
         .done(() => {
-          this._intervalStream = null;
-          this._intervalCache = this.newIntervalCache;
-          this._newIntervalCache = null;
-          this.trigger('intervalsReady', this.intervalCache);
+          delete this.streamCaches.intervalStream;
+          this.streamCaches.intervals = this.streamCaches.newIntervals;
+          delete this.streamCaches.newIntervals;
+          this.trigger('intervalStreamFinished');
         });
     }, 100);
   }
-  startStreamingTraceback () {
-      // Start the traceback stream (if something is selected), using the same
-      // separate cacheing trick. TODO: we're doing this in conjunction with the
-      // rest of the data collection, only because panning / zooming could
-      // necessitate requesting a longer traceback; ideally changing the selected
-      // interval shouldn't trigger a full data request. Maybe the selection
-      // interaction could be faster if we did this separately?
-      if (!this.linkedState.selectedIntervalId) {
-        this.tracebackStream = null;
-        this.tracebackCache = {
-          visibleIds: [],
-          rightEndpoint: null,
-          leftEndpoint: null
-        };
-        this.newTracebackCache = null;
-        this.lastTracebackTarget = null;
-      } else {
-        this.newTracebackCache = {
-          visibleIds: [],
-          rightEndpoint: null,
-          leftEndpoint: null
-        };
-        const tracebackTarget = this.linkedState.selectedIntervalId;
-        const tracebackStreamUrl = `/datasets/${label}/intervals/${tracebackTarget}/trace?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`;
-        const currentTracebackStream = this.tracebackStream = oboe(tracebackStreamUrl)
-          .fail(error => {
-            this.error = error;
-            console.log(error);
-          })
-          .node('!.*', function (idOrMetadata) {
-            if (currentTracebackStream !== self.tracebackStream) {
-              this.abort();
-              return;
-            } else if (typeof idOrMetadata === 'string') {
-              self.newTracebackCache.visibleIds.push(idOrMetadata);
-            } else if (idOrMetadata.beginTimestamp !== undefined) {
-              self.newTracebackCache.rightEndpoint = idOrMetadata;
-            } else if (idOrMetadata.endTimestamp !== undefined) {
-              self.newTracebackCache.leftEndpoint = idOrMetadata;
-            }
-            self.renderThrottled();
-          })
-          .done(() => {
-            this.tracebackStream = null;
-            this.tracebackCache = this.newTracebackCache;
-            this.newTracebackCache = null;
-            this.lastTracebackTarget = tracebackTarget;
-            this.render();
-          });
+  startTracebackStream () {
+    // Debounce the start of this expensive process...
+    window.clearTimeout(this._tracebackTimeout);
+    this._tracebackTimeout = window.setTimeout(async () => {
+      // Have we even selected anything?
+      const tracebackTarget = this.linkedState.selectedIntervalId;
+      if (!tracebackTarget) {
+        delete this.streamCaches.traceback;
+        delete this.streamCaches.newTraceback;
+        delete this.streamCaches.tracebackStream;
+        delete this.streamCaches.tracebackError;
+        this.trigger('tracebackStreamFinished');
+        return;
       }
 
-      // We need a render call here as the streams have just started up, mostly
-      // to show the spinner
-      this.render();
+      this.trigger('tracebackStreamStarted');
+      this.streamCaches.newTraceback = {
+        visibleIds: [],
+        rightEndpoint: null,
+        leftEndpoint: null
+      };
+      const self = this;
+      const label = encodeURIComponent(this.label);
+      const tracebackStreamUrl = `/datasets/${label}/intervals/${tracebackTarget}/trace?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
+      const currentTracebackStream = this.streamCaches.tracebackStream = oboe(tracebackStreamUrl)
+        .fail(error => {
+          this.streamCaches.tracebackError = error;
+          console.warn(error);
+        })
+        .node('!.*', function (idOrMetadata) {
+          delete self.streamCaches.tracebackError;
+          if (currentTracebackStream !== self.streamCaches.tracebackStream) {
+            this.abort();
+            return;
+          } else if (typeof idOrMetadata === 'string') {
+            self.streamCaches.newTraceback.visibleIds.push(idOrMetadata);
+          } else if (idOrMetadata.beginTimestamp !== undefined) {
+            self.streamCaches.newTraceback.rightEndpoint = idOrMetadata;
+          } else if (idOrMetadata.endTimestamp !== undefined) {
+            self.streamCaches.newTraceback.leftEndpoint = idOrMetadata;
+          }
+          self.trigger('tracebackUpdated');
+        })
+        .done(() => {
+          delete this.streamCaches.tracebackStream;
+          this.streamCaches.traceback = this.streamCaches.newTraceback;
+          delete this.streamCaches.newTraceback;
+          this.trigger('tracebackStreamFinished');
+        });
     }, 100);
   }
 }
