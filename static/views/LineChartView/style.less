@@ -1,0 +1,52 @@
+@import '../../style/colors.less';
+
+.LineChartView {
+  cursor: grab;
+  touch-action: none; /* Don't zoom the browser when the user pinches */
+  &:active {
+    cursor: grabbing;
+  }
+  text {
+    font: 9px sans-serif;
+  }
+  .background rect {
+    fill: transparent;
+  }
+  .cursor {
+    stroke-width: 1px;
+    stroke: @separatorColor;
+  }
+  .yAxis line {
+    stroke-weight: 1px;
+    stroke: @separatorColor;
+  }
+
+  .bar {
+    cursor: pointer;
+    .outline {
+      fill: none;
+      stroke-width: 1px;
+      stroke: @overviewColor;
+      vector-effect: non-scaling-stroke;
+    }
+    .area {
+      stroke: none;
+      opacity: 0.25;
+      fill: @overviewColor;
+    }
+    &:hover {
+      .area { opacity: 0.5; }
+    }
+    .traceback {
+      stroke: black;
+    }
+  }
+
+  .lines {
+    .line {
+      stroke-width: 1px;
+      stroke: black; /* TODO: Unify me */
+      vector-effect: non-scaling-stroke;
+    }
+  }
+}
