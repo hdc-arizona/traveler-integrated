@@ -18,13 +18,17 @@ class LinkedState extends Model {
     this.selectedPrimitive = null;
     this.selectedGUID = null;
     this.selectedIntervalId = null;
-    this.streamCaches = {};
+    this.caches = {};
     this._mode = 'Inclusive';
+    this.histogramResolution = 512;
+
+    // Start processes for collecting data
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
-      this.startIntervalStream();
-      this.startTracebackStream();
     })();
+    this.startIntervalStream();
+    this.startTracebackStream();
+    this.updateHistogram();
   }
   get begin () {
     return this.intervalWindow[0];
@@ -45,6 +49,10 @@ class LinkedState extends Model {
     this._mode = newMode;
     this.trigger('changeMode');
   }
+  setHistogramResolution (value) {
+    this.histogramResolution = value;
+    this.updateHistogram();
+  }
   setIntervalWindow ({
     begin = this.begin,
     end = this.end
@@ -58,6 +66,7 @@ class LinkedState extends Model {
     begin = Math.max(this.beginLimit, begin);
     end = Math.min(this.endLimit, end);
     this.intervalWindow = [begin, end];
+    this.updateHistogram();
     this.startIntervalStream();
     this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
@@ -67,6 +76,7 @@ class LinkedState extends Model {
   selectPrimitive (primitive) {
     if (primitive !== this.selectedPrimitive) {
       this.selectedPrimitive = primitive;
+      this.updateHistogram();
       this.trigger('primitiveSelected', { primitive });
     }
   }
@@ -122,29 +132,32 @@ class LinkedState extends Model {
     return views;
   }
   get isLoadingIntervals () {
-    return !!this.streamCaches.intervalStream;
+    return !!this.caches.intervalStream;
   }
   get loadedIntervalCount () {
-    return Object.keys(this.streamCaches.intervals || {}).length +
-      Object.keys(this.streamCaches.newIntervals || {}).length;
+    return Object.keys(this.caches.intervals || {}).length +
+      Object.keys(this.caches.newIntervals || {}).length;
   }
   get tooManyIntervals () {
-    return !!this.streamCaches.intervalOverflow;
+    return !!this.caches.intervalOverflow;
   }
   get isLoadingTraceback () {
-    return !!this.streamCaches.intervalStream;
+    return !!this.caches.intervalStream;
+  }
+  get isLoadingHistogram () {
+    return !this.caches.histogram;
   }
   getCurrentIntervals () {
     // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
-    const oldIntervals = this.streamCaches.intervals || {};
-    const newIntervals = this.streamCaches.newIntervals || {};
+    const oldIntervals = this.caches.intervals || {};
+    const newIntervals = this.caches.newIntervals || {};
     return Object.assign({}, oldIntervals, newIntervals);
   }
   getCurrentTraceback () {
     // Returns a right-to-left list of intervals
-    let traceback = this.streamCaches.traceback ||
-      this.streamCaches.newTraceback;
+    let traceback = this.caches.traceback ||
+      this.caches.newTraceback;
 
     if (traceback === undefined) {
       return [];
@@ -215,15 +228,15 @@ class LinkedState extends Model {
         const histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`);
         const intervalCount = histogram[0][2];
         bailEarly = intervalCount === 0 || intervalCount > this.intervalCutoff;
-        this.streamCaches.intervalOverflow = intervalCount > this.intervalCutoff;
+        this.caches.intervalOverflow = intervalCount > this.intervalCutoff;
       }
 
       if (bailEarly) {
         // Empty out whatever we were looking at before and bail immediately
-        delete this.streamCaches.intervals;
-        delete this.streamCaches.newIntervals;
-        delete this.streamCaches.intervalStream;
-        delete this.streamCaches.intervalError;
+        delete this.caches.intervals;
+        delete this.caches.newIntervals;
+        delete this.caches.intervalStream;
+        delete this.caches.intervalError;
         this.trigger('intervalStreamFinished');
         return;
       }
@@ -231,30 +244,30 @@ class LinkedState extends Model {
       // Start the interval stream, and collect it in a separate cache to avoid
       // old intervals from disappearing from incremental refreshes
       this.trigger('intervalStreamStarted');
-      this.streamCaches.newIntervals = {};
-      this.streamCaches.intervalOverflow = false;
+      this.caches.newIntervals = {};
+      this.caches.intervalOverflow = false;
       const self = this;
       const intervalStreamUrl = `/datasets/${label}/intervals?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
-      const currentIntervalStream = this.streamCaches.intervalStream = oboe(intervalStreamUrl)
+      const currentIntervalStream = this.caches.intervalStream = oboe(intervalStreamUrl)
         .fail(error => {
-          this.streamCaches.intervalError = error;
+          this.caches.intervalError = error;
           console.warn(error);
         })
         .node('!.*', function (interval) {
-          delete self.streamCaches.intervalError;
-          if (currentIntervalStream !== self.streamCaches.intervalStream) {
+          delete self.caches.intervalError;
+          if (currentIntervalStream !== self.caches.intervalStream) {
             // A different stream has been started; abort this one
             this.abort();
           } else {
             // Store the interval
-            self.streamCaches.newIntervals[interval.intervalId] = interval;
+            self.caches.newIntervals[interval.intervalId] = interval;
             self.trigger('intervalsUpdated');
           }
         })
         .done(() => {
-          delete this.streamCaches.intervalStream;
-          this.streamCaches.intervals = this.streamCaches.newIntervals;
-          delete this.streamCaches.newIntervals;
+          delete this.caches.intervalStream;
+          this.caches.intervals = this.caches.newIntervals;
+          delete this.caches.newIntervals;
           this.trigger('intervalStreamFinished');
         });
     }, 100);
@@ -265,16 +278,16 @@ class LinkedState extends Model {
     this._tracebackTimeout = window.setTimeout(async () => {
       // Is there even anything to stream?
       if (!this.selectedIntervalId || this.intervalWindow === null) {
-        delete this.streamCaches.traceback;
-        delete this.streamCaches.newTraceback;
-        delete this.streamCaches.tracebackStream;
-        delete this.streamCaches.tracebackError;
+        delete this.caches.traceback;
+        delete this.caches.newTraceback;
+        delete this.caches.tracebackStream;
+        delete this.caches.tracebackError;
         this.trigger('tracebackStreamFinished');
         return;
       }
 
       this.trigger('tracebackStreamStarted');
-      this.streamCaches.newTraceback = {
+      this.caches.newTraceback = {
         visibleIds: [],
         rightEndpoint: null,
         leftEndpoint: null
@@ -282,31 +295,75 @@ class LinkedState extends Model {
       const self = this;
       const label = encodeURIComponent(this.label);
       const tracebackStreamUrl = `/datasets/${label}/intervals/${this.selectedIntervalId}/trace?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
-      const currentTracebackStream = this.streamCaches.tracebackStream = oboe(tracebackStreamUrl)
+      const currentTracebackStream = this.caches.tracebackStream = oboe(tracebackStreamUrl)
         .fail(error => {
-          this.streamCaches.tracebackError = error;
+          this.caches.tracebackError = error;
           console.warn(error);
         })
         .node('!.*', function (idOrMetadata) {
-          delete self.streamCaches.tracebackError;
-          if (currentTracebackStream !== self.streamCaches.tracebackStream) {
+          delete self.caches.tracebackError;
+          if (currentTracebackStream !== self.caches.tracebackStream) {
             this.abort();
             return;
           } else if (typeof idOrMetadata === 'string') {
-            self.streamCaches.newTraceback.visibleIds.push(idOrMetadata);
+            self.caches.newTraceback.visibleIds.push(idOrMetadata);
           } else if (idOrMetadata.beginTimestamp !== undefined) {
-            self.streamCaches.newTraceback.rightEndpoint = idOrMetadata;
+            self.caches.newTraceback.rightEndpoint = idOrMetadata;
           } else if (idOrMetadata.endTimestamp !== undefined) {
-            self.streamCaches.newTraceback.leftEndpoint = idOrMetadata;
+            self.caches.newTraceback.leftEndpoint = idOrMetadata;
           }
           self.trigger('tracebackUpdated');
         })
         .done(() => {
-          delete this.streamCaches.tracebackStream;
-          this.streamCaches.traceback = this.streamCaches.newTraceback;
-          delete this.streamCaches.newTraceback;
+          delete this.caches.tracebackStream;
+          this.caches.traceback = this.caches.newTraceback;
+          delete this.caches.newTraceback;
           this.trigger('tracebackStreamFinished');
         });
+    }, 100);
+  }
+  getCurrentHistogramData () {
+    return {
+      histogram: this.caches.histogram,
+      primitiveHistogram: this.caches.primitiveHistogram,
+      domain: this.caches.histogramDomain,
+      maxCount: this.caches.histogramMaxCount,
+      error: this.caches.histogramError
+    };
+  }
+  updateHistogram () {
+    // Debounce...
+    window.clearTimeout(this._histogramTimeout);
+    this._histogramTimeout = window.setTimeout(async () => {
+      delete this.caches.histogram;
+      delete this.caches.primitiveHistogram;
+      delete this.caches.histogramDomain;
+      delete this.caches.histogramMaxCount;
+
+      const label = encodeURIComponent(this.label);
+      const urls = [`/datasets/${label}/histogram?mode=utilization&bins=${this.histogramResolution}`];
+      if (this.selectedPrimitive) {
+        const primitive = encodeURIComponent(this.selectedPrimitive);
+        urls.push(`/datasets/${label}/histogram?mode=utilization&bins=${this.histogramResolution}&primitive=${primitive}`);
+      }
+      try {
+        [this.caches.histogram, this.caches.primitiveHistogram] = await Promise.all(urls.map(url => d3.json(url)));
+      } catch (e) {
+        this.histogramError = e;
+        return;
+      }
+      delete this.histogramError;
+
+      let maxCount = 0;
+      const domain = [Infinity, -Infinity];
+      for (const [begin, end, count] of this.caches.histogram) {
+        maxCount = Math.max(maxCount, count);
+        domain[0] = Math.min(begin, domain[0]);
+        domain[1] = Math.max(end, domain[1]);
+      }
+      this.caches.histogramDomain = domain;
+      this.caches.histogramMaxCount = maxCount;
+      this.trigger('histogramUpdated');
     }, 100);
   }
 }
