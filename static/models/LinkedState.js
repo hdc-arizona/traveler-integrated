@@ -126,7 +126,7 @@ class LinkedState extends Model {
   }
   get loadedIntervalCount () {
     return Object.keys(this.streamCaches.intervals || {}).length +
-      Object.keys(this.streamCache.newIntervals || {}).length;
+      Object.keys(this.streamCaches.newIntervals || {}).length;
   }
   get tooManyIntervals () {
     return !!this.streamCaches.intervalOverflow;
@@ -210,15 +210,20 @@ class LinkedState extends Model {
       // First check whether we're asking for too much data by getting a
       // histogram with a single bin (TODO: draw per-location histograms instead
       // of just saying "Too much data; scroll to zoom in?")
-      const histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`);
-      const intervalCount = histogram[0][2];
-      if (intervalCount === 0 || intervalCount > this.intervalCutoff) {
+      let bailEarly = this.intervalWindow === null;
+      if (!bailEarly) {
+        const histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`);
+        const intervalCount = histogram[0][2];
+        bailEarly = intervalCount === 0 || intervalCount > this.intervalCutoff;
+        this.streamCaches.intervalOverflow = intervalCount > this.intervalCutoff;
+      }
+
+      if (bailEarly) {
         // Empty out whatever we were looking at before and bail immediately
         delete this.streamCaches.intervals;
         delete this.streamCaches.newIntervals;
         delete this.streamCaches.intervalStream;
         delete this.streamCaches.intervalError;
-        this.streamCaches.intervalOverflow = intervalCount > this.intervalCutoff;
         this.trigger('intervalStreamFinished');
         return;
       }
@@ -258,9 +263,8 @@ class LinkedState extends Model {
     // Debounce the start of this expensive process...
     window.clearTimeout(this._tracebackTimeout);
     this._tracebackTimeout = window.setTimeout(async () => {
-      // Have we even selected anything?
-      const tracebackTarget = this.linkedState.selectedIntervalId;
-      if (!tracebackTarget) {
+      // Is there even anything to stream?
+      if (!this.selectedIntervalId || this.intervalWindow === null) {
         delete this.streamCaches.traceback;
         delete this.streamCaches.newTraceback;
         delete this.streamCaches.tracebackStream;
@@ -277,7 +281,7 @@ class LinkedState extends Model {
       };
       const self = this;
       const label = encodeURIComponent(this.label);
-      const tracebackStreamUrl = `/datasets/${label}/intervals/${tracebackTarget}/trace?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
+      const tracebackStreamUrl = `/datasets/${label}/intervals/${this.selectedIntervalId}/trace?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
       const currentTracebackStream = this.streamCaches.tracebackStream = oboe(tracebackStreamUrl)
         .fail(error => {
           this.streamCaches.tracebackError = error;
