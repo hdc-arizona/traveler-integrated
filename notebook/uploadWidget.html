@@ -25,7 +25,11 @@
 <span class="spinner">
   Uploading performance data...
 </span>
-<a class="visLink" target="myviz" style="display:none">Show visualization</a>
+<span class="visLinks" style="display:none">
+  Visualize in
+  <a class="openInWindow" target="myviz">another browser tab</a>
+  <!--or an <a class="openInIframe">iframe</a>-->
+</span>
 <details class="showHandle">
   <summary>Details</summary>
   <pre class="uploadLog"></pre>
@@ -41,15 +45,19 @@
     let currentLog = '';
     currentContainer.receiveObject = function (obj) {
       if (obj.datasetLabel) {
-        currentContainer.querySelector('.visLink')
+        currentContainer.querySelector('.openInWindow')
           .setAttribute('href', 'http://localhost:8000/static/interface.html#' + window.encodeURIComponent(obj.datasetLabel))
+        currentContainer.querySelector('.openInIframe')
+          .addEventListener('click', () => {
+            // TODO
+          });
       } else if (obj.messageChunk) {
         currentLog += obj.messageChunk + '\n';
         currentContainer.querySelector('.uploadLog').innerText = currentLog;
       } else if (obj.done) {
         currentContainer.querySelector('.spinner')
           .setAttribute('style', 'display:none');
-        currentContainer.querySelector('.visLink')
+        currentContainer.querySelector('.visLinks')
           .removeAttribute('style');
       }
     };

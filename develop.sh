@@ -1,5 +1,5 @@
 # Launch traveler-integrated in the background
-python3 serve.py --db_dir /traveler-integrated/db &
+python3 serve.py --db_dir /traveler-dev/db &
 
 # Launch jupyter
 PORT=8789

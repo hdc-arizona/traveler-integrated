@@ -3,9 +3,11 @@ FROM stevenrbrandt/phylanx.test:working
 USER root
 RUN echo jovyan:fishfood77 | chpasswd
 
+# Fix otf2 path
+ENV PATH="/usr/local/otf2/bin:${PATH}"
+
 # Set up traveler-integrated
 WORKDIR /
-# RUN git clone https://github.com/alex-r-bigelow/traveler-integrated
 COPY . /traveler-integrated
 WORKDIR /traveler-integrated
 RUN find . | xargs chown jovyan
