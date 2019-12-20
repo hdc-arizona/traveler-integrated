@@ -1,4 +1,4 @@
-/* globals d3, oboe */
+/* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
@@ -18,83 +18,16 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .paddingInner(0.2)
       .paddingOuter(0.1);
 
-    this.stream = null;
-    this.cache = {};
-    this.newCache = null;
-    this.intervalCount = 0;
-
-    // Don't bother drawing bars if there are more than 10000 visible intervals
-    this.renderCutoff = 10000;
-
-    // Override uki's default .1 second debouncing of render() because we want
-    // to throttle incremental updates to at most once per second
-    this.debounceWait = 1000;
-
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
     GanttView.DOM_COUNT++;
   }
-  getData () {
-    // Debounce the start of this expensive process...
-    // (but flag that we're loading)
-    window.clearTimeout(this._resizeTimeout);
-    this._resizeTimeout = window.setTimeout(async () => {
-      const label = encodeURIComponent(this.layoutState.label);
-      const intervalWindow = this.linkedState.intervalWindow;
-      const self = this;
-      // First check whether we're asking for too much data by getting a
-      // histogram with a single bin (TODO: draw per-location histograms instead
-      // of just saying "Too much data; scroll to zoom in?")
-      this.histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`);
-      this.intervalCount = this.histogram[0][2];
-      if (this.isEmpty) {
-        // Empty out whatever we were looking at before and bail immediately
-        this.stream = null;
-        this.cache = {};
-        this.newCache = null;
-        this.render();
-        return;
-      }
 
-      // Okay, start the stream, and collect it in a separate cache to avoid
-      // old intervals from disappearing from incremental refreshes
-      this.newCache = {};
-      this.waitingOnIncrementalRender = false;
-      const currentStream = this.stream = oboe(`/datasets/${label}/intervals?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
-        .fail(error => {
-          this.error = error;
-          console.log(error);
-        })
-        .node('!.*', function (interval) {
-          if (currentStream !== self.stream) {
-            // A different stream has been started; abort this one
-            this.abort();
-          } else {
-            // Store the interval
-            const key = interval.enter.Timestamp + '_' + interval.leave.Timestamp + '_' + interval.Location;
-            self.newCache[key] = interval;
-            if (!self.waitingOnIncrementalRender) {
-              // self.render() is debounced; this converts it to throttling,
-              // rate-limiting incremental refreshes by this.debounceWait
-              self.render();
-              self.waitingOnIncrementalRender = true;
-            }
-          }
-        })
-        .done(() => {
-          this.stream = null;
-          this.cache = this.newCache;
-          this.newCache = null;
-          this.render();
-        });
-      this.render();
-    }, 100);
-  }
   get isLoading () {
-    return super.isLoading || this.stream !== null;
+    return super.isLoading || this.linkedState.isLoadingIntervals || this.linkedState.isLoadingTraceback;
   }
   get isEmpty () {
-    return this.error || this.intervalCount === 0 || this.intervalCount > this.renderCutoff;
+    return this.error || this.linkedState.loadedIntervalCount === 0;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
@@ -121,6 +54,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       bottom: 40,
       left: 40
     };
+    this._bounds = this.getChartBounds();
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
@@ -131,37 +65,57 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .attr('id', clipId);
     this.content.select('.clippedStuff')
       .attr('clip-path', `url(#${clipId})`);
+    this.drawClip();
 
-    // Set up zoom / pan interactions
-    this.setupZoomAndPan();
-
-    // Update scales whenever something changes the brush
-    this.linkedState.on('newIntervalWindow', () => {
-      this.xScale.domain(this.linkedState.intervalWindow);
-      this.yScale.domain(this.linkedState.metadata.locationNames);
-      // Abort + re-start the stream
-      this.getData();
-    });
-    // Initialize the scales / stream
-    this.xScale.domain(this.linkedState.intervalWindow);
-    this.yScale.domain(this.linkedState.metadata.locationNames);
-    this.getData();
-
-    // Draw the axes right away (because we have a longer debounceWait than
-    // normal, there's an initial ugly flash before draw() gets called)
-    this._bounds = this.getChartBounds();
-    this.drawAxes();
-
-    // Redraw when a new primitive is selected
-    // TODO: can probably do this immediately in a more light-weight way?
-    this.linkedState.on('primitiveSelected', () => { this.render(); });
-
+    // Deselect the primitive / interval selections when the user clicks the background
     this.content.select('.background')
       .on('click', () => {
         this.linkedState.selectPrimitive(null);
         this.linkedState.selectIntervalId(null);
-        this.render();
       });
+
+    // Initialize the scales / stream
+    this.xScale.domain(this.linkedState.intervalWindow);
+    this.yScale.domain(this.linkedState.metadata.locationNames);
+
+    // Set up zoom / pan interactions
+    this.setupZoomAndPan();
+
+    // Set up listeners on the model
+    this.linkedState.on('newIntervalWindow', () => {
+      // Update scales whenever something changes the brush
+      this.xScale.domain(this.linkedState.intervalWindow);
+      this.yScale.domain(this.linkedState.metadata.locationNames);
+      // Update the axes immediately for smooth dragging responsiveness
+      this.drawAxes();
+      // Make sure we render eventually
+      this.render();
+    });
+    const showSpinner = () => { this.drawSpinner(); };
+    this.linkedState.on('intervalStreamStarted', showSpinner);
+    this.linkedState.on('tracebackStreamStarted', showSpinner);
+    this.linkedState.on('intervalsUpdated', () => {
+      // This is an incremental update; we don't need to do a full render()...
+      // (but still debounce this, as we don't want to call drawBars() for every
+      // new interval)
+      window.clearTimeout(this._incrementalIntervalTimeout);
+      this._incrementalIntervalTimeout = window.setTimeout(() => {
+        this.drawBars(this.linkedState.getCurrentIntervals());
+      });
+    });
+    this.linkedState.on('tracebackUpdated', () => {
+      // This is an incremental update; we don't need to do a full render()...
+      // (but still debounce this, as we don't want to call drawLinks() for
+      // every new interval)
+      window.clearTimeout(this._incrementalTracebackTimeout);
+      this._incrementalTracebackTimeout = window.setTimeout(() => {
+        this.drawLinks(this.linkedState.getCurrentTraceback());
+      });
+    });
+    const justFullRender = () => { this.render(); };
+    this.linkedState.on('primitiveSelected', justFullRender);
+    this.linkedState.on('intervalStreamFinished', justFullRender);
+    this.linkedState.on('tracebackStreamFinished', justFullRender);
   }
   draw () {
     super.draw();
@@ -171,61 +125,32 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     } else if (this.isEmpty) {
       if (this.error) {
         this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
-      } else if (this.intervalCount === 0) {
-        this.emptyStateDiv.html('<p>No data in the current view</p>');
-      } else {
+      } else if (this.linkedState.tooManyIntervals) {
         this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
+      } else {
+        this.emptyStateDiv.html('<p>No data in the current view</p>');
       }
     }
-    // Update the dimensions of the plot in case we were resized (NOT updated by
-    // immediately-drawn things like drawAxes that get executed repeatedly by
-    // scrolling / panning)
+    // Update the dimensions of the plot in case we were resized
+    // (window.getBoundingClientRect() is semi-expensive, so we DON'T update
+    // this during incremental / immediate draw calls in setup()'s listeners or
+    // zooming / panning that need more responsiveness)
     this._bounds = this.getChartBounds();
 
-    // Combine old data with any new data that's streaming in
-    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
-
-    // Hide the small spinner
-    this.content.select('.small.spinner').style('display', 'none');
+    // Update whether we're showing the spinner
+    this.drawSpinner();
     // Update the clip rect
     this.drawClip();
     // Update the axes (also updates scales)
     this.drawAxes();
 
-    if (this.linkedState.selectedIntervalId) {
-      // This is partial clone code from drawLinks
-      // Collect only the links in the back-path of the selected IntervalId
-      // TODO Make me more efficient, this has a lot of passes
-      let workingId = this.linkedState.selectedIntervalId;
-      let inView = true;
-      while (inView) {
-        let interval = data.find(d => d.value.intervalId === workingId);
-
-        // Only continue if interval is found and has a link backwards
-        if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
-          interval.value.inTraceBack = true;
-        } else {
-          inView = false;
-          continue;
-        }
-
-        workingId = interval.value.lastParentInterval.id;
-        // Only continue if previous interval is drawn
-        if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
-          inView = false;
-        }
-      }
-    } else {
-      data.map(d => { d.value.inTraceBack = false; return d; });
-    }
-
     // Update the bars
-    this.drawBars(data);
+    this.drawBars(this.linkedState.getCurrentIntervals());
     // Update the links
-    this.drawLinks(data);
-
-    // Update the incremental flag so that we can call render again if needed
-    this.waitingOnIncrementalRender = false;
+    this.drawLinks(this.linkedState.getCurrentTraceback());
+  }
+  drawSpinner () {
+    this.content.select('.small.spinner').style('display', this.isLoading ? null : 'none');
   }
   drawClip () {
     this.content.select('clipPath rect')
@@ -272,14 +197,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.content.select('.yAxisLabel')
       .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
   }
-  drawBars (data) {
+  drawBars (intervals) {
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.bars').attr('transform', null);
     }
 
     let bars = this.content.select('.bars')
-      .selectAll('.bar').data(data, d => d.key);
+      .selectAll('.bar').data(d3.entries(intervals), d => d.key);
     bars.exit().remove();
     const barsEnter = bars.enter().append('g')
       .classed('bar', true);
@@ -367,35 +292,28 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         this.render();
       });
   }
-  drawLinks (data) {
+  drawLinks (linkData) {
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
     }
-    let linkData = [];
-    if (!this.linkedState.selectedIntervalId) {
-      linkData = data.filter(d => d.value.hasOwnProperty('lastParentInterval'));
-    } else {
-      linkData = data.filter(d => d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack);
-    }
 
     let links = this.content.select('.links')
-      .selectAll('.link').data(linkData, d => d.key);
+      .selectAll('.link').data(linkData, d => d.intervalId);
     links.exit().remove();
     const linksEnter = links.enter().append('g')
       .classed('link', true);
     links = links.merge(linksEnter);
 
-    // links.attr('transform', d => `translate(${this.xScale(d.value.lastGuidEndTimestamp)},${this.yScale(d.value.lastGuidLocation)})`);
     let halfwayOffset = this.yScale.bandwidth() / 2;
 
     linksEnter.append('line')
       .classed('line', true);
     links.selectAll('line')
-      .attr('x1', d => this.xScale(d.value.lastParentInterval.endTimestamp))
-      .attr('x2', d => this.xScale(d.value.enter.Timestamp))
-      .attr('y1', d => this.yScale(d.value.lastParentInterval.location) + halfwayOffset)
-      .attr('y2', d => this.yScale(d.value.Location) + halfwayOffset);
+      .attr('x1', d => this.xScale(d.lastParentInterval.endTimestamp))
+      .attr('x2', d => this.xScale(d.enter.Timestamp))
+      .attr('y1', d => this.yScale(d.lastParentInterval.location) + halfwayOffset)
+      .attr('y2', d => this.yScale(d.Location) + halfwayOffset);
   }
   setupZoomAndPan () {
     this.initialDragState = null;
@@ -432,8 +350,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         // views immediately
         this.linkedState.setIntervalWindow(actualBounds);
 
-        // For responsiveness, draw the axes immediately (the debounced, full
-        // render() triggered by changing linkedState may take a while)
+        // For responsiveness, draw the axes immediately (waiting for the
+        // events to propagate from setIntervalWindow may take a while)
         this.drawAxes();
 
         // Patch a temporary scale transform to the bars / links layers (this
