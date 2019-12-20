@@ -12,7 +12,7 @@ from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 # Possible files / metadata structures that we create / open / update
 shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
 requiredShelves = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['intervalIndexes', 'metricIndexes', 'trees', 'physl', 'python', 'cpp']
+pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
 
@@ -409,7 +409,6 @@ class Database:
             'locations': {},
             'both': {}
         }
-        metricIndexes = self.datasets[label]['metricIndexes'] = {}
         guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
         self.datasets[label]['meta']['storedEvents'] = storeEvents
         if storeEvents:
@@ -421,6 +420,9 @@ class Database:
         await log('Parsing OTF2 events (.=2500 events)')
         newR = seenR = 0
         currentEvent = None
+        includedMetrics = 0
+        skippedMetricsForMissingPrior = 0
+        skippedMetricsForMismatch = 0
 
         for line in file:
             eventLineMatch = eventLineParser.match(line)
@@ -436,12 +438,14 @@ class Database:
                 timestamp = int(metricLineMatch.group(2))
                 metricType = metricLineMatch.group(3)
                 value = int(float(metricLineMatch.group(4)))
-                if location not in metricIndexes:
-                    metricIndexes[location] = {}
-                if metricType not in metricIndexes[location]:
-                    metricIndexes[location][metricType] = IntervalTree()
-                miv = Interval(timestamp, timestamp+1, value)
-                metricIndexes[location][metricType].add(miv)
+
+                if currentEvent is None:
+                    skippedMetricsForMissingPrior += 1
+                elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
+                    skippedMetricsForMismatch += 1
+                else:
+                    includedMetrics += 1
+                    currentEvent['metrics'][metricType] = value
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:
@@ -455,7 +459,7 @@ class Database:
                     # Add to primitive / guid counts
                     newR += counts[0]
                     seenR += counts[1]
-                currentEvent = {}
+                currentEvent = {'metrics': {}}
                 currentEvent['Event'] = eventLineMatch.group(1)
                 currentEvent['Location'] = eventLineMatch.group(2)
                 currentEvent['Timestamp'] = int(eventLineMatch.group(3))
@@ -478,6 +482,7 @@ class Database:
         await log('')
         await log('Finished processing %i events' % numEvents)
         await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
+        await log('Metrics included: %d; skpped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
 
         # Now that we've seen all the locations, store that list in our metadata
         locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
