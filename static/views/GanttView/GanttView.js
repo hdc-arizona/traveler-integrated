@@ -102,9 +102,13 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         this.newTracebackCache = null;
         this.lastTracebackTarget = null;
       } else {
-        this.newTracebackCache = [];
+        this.newTracebackCache = {
+          visibleIds: [],
+          rightEndpoint: null,
+          leftEndpoint: null
+        };
         const tracebackTarget = this.linkedState.selectedIntervalId;
-        const tracebackStreamUrl = `/datasets/${label}/intervals/${tracebackTarget}?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`;
+        const tracebackStreamUrl = `/datasets/${label}/intervals/${tracebackTarget}/trace?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`;
         const currentTracebackStream = this.tracebackStream = oboe(tracebackStreamUrl)
           .fail(error => {
             this.error = error;
@@ -115,13 +119,13 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
               this.abort();
               return;
             } else if (typeof idOrMetadata === 'string') {
-              this.newTracebackCache.visibleIds.push(idOrMetadata);
+              self.newTracebackCache.visibleIds.push(idOrMetadata);
             } else if (idOrMetadata.beginTimestamp !== undefined) {
-              this.newTracebackCache.rightEndpoint = idOrMetadata;
+              self.newTracebackCache.rightEndpoint = idOrMetadata;
             } else if (idOrMetadata.endTimestamp !== undefined) {
-              this.newTracebackCache.leftEndpoint = idOrMetadata;
+              self.newTracebackCache.leftEndpoint = idOrMetadata;
             }
-            this.renderThrottled();
+            self.renderThrottled();
           })
           .done(() => {
             this.tracebackStream = null;
@@ -192,6 +196,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Abort + re-start the stream
       this.getData();
     });
+    // Retrieve new data whenever the selected interval changes
+    this.linkedState.on('intervalIdSelected', () => {
+      this.getData();
+    });
     // Initialize the scales / stream
     this.xScale.domain(this.linkedState.intervalWindow);
     this.yScale.domain(this.linkedState.metadata.locationNames);
@@ -232,32 +240,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // scrolling / panning)
     this._bounds = this.getChartBounds();
 
-    // Combine old intervals with any new ones that are streaming in for more
+    // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
     const intervals = Object.assign({}, this.intervalCache, this.newIntervalCache || {});
-    // Do the same with the traceback, but only if the target is the same as
-    // the last time that we fetched data
-    let traceback;
-    if (this.linkedState.selectedIntervalId !== null &&
-        this.linkedState.selectedIntervalId === this.lastTracebackTarget) {
-      // Combine the list of visibleIds, but only include the left / right
-      // endpoints of newTracebackCache (in the event that the target interval
-      // was just scrolled back into view, don't draw any lines beyond it)
-      traceback = {
-        visibleIds: this.newTracebackCache.visibleIds.length > this.tracebackCache.visibleIds.length
-          ? this.newTracebackCache.visibleIds : this.tracebackCache.visibleIds,
-        leftEndpoint: this.newTracebackCache.leftEndpoint,
-        rightEndpoint: this.newTracebackCache.rightEndpoint
-      };
-    } else if (this.newTracebackCache !== null) {
-      // Need to make a copy, because otherwise this.drawLinks() could
-      // potentially mutate this.newTracebackCache
-      traceback = Object.assign({}, this.newTracebackCache);
-    } else {
-      // Need to make a copy, because otherwise this.drawLinks() could
-      // potentially mutate this.tracebackCache
-      traceback = Object.assign({}, this.tracebackCache);
-    }
+    const linkData = this.getLinkData(intervals);
 
     // Update whether we're showing the spinner
     this.content.select('.small.spinner').style('display', this.isLoading ? null : 'none');
@@ -269,7 +255,60 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Update the bars
     this.drawBars(intervals);
     // Update the links
-    this.drawLinks(intervals, traceback);
+    this.drawLinks(linkData);
+  }
+  getLinkData (intervals) {
+    // Make a copy of the newest available cache, because otherwise
+    // this.drawLinks() could potentially mutate the original
+    const traceback = Object.assign({}, this.newTracebackCache || this.tracebackCache);
+
+    // Derive a list of intervals from the streamed list of IDs
+    let linkData = [];
+    for (const intervalId of traceback.visibleIds) {
+      if (intervals[intervalId]) {
+        linkData.push(intervals[intervalId]);
+      } else {
+        // The list of IDs came back faster than the intervals themselves, we
+        // should cut off the line at this point (should only happen during
+        // incremental rendering)
+        delete traceback.leftEndpoint;
+        break;
+      }
+    }
+
+    if (linkData.length > 0) {
+      if (traceback.rightEndpoint) {
+        // Construct a fake "interval" for the right endpoint, because we draw
+        // lines to the left (linkData is right-to-left)
+        const parent = linkData[0];
+        linkData.unshift({
+          intervalId: traceback.rightEndpoint.id,
+          Location: traceback.rightEndpoint.location,
+          enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
+          lastParentInterval: {
+            id: parent.intervalId,
+            endTimestamp: parent.leave.Timestamp,
+            location: parent.Location
+          }
+        });
+      }
+      if (traceback.leftEndpoint) {
+        // Copy the important parts of the leftmost interval object, overriding
+        // lastParentInterval (linkData is right-to-left)
+        const firstInterval = linkData[linkData.length - 1];
+        linkData[linkData.length - 1] = {
+          intervalId: firstInterval.intervalId,
+          Location: firstInterval.Location,
+          enter: { Timestamp: firstInterval.enter.Timestamp },
+          lastParentInterval: traceback.leftEndpoint
+        };
+      } else if (!linkData[linkData.length - 1].lastParentInterval) {
+        // In cases where an interval with no parent is at the beginning of the
+        // traceback, there's no line to draw to the left; we can just omit it
+        linkData.splice(-1);
+      }
+    }
+    return linkData;
   }
   drawClip () {
     this.content.select('clipPath rect')
@@ -411,50 +450,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         this.render();
       });
   }
-  drawLinks (intervals, traceback) {
+  drawLinks (linkData) {
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.links').attr('transform', null);
-    }
-
-    // Derive a list of intervals from the streamed list of IDs
-    let linkData = [];
-    for (const intervalId of traceback.visibleIds) {
-      if (intervals[intervalId]) {
-        linkData.push(intervalId);
-      } else {
-        // The list of IDs came back faster than the intervals themselves, we
-        // should cut off the line at this point (should only happen during
-        // incremental rendering)
-        delete traceback.leftEndpoint;
-        break;
-      }
-    }
-
-    if (traceback.leftEndpoint && linkData.length > 0) {
-      // Copy the important parts of the first interval object, overriding
-      // lastParentInterval
-      linkData[0] = {
-        intervalId: linkData[0].intervalId,
-        Location: linkData[0].Location,
-        enter: { Timestamp: linkData[0].enter.Timestamp },
-        lastParentInterval: traceback.leftEndpoint
-      };
-    }
-    if (traceback.rightEndpoint && linkData.length > 0) {
-      // Construct a fake "interval" for the right endpoint, because we draw
-      // lines to the left
-      const parent = linkData[linkData.length - 1];
-      linkData.push({
-        intervalId: traceback.rightEndpoint.id,
-        Location: traceback.rightEndpoint.location,
-        enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
-        lastParentInterval: {
-          id: parent.intervalId,
-          endTimestamp: parent.leave.Timestamp,
-          location: parent.Location
-        }
-      });
     }
 
     let links = this.content.select('.links')

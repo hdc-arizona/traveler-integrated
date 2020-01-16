@@ -253,7 +253,7 @@ def intervals(label: str, begin: float = None, end: float = None):
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
-@app.get('/datasets/{label}/intervals/{intervalId}/Trace')
+@app.get('/datasets/{label}/intervals/{intervalId}/trace')
 def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):
     # This streams back a list of string IDs, as well as two special metadata
     # objects for drawing lines to the left and right of the queried range when
@@ -268,65 +268,73 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
 
     def intervalIdGenerator():
         yield '['
-        targetInterval = intervalObj = oneBeyondRight = db[label]['itervals'][intervalId]
+        targetInterval = intervalObj = db[label]['intervals'][intervalId]
+        lastInterval = None
+        yieldComma = False
 
-        while intervalObj is not None:
-            # Until we yield the first interval, keep track of whatever to its
-            # right, beyond the queried window
-            if oneBeyondRight is not None and intervalObj['enter']['Timestamp'] <= end:
-                if oneBeyondRight == targetInterval:
-                    # The target interval is within the queried window; we can just send
-                    # that ID back directly instead of metadata
-                    yield '"%s"' % targetInterval['intervalId']
-                else:
-                    # Before sending the first interval within the queried
-                    # window, yield some metadata about the interval beyond the
-                    # end boundary, so the client can draw lines beyond the
-                    # window (and won't need access to the interval beyond the
-                    # window itself)
-                    yield json.dumps({
-                        'type': 'beyondRight',
-                        'id': oneBeyondRight['intervalId'],
-                        'location': oneBeyondRight['Location'],
-                        'beginTimestamp': oneBeyondRight['enter']['Timestamp']
-                    })
-                # Don't track whatever is to the right anymore
-                oneBeyondRight = None
+        # First phase: from the targetInterval, step backward until we encounter
+        # an interval in the queried range (or we run out of intervals)
+        while 'lastParentInterval' in intervalObj and intervalObj['enter']['Timestamp'] > end:
+            lastInterval = intervalObj
+            parentId = intervalObj['lastParentInterval']['id']
+            intervalObj = db[label]['intervals'][parentId]
 
-            # Yield the current interval (corner case: if it's the same as the
-            # target interval, don't yield it twice)
-            if intervalObj != targetInterval:
-                yield ',"%s"' % intervalObj['intervalId']
-
-            # Point oneBeyondRight to the current interval if we haven't found
-            # one in the queried range yet, and shift intervalObj to its parent
-            if 'lastParentInterval' in intervalObj:
-                if oneBeyondRight is not None:
-                    oneBeyondRight = intervalObj
-                prevId = intervalObj['lastParentInterval']['id']
-                intervalObj = db[label]['intervals'][prevId]
-
-                # Stop yielding intervals if we went to the left of the queried
-                # range
-                if intervalObj['leave']['Timestamp'] < begin:
-                    break
-            else:
-                # We reached the beginning of the dataset; nothing left to yield
-                intervalObj = None
-
-        # If there's one last interval to the left, beyond the begin boundary,
-        # yield its metadata for beyond-the-scope drawing
-        if intervalObj is not None and 'lastParentInterval' in intervalObj:
-            yield ',' + json.dumps({
-                'type': 'beyondLeft',
-                'id': intervalObj['lastParentInterval']['id'],
-                'location': intervalObj['lastParentInterval']['location'],
-                'endTimestamp': intervalObj['lastParentInterval']['endTimestamp']
+        if targetInterval != intervalObj:
+            # Because the target interval isn't in the query window, yield some
+            # metadata about the interval beyond the end boundary, so the client
+            # can draw lines beyond the window (and won't need access to the
+            # interval beyond the window itself)
+            yield json.dumps({
+                'type': 'beyondRight',
+                'id': lastInterval['intervalId'],
+                'location': lastInterval['Location'],
+                'beginTimestamp': lastInterval['enter']['Timestamp']
             })
-            yield ',"%s"' % intervalObj['intervalId']
+            yieldComma = True
 
+        # Second phase: yield interval ids until we encounter an interval beyond
+        # the queried range (or we run out)
+        while 'lastParentInterval' in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield '"%s"' % intervalObj['intervalId']
+            lastInterval = intervalObj
+            parentId = intervalObj['lastParentInterval']['id']
+            intervalObj = db[label]['intervals'][parentId]
+
+        if 'lastParentInterval' not in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
+            # We ran out of intervals, and the last one was in range; just yield
+            # its id (no beyondLeft metadata needed)
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield '"%s"' % intervalObj['intervalId']
+        elif lastInterval and lastInterval['leave']['Timestamp'] >= begin:
+            # Yield some metadata about the interval beyond the begin boundary,
+            # so the client can draw lines beyond the window (and won't need
+            # access to the interval itself)
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield json.dumps({
+                'type': 'beyondLeft',
+                'id': intervalObj['intervalId'],
+                'location': intervalObj['Location'],
+                'endTimestamp': intervalObj['leave']['Timestamp']
+            })
+
+        # Finished
         yield ']'
     return StreamingResponse(intervalIdGenerator(), media_type='application/json')
+
+@app.get('/datasets/{label}/guids/{guid}/intervalIds')
+def guidIntervalIds(label: str, guid: str):
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+    if guid not in db[label]['guids']:
+        raise HTTPException(status_code=404, detail='GUID %s not found' % guid)
+    return db[label]['guids'][guid]
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())

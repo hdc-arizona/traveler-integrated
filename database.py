@@ -578,17 +578,22 @@ class Database:
 
             # Parent GUIDs refer to the one in the enter event, not the leave event
             guid = intervalObj.get('GUID', intervalObj['enter'].get('GUID', None))
+
             if guid is None:
                 missingCount += 1
-                continue
+            else:
+                if not guid in guids:
+                    guids[guid] = []
+                guids[guid] = guids[guid] + [intervalId]
 
             # Connect to most recent interval with the parent GUID
             parentGuid = intervalObj.get('Parent GUID', intervalObj['enter'].get('Parent GUID', None))
+
             if parentGuid is not None and parentGuid in guids:
                 foundPrior = False
                 for parentIntervalId in reversed(guids[parentGuid]):
                     parentInterval = intervals[parentIntervalId]
-                    if parentInterval['leave']['Timestamp'] <= intervalObj['enter']['Timestamp']:
+                    if parentInterval['enter']['Timestamp'] <= intervalObj['enter']['Timestamp']:
                         foundPrior = True
                         intervalCount += 1
                         # Store metadata about the most recent interval
@@ -614,11 +619,6 @@ class Database:
                     missingCount += 1
             else:
                 missingCount += 1
-
-            # Store this interval by its leave GUID
-            if guid not in guids:
-                guids[guid] = []
-            guids[guid] = guids[guid] + [intervalId]
 
             if (missingCount + intervalCount) % 2500 == 0:
                 await log('.', end='')
