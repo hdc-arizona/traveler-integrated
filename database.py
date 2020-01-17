@@ -18,7 +18,7 @@ requiredPickleDicts = ['trees']
 
 # Silly file extensions that sometimes get added to shelve, depending on the
 # platform; see: https://stackoverflow.com/questions/16171833/why-does-the-shelve-module-in-python-sometimes-create-files-with-different-exten
-shelfExtensions = ['', 'db', 'dat']
+shelfExtensions = ['', '.db', '.dat']
 
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')
@@ -71,7 +71,7 @@ class Database:
                 spath = os.path.join(labelDir, stype + '.shelf')
                 found = False
                 for ext in shelfExtensions:
-                    if os.path.exists(spath + '.' + ext):
+                    if os.path.exists(spath + ext):
                         await log('Loading %s %s...' % (label, stype))
                         self.datasets[label][stype] = shelve.open(spath)
                         found = True
