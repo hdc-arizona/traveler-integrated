@@ -46,6 +46,7 @@ addAttrSplitter = re.compile(r'\), \(')
 addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
+memInfoMetricParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("meminfo:([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 async def logToConsole(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
@@ -428,11 +429,26 @@ class Database:
             eventLineMatch = eventLineParser.match(line)
             addAttrLineMatch = addAttrLineParser.match(line)
             metricLineMatch = metricLineParser.match(line)
-            if currentEvent is None and eventLineMatch is None and metricLineMatch is None:
+            memInfoLineMatch = memInfoMetricParser.match(line)
+            if currentEvent is None and eventLineMatch is None and memInfoLineMatch is None and metricLineMatch is None:
                 # This is a blank / header line
                 continue
 
-            if metricLineMatch is not None:
+            if memInfoLineMatch is not None:
+                # this is a meminfo metric line
+                location = memInfoLineMatch.group(1)
+                timestamp = int(memInfoLineMatch.group(2))
+                metricType = memInfoLineMatch.group(3)
+                value = int(float(memInfoLineMatch.group(4)))
+                
+                if currentEvent is None:
+                    skippedMetricsForMissingPrior += 1
+                elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
+                    skippedMetricsForMismatch += 1
+                else:
+                    includedMetrics += 1
+                    currentEvent['metrics'][metricType] = value
+            elif metricLineMatch is not None:
                 # This is a metric line
                 location = metricLineMatch.group(1)
                 timestamp = int(metricLineMatch.group(2))
