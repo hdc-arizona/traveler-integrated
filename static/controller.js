@@ -10,6 +10,7 @@ import PhyslView from './views/CodeView/PhyslView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
+import LineChartView from "./views/LineChartView/LineChartView.js";
 
 const viewClassLookup = {
   TreeView,
@@ -18,7 +19,8 @@ const viewClassLookup = {
   PythonView,
   PhyslView,
   GanttView,
-  UtilizationView
+  UtilizationView,
+  LineChartView
 };
 
 class Controller {
@@ -169,6 +171,7 @@ class Controller {
     if (views.GanttView && views.UtilizationView) {
       delete views.GanttView;
       delete views.UtilizationView;
+      delete views.LineChartView;
       newLayout.content.push({
         type: 'column',
         content: [{
@@ -178,6 +181,10 @@ class Controller {
         }, {
           type: 'component',
           componentName: 'UtilizationView',
+          componentState: { label: linkedState.label }
+        }, {
+          type: 'component',
+          componentName: 'LineChartView',
           componentState: { label: linkedState.label }
         }]
       });

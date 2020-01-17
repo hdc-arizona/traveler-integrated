@@ -114,20 +114,20 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     }, 100);
   }
   get isLoading () {
-    return super.isLoading || this.stream !== null;
+    return super.isLoading || this.linkedState.isLoadingIntervals;
   }
   get isEmpty () {
-    return this.error || this.intervalCount === 0 || this.intervalCount > this.renderCutoff;
+    return this.error || this.linkedState.loadedIntervalCount === 0;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
     const result = {
-      width: bounds.width - this.margin.left - this.margin.right,
-      height: bounds.height - this.margin.top - this.margin.bottom,
-      left: bounds.left + this.margin.left,
-      top: bounds.top + this.margin.top,
-      right: bounds.right - this.margin.right,
-      bottom: bounds.bottom - this.margin.bottom
+        width: bounds.width - this.margin.left - this.margin.right,
+        height: bounds.height - this.margin.top - this.margin.bottom,
+        left: bounds.left + this.margin.left,
+        top: bounds.top + this.margin.top,
+        right: bounds.right - this.margin.right,
+        bottom: bounds.bottom - this.margin.bottom
     };
     this.xScale.range([0, result.width]);
     this.yScale.range([0, result.height]);
@@ -155,35 +155,40 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.content.select('.clippedStuff')
         .attr('clip-path', `url(#${clipId})`);
 
+    var __self = this;
     // Set up zoom / pan interactions
     this.setupZoomAndPan();
-
-    // Update scales whenever something changes the brush
+    this.linkedState.getMaxMinOfMetric(this.curMetric);
+    // // Update scales whenever something changes the brush
     this.linkedState.on('newIntervalWindow', () => {
       this.xScale.domain(this.linkedState.intervalWindow);
-      // this.yScale.domain([200, 100]);
-      // Abort + re-start the stream
-      this.getData();
+      // // this.yScale.domain([200, 100]);
+      // // Abort + re-start the stream
+      // this.getData();
+        var maxY = this.linkedState.getMaxMinOfMetric(this.curMetric);
+        console.log("got maxY : " + maxY);
+        this.yScale.domain([maxY+3, 0]);
+        __self.render();
     });
-    // Initialize the scales / stream
-    this.xScale.domain(this.linkedState.intervalWindow);
-    // this.yScale.domain([200, 100]);
-    this.getData();
-
-    // Draw the axes right away (because we have a longer debounceWait than
-    // normal, there's an initial ugly flash before draw() gets called)
-    this._bounds = this.getChartBounds();
-    this.drawAxes();
-
-    // Redraw when a new primitive is selected
-    // TODO: can probably do this immediately in a more light-weight way?
-    this.linkedState.on('primitiveSelected', () => { this.render(); });
-
-    this.content.select('.background')
-        .on('click', () => {
-          this.selectedLocation = "-1";
-          this.render();
-        });
+    // // Initialize the scales / stream
+    // this.xScale.domain(this.linkedState.intervalWindow);
+    // // this.yScale.domain([200, 100]);
+    // this.getData();
+    //
+    // // Draw the axes right away (because we have a longer debounceWait than
+    // // normal, there's an initial ugly flash before draw() gets called)
+    // this._bounds = this.getChartBounds();
+    // this.drawAxes();
+    //
+    // // Redraw when a new primitive is selected
+    // // TODO: can probably do this immediately in a more light-weight way?
+    // this.linkedState.on('primitiveSelected', () => { this.render(); });
+    //
+    // this.content.select('.background')
+    //     .on('click', () => {
+    //       this.selectedLocation = "-1";
+    //       this.render();
+    //     });
   }
   draw () {
     super.draw();
@@ -205,7 +210,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this._bounds = this.getChartBounds();
 
     // Combine old data with any new data that's streaming in
-    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
+    const data = d3.entries(this.linkedState.getCurrentIntervals());
 
     // Hide the small spinner
     this.content.select('.small.spinner').style('display', 'none');
@@ -294,51 +299,51 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     cirlces = cirlces.merge(cirlcesEnter);
 
     var calcRate = function (d, i) {
-      if(d.value.location in locationPosition) {
+      if(d.value['Location'] in locationPosition) {
         //do nothing
       } else {
-        locationPosition[d.value.location] = [-1, -1];
+        locationPosition[d.value['Location']] = [-1, -1];
       }
       var Xi = 0;
       var Ti  = 0;
-      if(locationPosition[d.value.location][0] > -1) {
-        var dd = cirlces.data()[locationPosition[d.value.location][0]];
-        Xi = dd.value[_self.curMetric];
-        Ti = dd.value.timestamp;
+      if(locationPosition[d.value['Location']][0] > -1) {
+        var dd = cirlces.data()[locationPosition[d.value['Location']][0]];
+        Xi = dd.value['metrics'][_self.curMetric];
+        Ti = dd.value['enter']['Timestamp'];
       }
-      var Xj = d.value[_self.curMetric];
-      var Tj = d.value.timestamp;
-      if(locationPosition[d.value.location][1] == -1 && Xi == Xj) {
+      var Xj = d.value['metrics'][_self.curMetric];
+      var Tj = d.value['enter']['Timestamp'];
+      if(locationPosition[d.value['Location']][1] == -1 && Xi == Xj) {
         Xi = 0; Ti = 0;
       }
       var ret = Math.abs(Xj - Xi) / Math.abs(Tj - Ti);
 
       var Xh = 0;
       var Th = 0;
-      if(locationPosition[d.value.location][1] > -1) {
-        var pred = cirlces.data()[locationPosition[d.value.location][1]];
-        Xh = pred.value[_self.curMetric];
-        Th = pred.value.timestamp;
+      if(locationPosition[d.value['Location']][1] > -1) {
+        var pred = cirlces.data()[locationPosition[d.value['Location']][1]];
+        Xh = pred.value['metrics'][_self.curMetric];
+        Th = pred.value['enter']['Timestamp'];
         ret += Math.abs(Xi - Xh) / Math.abs(Ti - Th);
       }
-      locationPosition[d.value.location][1] = locationPosition[d.value.location][0];
-      locationPosition[d.value.location][0] = i;
+      locationPosition[d.value['Location']][1] = locationPosition[d.value['Location']][0];
+      locationPosition[d.value['Location']][0] = i;
       return ret;
     };
 
     cirlces.attr('class','dot')
-        .attr('cx', d => this.xScale(d.value.timestamp))
+        .attr('cx', d => this.xScale(d.value['enter']['Timestamp']))
         .attr('cy', function (d, i) {
           return _self.yScale(calcRate(d, i));
         })
         .attr('r', d => {
-          if (d.value.location === _self.selectedLocation) {
-            return 2.0;
+          if (d.value['Location'] === _self.selectedLocation) {
+            return 5.0;
           }
-          return 1.0;
+          return 3.0;
         })
         .style('opacity', d => {
-          if (d.value.location === _self.selectedLocation) {
+          if (d.value['Location'] === _self.selectedLocation) {
             return 1.0;
           }
           return _self.baseOpacity;
@@ -355,28 +360,28 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
 
     lines.attr('class','line')
         .attr('x1', function(d,i){
-          if(d.value.location in timePosition) {
-            var prevData = lines.data()[timePosition[d.value.location]];
-            timePosition[d.value.location] = i;
-            return _self.xScale(prevData.value.timestamp);
+          if(d.value['Location'] in timePosition) {
+            var prevData = lines.data()[timePosition[d.value['Location']]];
+            timePosition[d.value['Location']] = i;
+            return _self.xScale(prevData.value['enter']['Timestamp']);
           } else {
-            timePosition[d.value.location] = i;
+            timePosition[d.value['Location']] = i;
           }
           return _self.xScale(0);
         })
         .attr('y1', function(d,i){
-          if(d.value.location in ratePosition) {
-            var prevData = lines.data()[ratePosition[d.value.location]];
-            var retVal = _self.yScale(calcRate(prevData, ratePosition[d.value.location]));
-            ratePosition[d.value.location] = i;
+          if(d.value['Location'] in ratePosition) {
+            var prevData = lines.data()[ratePosition[d.value['Location']]];
+            var retVal = _self.yScale(calcRate(prevData, ratePosition[d.value['Location']]));
+            ratePosition[d.value['Location']] = i;
             return retVal;
           } else {
-            ratePosition[d.value.location] = i;
+            ratePosition[d.value['Location']] = i;
           }
           return _self.yScale(0);
         })
         .attr('x2', function(d,i){
-          return _self.xScale(d.value.timestamp);
+          return _self.xScale(d.value['enter']['Timestamp']);
         })
         .attr('y2', function(d,i){
           if(i===0) {
@@ -385,14 +390,14 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           return _self.yScale(calcRate(d, i));
         })
         .style('stroke', d => {
-          if (d.value.location === _self.selectedLocation) {
+          if (d.value['Location'] === _self.selectedLocation) {
             return 'blue';
           }
           return 'black';
         })
         .style('stroke-width', 3)
         .style('opacity', d => {
-          if (d.value.location === _self.selectedLocation) {
+          if (d.value['Location'] === _self.selectedLocation) {
             return 1.0;
           }
           return _self.baseOpacity;
@@ -408,7 +413,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           window.controller.tooltip.hide();
         })
         .on('click', (d) => {
-          this.selectedLocation = d.value.location;
+          this.selectedLocation = d.value['Location'];
           console.log("clicked " + this.selectedLocation);
           this.render();
         });
