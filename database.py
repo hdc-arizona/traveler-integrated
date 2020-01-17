@@ -10,15 +10,11 @@ from blist import sortedlist #pylint: disable=import-error
 from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 
 # Possible files / metadata structures that we create / open / update
-shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
+shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'metrices']
 requiredShelves = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
+pickles = ['intervalIndexes', 'metricIndexes', 'trees', 'physl', 'python', 'cpp']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
-
-# Silly file extensions that sometimes get added to shelve, depending on the
-# platform; see: https://stackoverflow.com/questions/16171833/why-does-the-shelve-module-in-python-sometimes-create-files-with-different-exten
-shelfExtensions = ['', 'db', 'dat']
 
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')
@@ -30,7 +26,7 @@ dotLineParser = re.compile(r'"([^"]*)" -- "([^"]*)";')
 
 # Tools for handling the performance csv
 perfModeParser = re.compile(r'primitive_instance,display_name,count,time,eval_direct')
-perfLineParser = re.compile(r'"([^"]*)","([^"]*)",(\d+),(\d+),(-?\d)')
+perfLineParser = re.compile(r'"([^"]*)","([^"]*)",(\d+),(\d+),(-?1)')
 
 # Tools for handling the inclusive time line
 timeParser = re.compile(r'time: ([\d\.]+)')
@@ -69,14 +65,13 @@ class Database:
             labelDir = os.path.join(self.dbDir, label)
             for stype in shelves:
                 spath = os.path.join(labelDir, stype + '.shelf')
-                found = False
-                for ext in shelfExtensions:
-                    if os.path.exists(spath + '.' + ext):
-                        await log('Loading %s %s...' % (label, stype))
-                        self.datasets[label][stype] = shelve.open(spath)
-                        found = True
-                        break
-                if not found and stype in requiredShelves:
+                if os.path.exists(spath):
+                    await log('Loading %s %s...' % (label, stype))
+                    self.datasets[label][stype] = shelve.open(spath)
+                elif os.path.exists(spath + '.db'): # shelves auto-add .db to their filenames on some platforms (but not all); see https://stackoverflow.com/questions/8704728/using-python-shelve-cross-platform
+                    await log('Loading %s %s...' % (label, stype))
+                    self.datasets[label][stype] = shelve.open(spath)
+                elif stype in requiredShelves:
                     raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), spath)
             for stype in pickles:
                 spath = os.path.join(labelDir, stype + '.pickle')
@@ -200,30 +195,25 @@ class Database:
 
     def processNewickNode(self, label, node):
         # Create the hashed primitive object
-        primitiveName = node.name.strip()
+        if node.name is None:
+            primitiveName = ''
+        else:
+            primitiveName = node.name.strip()
         newR = self.processPrimitive(label, primitiveName, 'newick')[1]
         seenR = 1 if newR == 0 else 0
         tree = {'name': primitiveName, 'children': []}
         newL = seenL = 0
 
         # Create the tree hierarchy
-        def handleChildren(childList):
-            nonlocal newR, seenR, newL, seenL
-            if not childList:
-                return
-            for child in childList:
-                if child.name is None:
-                    # Skip nodes with no names, and connect to their children instead
-                    handleChildren(child.descendants)
-                else:
-                    childTree, nr, sr, nl, sl = self.processNewickNode(label, child)
-                    tree['children'].append(childTree)
-                    newR += nr
-                    seenR += sr
-                    l = self.addPrimitiveChild(label, primitiveName, childTree['name'], 'newick')[1]
-                    newL += nl + l
-                    seenL += sl + (1 if l == 0 else 0)
-        handleChildren(node.descendants)
+        if node.descendants:
+            for child in node.descendants:
+                childTree, nr, sr, nl, sl = self.processNewickNode(label, child)
+                tree['children'].append(childTree)
+                newR += nr
+                seenR += sr
+                l = self.addPrimitiveChild(label, primitiveName, childTree['name'], 'newick')[1]
+                newL += nl + l
+                seenL += sl + (1 if l == 0 else 0)
         return (tree, newR, seenR, newL, seenL)
     async def processNewickTree(self, label, newickText, log=logToConsole):
         tree, newR, seenR, newL, seenL = self.processNewickNode(label, newick.loads(newickText)[0])
@@ -404,10 +394,16 @@ class Database:
         labelDir = os.path.join(self.dbDir, label)
         primitives = self.datasets[label]['primitives']
         intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals.shelf'))
+        metrices = self.datasets[label]['metrices'] = shelve.open(os.path.join(labelDir, 'metrices.shelf'))
+
         intervalIndexes = self.datasets[label]['intervalIndexes'] = {
             'primitives': {},
             'locations': {},
             'both': {}
+        }
+        metricIndexes = self.datasets[label]['metricIndexes'] = {
+            'main': IntervalTree(),
+            'locations': {}
         }
         guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
         self.datasets[label]['meta']['storedEvents'] = storeEvents
@@ -415,14 +411,12 @@ class Database:
             self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events.shelf'))
 
         # Temporary counters / lists for sorting
+        numMetrices = -1
         numEvents = 0
         self.sortedEventsByLocation = {}
         await log('Parsing OTF2 events (.=2500 events)')
         newR = seenR = 0
         currentEvent = None
-        includedMetrics = 0
-        skippedMetricsForMissingPrior = 0
-        skippedMetricsForMismatch = 0
 
         for line in file:
             eventLineMatch = eventLineParser.match(line)
@@ -439,13 +433,32 @@ class Database:
                 metricType = metricLineMatch.group(3)
                 value = int(float(metricLineMatch.group(4)))
 
-                if currentEvent is None:
-                    skippedMetricsForMissingPrior += 1
-                elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
-                    skippedMetricsForMismatch += 1
+                if location not in metricIndexes['locations']:
+                    metricIndexes['locations'][location] = IntervalTree()
+
+                metricKeys = str(numMetrices)
+                if metricKeys in metrices and metrices[metricKeys]['timestamp'] == timestamp and metrices[metricKeys]['location'] == location:
+                    dicts = metrices[metricKeys]
+                    dicts.update({metricType: value})
+                    metrices[metricKeys] = dicts
                 else:
-                    includedMetrics += 1
-                    currentEvent['metrics'][metricType] = value
+                    numMetrices += 1
+                    metricKeys = str(numMetrices)
+                    miv = Interval(timestamp, timestamp+1, metricKeys)
+                    metricIndexes['locations'][location].add(miv)
+                    metricIndexes['main'].add(miv)
+                    metricObj = {
+                        'metricId': metricKeys,
+                        'location': location,
+                        'timestamp': timestamp,
+                        metricType: value
+                    }
+                    metrices[metricKeys] = metricObj
+                    # if numMetrices % 2500 == 0:
+                    #     await log('.', end='')
+                    # if numMetrices % 100000 == 0:
+                    #     await log('processed %i metrices' % numMetrices)
+
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:
@@ -459,7 +472,7 @@ class Database:
                     # Add to primitive / guid counts
                     newR += counts[0]
                     seenR += counts[1]
-                currentEvent = {'metrics': {}}
+                currentEvent = {}
                 currentEvent['Event'] = eventLineMatch.group(1)
                 currentEvent['Location'] = eventLineMatch.group(2)
                 currentEvent['Timestamp'] = int(eventLineMatch.group(3))
@@ -482,7 +495,6 @@ class Database:
         await log('')
         await log('Finished processing %i events' % numEvents)
         await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
-        await log('Metrics included: %d; skpped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
 
         # Now that we've seen all the locations, store that list in our metadata
         locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
@@ -602,22 +614,17 @@ class Database:
 
             # Parent GUIDs refer to the one in the enter event, not the leave event
             guid = intervalObj.get('GUID', intervalObj['enter'].get('GUID', None))
-
             if guid is None:
                 missingCount += 1
-            else:
-                if not guid in guids:
-                    guids[guid] = []
-                guids[guid] = guids[guid] + [intervalId]
+                continue
 
             # Connect to most recent interval with the parent GUID
             parentGuid = intervalObj.get('Parent GUID', intervalObj['enter'].get('Parent GUID', None))
-
             if parentGuid is not None and parentGuid in guids:
                 foundPrior = False
                 for parentIntervalId in reversed(guids[parentGuid]):
                     parentInterval = intervals[parentIntervalId]
-                    if parentInterval['enter']['Timestamp'] <= intervalObj['enter']['Timestamp']:
+                    if parentInterval['leave']['Timestamp'] <= intervalObj['enter']['Timestamp']:
                         foundPrior = True
                         intervalCount += 1
                         # Store metadata about the most recent interval
@@ -643,6 +650,11 @@ class Database:
                     missingCount += 1
             else:
                 missingCount += 1
+
+            # Store this interval by its leave GUID
+            if guid not in guids:
+                guids[guid] = []
+            guids[guid] = guids[guid] + [intervalId]
 
             if (missingCount + intervalCount) % 2500 == 0:
                 await log('.', end='')

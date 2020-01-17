@@ -28,7 +28,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
 
     // Override uki's default .1 second debouncing of render() because we want
     // to throttle incremental updates to at most once per second
-    // this.debounceWait = 1000;
+    this.debounceWait = 1000;
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `LineChartView${LineChartView.DOM_COUNT}`;
