@@ -122,11 +122,14 @@ class Database:
 
     async def save(self, label, log=logToConsole):
         labelDir = os.path.join(self.dbDir, label)
-        for ptype in self.datasets[label].keys():
-            if ptype in pickles:
-                await log('Saving %s pickle: %s' % (label, ptype))
-                with open(os.path.join(labelDir, ptype + '.pickle'), 'wb') as pickleFile:
-                    pickle.dump(self.datasets[label][ptype], pickleFile)
+        for ctype in self.datasets[label].keys():
+            if ctype in diskCacheIndices:
+                await log('Saving %s diskCache.Index: %s' % (label, ctype))
+                self.datasets[label][ctype].cache.close()
+            if ctype in pickles:
+                await log('Saving %s pickle: %s' % (label, ctype))
+                with open(os.path.join(labelDir, ctype + '.pickle'), 'wb') as pickleFile:
+                    pickle.dump(self.datasets[label][ctype], pickleFile)
 
     def processPrimitive(self, label, primitiveName, source=None):
         primitives = self.datasets[label]['primitives']
