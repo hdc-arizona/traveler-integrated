@@ -15,47 +15,11 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
     this.xScale = d3.scaleLinear().clamp(true);
     this.yScale = d3.scaleLinear();
   }
-  getData () {
-    // Debounce...
-    window.clearTimeout(this._resizeTimeout);
-    this._resizeTimeout = window.setTimeout(async () => {
-      const bounds = this.getChartBounds();
-      this.histogram = undefined;
-      this.render();
-      try {
-        const label = encodeURIComponent(this.layoutState.label);
-        const numBins = Math.floor(bounds.width);
-        this.histogram = await d3.json(`/datasets/${label}/histogram?mode=utilization&bins=${numBins}`);
-        if (this.linkedState.selectedPrimitive) {
-          const primitive = encodeURIComponent(this.linkedState.selectedPrimitive);
-          this.primitiveHistogram = await d3.json(`/datasets/${label}/histogram?mode=utilization&bins=${numBins}&primitive=${primitive}`);
-        } else {
-          delete this.primitiveHistogram;
-        }
-      } catch (e) {
-        this.histogram = e;
-        return;
-      }
-
-      let maxCount = 0;
-      const domain = [Infinity, -Infinity];
-      for (const [begin, end, count] of this.histogram) {
-        maxCount = Math.max(maxCount, count);
-        domain[0] = Math.min(begin, domain[0]);
-        domain[1] = Math.max(end, domain[1]);
-      }
-
-      this.xScale.domain(domain);
-      this.yScale.domain([0, maxCount]);
-
-      this.render();
-    }, 100);
-  }
   get isLoading () {
-    return super.isLoading || this.histogram === undefined;
+    return super.isLoading || this.linkedState.isLoadingHistogram;
   }
   get isEmpty () {
-    return this.histogram !== undefined && this.histogram instanceof Error;
+    return !!this.linkedState.histogramError;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
@@ -87,38 +51,51 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
     // Prep interactive callbacks for the brush
     this.setupBrush();
 
-    // Update the brush if something else changes it (e.g. GanttView is zoomed)
-    this.linkedState.on('newIntervalWindow', () => { this.drawBrush(); });
-    // Grab new histograms when a new primitive is selected
-    this.linkedState.on('primitiveSelected', () => { this.getData(); });
+    // Set up listeners
+    this.linkedState.on('newIntervalWindow', () => {
+      // Update the brush immediately if something else changes it (e.g.
+      // GanttView is zoomed)
+      this.drawBrush();
+    });
+    this.linkedState.on('histogramUpdated', () => {
+      // Full render whenever we have new histograms
+      this.render();
+    });
     // Grab new histograms whenever the view is resized
-    this.container.on('resize', () => { this.getData(); });
-    // Initial data
-    this.getData();
+    this.container.on('resize', () => {
+      const nPixels = Math.floor(this.getChartBounds().width);
+      this.linkedState.setHistogramResolution(nPixels);
+    });
   }
   draw () {
     super.draw();
 
+    const data = this.linkedState.getCurrentHistogramData();
+
     if (this.isHidden || this.isLoading) {
       return; // eslint-disable-line no-useless-return
-    } else if (this.histogram instanceof Error) {
+    } else if (data.error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
+      // Set / update the scales
+      this.xScale.domain(data.domain);
+      this.yScale.domain([0, data.maxCount]);
+
       // Update the axis
       this.drawAxes();
 
       // Update the overview paths
-      this.drawPaths(this.content.select('.overview'), this.histogram);
+      this.drawPaths(this.content.select('.overview'), data.histogram);
 
       // Update the currently selected primitive paths
       const selectedPrimitive = this.content.select('.selectedPrimitive');
-      selectedPrimitive.style('display', this.primitiveHistogram ? null : 'none');
-      if (this.primitiveHistogram) {
+      selectedPrimitive.style('display', data.primitiveHistogram ? null : 'none');
+      if (data.primitiveHistogram) {
         selectedPrimitive.select('.area')
           .style('fill', this.linkedState.selectionColor);
         selectedPrimitive.select('.outline')
           .style('stroke', this.linkedState.selectionColor);
-        this.drawPaths(selectedPrimitive, this.primitiveHistogram);
+        this.drawPaths(selectedPrimitive, data.primitiveHistogram);
       }
 
       // Update the brush
