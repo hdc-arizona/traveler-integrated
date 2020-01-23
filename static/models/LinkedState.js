@@ -367,6 +367,29 @@ class LinkedState extends Model {
       this.trigger('histogramUpdated');
     }, 100);
   }
+  getMaxMinOfMetric(metric){
+    var intervalList = Object.values(this.getCurrentIntervals());
+    var maxY = 0, curX = 0, curT = 0, rt = 0;
+    var locationPosition = {};
+    for(const interval of intervalList){
+      if('metrics' in interval && metric in interval['metrics']) {
+        curX = interval['metrics'][metric];
+        curT = interval['enter']['Timestamp'];
+        if(interval['Location'] in locationPosition && locationPosition[interval['Location']][0] > -1) {
+          rt = Math.abs(curX - locationPosition[interval['Location']][0]) / Math.abs(curT - locationPosition[interval['Location']][1]);
+        } else {
+          locationPosition[interval['Location']] = [-1,-1];
+          rt = curX/curT;
+        }
+        locationPosition[interval['Location']][0] = curX;
+        locationPosition[interval['Location']][1] = curT;
+        maxY = Math.max(maxY, rt);
+      }
+    }
+    // console.log("maximum value for " + metric + " : " + maxY);
+    // console.log(locationPosition);
+    return maxY;
+  }
 }
 LinkedState.COLOR_SCHEMES = {
   Inclusive: {
