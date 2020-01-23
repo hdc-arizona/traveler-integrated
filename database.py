@@ -10,7 +10,7 @@ from blist import sortedlist #pylint: disable=import-error
 from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 
 # Possible files / metadata structures that we create / open / update
-shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
+shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'metrics']
 requiredShelves = ['meta', 'primitives', 'primitiveLinks']
 pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
 requiredMetaLists = ['sourceFiles']
@@ -46,7 +46,8 @@ addAttrSplitter = re.compile(r'\), \(')
 addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
-memInfoMetricParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("meminfo:([^"]*)" <\d+>; [^;]*; ([^\)]*)')
+# memInfoMetricParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("meminfo:([^"]*)" <\d+>; [^;]*; ([^\)]*)')
+metricPrefixes = ('meminfo', 'status', 'io')
 
 async def logToConsole(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
@@ -404,6 +405,7 @@ class Database:
         # Set up database files
         labelDir = os.path.join(self.dbDir, label)
         primitives = self.datasets[label]['primitives']
+        metrics = self.datasets[label]['metrics']
         intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals.shelf'))
         intervalIndexes = self.datasets[label]['intervalIndexes'] = {
             'primitives': {},
@@ -429,39 +431,29 @@ class Database:
             eventLineMatch = eventLineParser.match(line)
             addAttrLineMatch = addAttrLineParser.match(line)
             metricLineMatch = metricLineParser.match(line)
-            memInfoLineMatch = memInfoMetricParser.match(line)
-            if currentEvent is None and eventLineMatch is None and memInfoLineMatch is None and metricLineMatch is None:
+            if currentEvent is None and eventLineMatch is None and metricLineMatch is None:
                 # This is a blank / header line
                 continue
 
-            if memInfoLineMatch is not None:
-                # this is a meminfo metric line
-                location = memInfoLineMatch.group(1)
-                timestamp = int(memInfoLineMatch.group(2))
-                metricType = memInfoLineMatch.group(3)
-                value = int(float(memInfoLineMatch.group(4)))
-                
-                if currentEvent is None:
-                    skippedMetricsForMissingPrior += 1
-                elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
-                    skippedMetricsForMismatch += 1
-                else:
-                    includedMetrics += 1
-                    currentEvent['metrics'][metricType] = value
-            elif metricLineMatch is not None:
+            if metricLineMatch is not None:
                 # This is a metric line
                 location = metricLineMatch.group(1)
                 timestamp = int(metricLineMatch.group(2))
                 metricType = metricLineMatch.group(3)
                 value = int(float(metricLineMatch.group(4)))
 
-                if currentEvent is None:
-                    skippedMetricsForMissingPrior += 1
-                elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
-                    skippedMetricsForMismatch += 1
-                else:
-                    includedMetrics += 1
-                    currentEvent['metrics'][metricType] = value
+                if metricType.startswith(metricPrefixes):
+                    await log(line)
+                if metricType.startswith('PAPI'):
+                    if currentEvent is None:
+                        skippedMetricsForMissingPrior += 1
+                    elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
+                        skippedMetricsForMismatch += 1
+                    else:
+                        includedMetrics += 1
+                        currentEvent['metrics'][metricType] = value
+                else: # do the other meminfo status io parsing here
+                    metrics[metricType][str(timestamp)] = value
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:
@@ -490,6 +482,7 @@ class Database:
                     attr = addAttrParser.match(attrStr)
                     assert attr is not None
                     currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
+        return
         # The last event will never have had a chance to be processed:
         if currentEvent is not None:
             counts = self.processEvent(label, currentEvent, str(numEvents))
