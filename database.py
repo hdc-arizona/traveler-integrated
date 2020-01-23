@@ -2,23 +2,19 @@ import os
 import re
 import sys
 import shutil
-import shelve
 import pickle
 import errno
 import newick
+import diskcache #pylint: disable=import-error
 from blist import sortedlist #pylint: disable=import-error
 from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 
 # Possible files / metadata structures that we create / open / update
-shelves = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
-requiredShelves = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['intervalIndexes', 'metricIndexes', 'trees', 'physl', 'python', 'cpp']
+diskCacheIndices = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events']
+requiredDiskCacheIndices = ['meta', 'primitives', 'primitiveLinks']
+pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
-
-# Silly file extensions that sometimes get added to shelve, depending on the
-# platform; see: https://stackoverflow.com/questions/16171833/why-does-the-shelve-module-in-python-sometimes-create-files-with-different-exten
-shelfExtensions = ['', 'db', 'dat']
 
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')
@@ -46,6 +42,7 @@ addAttrSplitter = re.compile(r'\), \(')
 addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
+memInfoMetricParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Value: \("meminfo:([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 async def logToConsole(value, end='\n'):
     sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
@@ -67,24 +64,22 @@ class Database:
         for label in os.listdir(self.dbDir):
             self.datasets[label] = {}
             labelDir = os.path.join(self.dbDir, label)
-            for stype in shelves:
-                spath = os.path.join(labelDir, stype + '.shelf')
-                found = False
-                for ext in shelfExtensions:
-                    if os.path.exists(spath + '.' + ext):
-                        await log('Loading %s %s...' % (label, stype))
-                        self.datasets[label][stype] = shelve.open(spath)
-                        found = True
-                        break
-                if not found and stype in requiredShelves:
-                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), spath)
-            for stype in pickles:
-                spath = os.path.join(labelDir, stype + '.pickle')
-                if os.path.exists(spath):
-                    await log('Loading %s %s...' % (label, stype))
-                    if stype == 'intervalIndexes':
+            for ctype in diskCacheIndices:
+                cpath = os.path.join(labelDir, ctype + '.diskCacheIndex')
+                if os.path.exists(cpath):
+                    await log('Loading %s %s...' % (label, ctype))
+                    self.datasets[label][ctype] = diskcache.Index(cpath)
+                elif ctype in requiredDiskCacheIndices:
+                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), cpath)
+            for ptype in pickles:
+                ppath = os.path.join(labelDir, ptype + '.pickle')
+                if os.path.exists(ppath):
+                    await log('Loading %s %s...' % (label, ptype))
+                    if ptype == 'intervalIndexes':
                         await log('(may take a while if %s is large)' % label)
-                    self.datasets[label][stype] = pickle.load(open(spath, 'rb'))
+                    self.datasets[label][ptype] = pickle.load(open(ppath, 'rb'))
+                elif ptype in requiredPickleDicts:
+                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), ppath)
             for listType in requiredMetaLists:
                 self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, [])
 
@@ -103,11 +98,11 @@ class Database:
             self.purgeDataset(label)
         self.datasets[label] = {}
         os.makedirs(labelDir)
-        for stype in requiredShelves:
-            spath = os.path.join(labelDir, stype + '.shelf')
-            self.datasets[label][stype] = shelve.open(spath)
-        for stype in requiredPickleDicts:
-            self.datasets[label][stype] = {}
+        for ctype in requiredDiskCacheIndices:
+            cpath = os.path.join(labelDir, ctype + '.diskCacheIndex')
+            self.datasets[label][ctype] = diskcache.Index(cpath)
+        for ptype in requiredPickleDicts:
+            self.datasets[label][ptype] = {}
         for listType in requiredMetaLists:
             self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, [])
 
@@ -118,7 +113,7 @@ class Database:
             shutil.rmtree(labelDir)
 
     def addSourceFile(self, label, fileName, fileType):
-        # Have to do this separately because meta is a shelf
+        # Have to do this separately because meta is a diskcache
         sourceFiles = self.datasets[label]['meta']['sourceFiles']
         sourceFiles.append({'fileName': fileName, 'fileType': fileType})
         self.datasets[label]['meta']['sourceFiles'] = sourceFiles
@@ -128,24 +123,14 @@ class Database:
 
     async def save(self, label, log=logToConsole):
         labelDir = os.path.join(self.dbDir, label)
-        for stype in self.datasets[label].keys():
-            if stype in shelves:
-                await log('Saving %s shelf: %s' % (label, stype))
-                self.datasets[label][stype].close()
-                # .sync() doesn't actually push all the data to disk (because we're not
-                # using writeback?), so we close + reopen the shelf
-                self.datasets[label][stype] = shelve.open(os.path.join(labelDir, stype + '.shelf'))
-            elif stype in pickles:
-                await log('Saving %s pickle: %s' % (label, stype))
-                with open(os.path.join(labelDir, stype + '.pickle'), 'wb') as pickleFile:
-                    pickle.dump(self.datasets[label][stype], pickleFile)
-
-    async def close(self, log=logToConsole):
-        for label, dataset in self.datasets.items():
-            for stype in dataset.keys():
-                if stype in shelves:
-                    await log('Closing %s shelf: %s' % (label, stype))
-                    dataset[stype].close()
+        for ctype in self.datasets[label].keys():
+            if ctype in diskCacheIndices:
+                await log('Saving %s diskCache.Index: %s' % (label, ctype))
+                self.datasets[label][ctype].cache.close()
+            if ctype in pickles:
+                await log('Saving %s pickle: %s' % (label, ctype))
+                with open(os.path.join(labelDir, ctype + '.pickle'), 'wb') as pickleFile:
+                    pickle.dump(self.datasets[label][ctype], pickleFile)
 
     def processPrimitive(self, label, primitiveName, source=None):
         primitives = self.datasets[label]['primitives']
@@ -159,7 +144,7 @@ class Database:
         if primitiveName in primitives:
             # Already existed
             if updatedSources:
-                primitives[primitiveName] = primitive # tells the primitives shelf that there was an update
+                primitives[primitiveName] = primitive # tells the primitives diskcache that there was an update
             return (primitive, 0)
         primitiveChunks = primitiveName.split('$')
         primitive['name'] = primitiveChunks[0]
@@ -177,10 +162,10 @@ class Database:
         primitiveLinks = self.datasets[label]['primitiveLinks']
         if child not in parentPrimitive['children']:
             parentPrimitive['children'].append(child)
-            primitives[parent] = parentPrimitive # tells the primitives shelf that there was an update
+            primitives[parent] = parentPrimitive # tells the primitives diskcache that there was an update
         if parent not in childPrimitive['parents']:
             childPrimitive['parents'].append(parent)
-            primitives[child] = childPrimitive # tells the primitives shelf that there was an update
+            primitives[child] = childPrimitive # tells the primitives diskcache that there was an update
 
         linkId = parent + '_' + child
         link = primitiveLinks.get(linkId, {'parent': parent, 'child': child})
@@ -193,7 +178,7 @@ class Database:
         if linkId in primitiveLinks:
             # Already existed
             if updatedSources:
-                primitiveLinks[linkId] = link # tells the primitiveLinks shelf that there was an update
+                primitiveLinks[linkId] = link # tells the primitiveLinks diskcache that there was an update
             return (link, 0)
         primitiveLinks[linkId] = link
         return (link, 1)
@@ -282,7 +267,7 @@ class Database:
         primitive['time'] = float(perfLine[4])
         primitive['eval_direct'] = float(perfLine[5])
         primitive['avg_time'] = primitive['time'] / primitive['count'] if primitive['count'] != 0 else primitive['time']
-        self.datasets[label]['primitives'][primitiveName] = primitive # tells the primitives shelf that there was an update
+        self.datasets[label]['primitives'][primitiveName] = primitive # tells the primitives diskcache that there was an update
         return (newR, primitive['time'])
     async def processCsv(self, label, lines, log=logToConsole):
         newR = seenR = maxTime = 0
@@ -403,17 +388,16 @@ class Database:
         # Set up database files
         labelDir = os.path.join(self.dbDir, label)
         primitives = self.datasets[label]['primitives']
-        intervals = self.datasets[label]['intervals'] = shelve.open(os.path.join(labelDir, 'intervals.shelf'))
+        intervals = self.datasets[label]['intervals'] = diskcache.Index(os.path.join(labelDir, 'intervals.diskCacheIndex'))
         intervalIndexes = self.datasets[label]['intervalIndexes'] = {
             'primitives': {},
             'locations': {},
             'both': {}
         }
-        metricIndexes = self.datasets[label]['metricIndexes'] = {}
-        guids = self.datasets[label]['guids'] = shelve.open(os.path.join(labelDir, 'guids.shelf'))
+        guids = self.datasets[label]['guids'] = diskcache.Index(os.path.join(labelDir, 'guids.diskCacheIndex'))
         self.datasets[label]['meta']['storedEvents'] = storeEvents
         if storeEvents:
-            self.datasets[label]['events'] = shelve.open(os.path.join(labelDir, 'events.shelf'))
+            self.datasets[label]['events'] = diskcache.Index(os.path.join(labelDir, 'events.diskCacheIndex'))
 
         # Temporary counters / lists for sorting
         numEvents = 0
@@ -421,27 +405,47 @@ class Database:
         await log('Parsing OTF2 events (.=2500 events)')
         newR = seenR = 0
         currentEvent = None
+        includedMetrics = 0
+        skippedMetricsForMissingPrior = 0
+        skippedMetricsForMismatch = 0
 
         for line in file:
             eventLineMatch = eventLineParser.match(line)
             addAttrLineMatch = addAttrLineParser.match(line)
             metricLineMatch = metricLineParser.match(line)
-            if currentEvent is None and eventLineMatch is None and metricLineMatch is None:
+            memInfoLineMatch = memInfoMetricParser.match(line)
+            if currentEvent is None and eventLineMatch is None and memInfoLineMatch is None and metricLineMatch is None:
                 # This is a blank / header line
                 continue
 
-            if metricLineMatch is not None:
+            if memInfoLineMatch is not None:
+                # this is a meminfo metric line
+                location = memInfoLineMatch.group(1)
+                timestamp = int(memInfoLineMatch.group(2))
+                metricType = memInfoLineMatch.group(3)
+                value = int(float(memInfoLineMatch.group(4)))
+
+                if currentEvent is None:
+                    skippedMetricsForMissingPrior += 1
+                elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
+                    skippedMetricsForMismatch += 1
+                else:
+                    includedMetrics += 1
+                    currentEvent['metrics'][metricType] = value
+            elif metricLineMatch is not None:
                 # This is a metric line
                 location = metricLineMatch.group(1)
                 timestamp = int(metricLineMatch.group(2))
                 metricType = metricLineMatch.group(3)
                 value = int(float(metricLineMatch.group(4)))
-                if location not in metricIndexes:
-                    metricIndexes[location] = {}
-                if metricType not in metricIndexes[location]:
-                    metricIndexes[location][metricType] = IntervalTree()
-                miv = Interval(timestamp, timestamp+1, value)
-                metricIndexes[location][metricType].add(miv)
+
+                if currentEvent is None:
+                    skippedMetricsForMissingPrior += 1
+                elif currentEvent['Timestamp'] != timestamp or currentEvent['Location'] != location:
+                    skippedMetricsForMismatch += 1
+                else:
+                    includedMetrics += 1
+                    currentEvent['metrics'][metricType] = value
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:
@@ -455,7 +459,7 @@ class Database:
                     # Add to primitive / guid counts
                     newR += counts[0]
                     seenR += counts[1]
-                currentEvent = {}
+                currentEvent = {'metrics': {}}
                 currentEvent['Event'] = eventLineMatch.group(1)
                 currentEvent['Location'] = eventLineMatch.group(2)
                 currentEvent['Timestamp'] = int(eventLineMatch.group(3))
@@ -478,6 +482,7 @@ class Database:
         await log('')
         await log('Finished processing %i events' % numEvents)
         await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
+        await log('Metrics included: %d; skpped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
 
         # Now that we've seen all the locations, store that list in our metadata
         locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
@@ -539,7 +544,7 @@ class Database:
         # Now for indexing: we want per-location indexes, per-primitive indexes,
         # as well as both filters at the same time (we key by locations first)
         # TODO: these are all built in memory... should probably find a way to
-        # make a shelve-like version of IntervalTree:
+        # make a diskcache-like version of IntervalTree:
         for location in locationNames:
             intervalIndexes['locations'][location] = IntervalTree()
             intervalIndexes['both'][location] = {}
@@ -597,17 +602,22 @@ class Database:
 
             # Parent GUIDs refer to the one in the enter event, not the leave event
             guid = intervalObj.get('GUID', intervalObj['enter'].get('GUID', None))
+
             if guid is None:
                 missingCount += 1
-                continue
+            else:
+                if not guid in guids:
+                    guids[guid] = []
+                guids[guid] = guids[guid] + [intervalId]
 
             # Connect to most recent interval with the parent GUID
             parentGuid = intervalObj.get('Parent GUID', intervalObj['enter'].get('Parent GUID', None))
+
             if parentGuid is not None and parentGuid in guids:
                 foundPrior = False
                 for parentIntervalId in reversed(guids[parentGuid]):
                     parentInterval = intervals[parentIntervalId]
-                    if parentInterval['leave']['Timestamp'] <= intervalObj['enter']['Timestamp']:
+                    if parentInterval['enter']['Timestamp'] <= intervalObj['enter']['Timestamp']:
                         foundPrior = True
                         intervalCount += 1
                         # Store metadata about the most recent interval
@@ -616,7 +626,7 @@ class Database:
                             'location': parentInterval['Location'],
                             'endTimestamp': parentInterval['leave']['Timestamp']
                         }
-                        # Because intervals is a shelf, it needs a copy to know that something changed
+                        # Because intervals is a diskcache, it needs a copy to know that something changed
                         intervals[intervalId] = intervalObj.copy()
 
                         # While we're here, note the parent-child link in the primitive graph
@@ -633,11 +643,6 @@ class Database:
                     missingCount += 1
             else:
                 missingCount += 1
-
-            # Store this interval by its leave GUID
-            if guid not in guids:
-                guids[guid] = []
-            guids[guid] = guids[guid] + [intervalId]
 
             if (missingCount + intervalCount) % 2500 == 0:
                 await log('.', end='')

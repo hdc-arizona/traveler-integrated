@@ -137,8 +137,6 @@ async def main():
             await logToConsole('Error encountered; purging corrupted data for: %s' % label)
             db.purgeDataset(label)
             raise
-        # Always close all shelves
-        await db.close()
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())

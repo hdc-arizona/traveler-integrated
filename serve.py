@@ -27,10 +27,10 @@ app = FastAPI(
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
 
-def checkLabel(label):
+def checkDatasetExistence(label):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-def checkIntervals(label):
+def checkDatasetHasIntervals(label):
     if 'intervals' not in db[label] or 'intervalIndexes' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
 
@@ -48,7 +48,7 @@ def list_datasets():
 
 @app.get('/datasets/{label}')
 def get_dataset(label: str):
-    checkLabel(label)
+    checkDatasetExistence(label)
     return db[label]['meta']
 class BasicDataset(BaseModel):
     newick: str = None
@@ -96,13 +96,13 @@ class TreeSource(str, Enum):
     graph = 'graph'
 @app.get('/datasets/{label}/tree')
 def get_tree(label: str, source: TreeSource = TreeSource.newick):
-    checkLabel(label)
+    checkDatasetExistence(label)
     if source not in db[label]['trees']:
         raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
     return db[label]['trees'][source]
 @app.post('/datasets/{label}/tree')
 def add_newick_tree(label: str, file: UploadFile = File(...)):
-    checkLabel(label)
+    checkDatasetExistence(label)
     logger = ClientLogger()
     async def startProcess():
         db.addSourceFile(label, file.filename, 'newick')
@@ -113,7 +113,7 @@ def add_newick_tree(label: str, file: UploadFile = File(...)):
 
 @app.post('/datasets/{label}/csv')
 def add_performance_csv(label: str, file: UploadFile = File(...)):
-    checkLabel(label)
+    checkDatasetExistence(label)
     logger = ClientLogger()
     async def startProcess():
         db.addSourceFile(label, file.filename, 'csv')
@@ -124,7 +124,7 @@ def add_performance_csv(label: str, file: UploadFile = File(...)):
 
 @app.post('/datasets/{label}/dot')
 def add_dot_graph(label: str, file: UploadFile = File(...)):
-    checkLabel(label)
+    checkDatasetExistence(label)
     logger = ClientLogger()
     async def startProcess():
         db.addSourceFile(label, file.filename, 'dot')
@@ -135,7 +135,7 @@ def add_dot_graph(label: str, file: UploadFile = File(...)):
 
 @app.post('/datasets/{label}/log')
 def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
-    checkLabel(label)
+    checkDatasetExistence(label)
     logger = ClientLogger()
     async def startProcess():
         db.addSourceFile(label, file.filename, 'log')
@@ -155,42 +155,42 @@ async def add_otf2_trace(label: str, request: Request):
 
 @app.get('/datasets/{label}/physl')
 def get_physl(label: str):
-    checkLabel(label)
+    checkDatasetExistence(label)
     if 'physl' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not include physl source code')
     return db[label]['physl']
 @app.post('/datasets/{label}/physl')
 async def add_physl(label: str, file: UploadFile = File(...)):
-    checkLabel(label)
+    checkDatasetExistence(label)
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'physl')
     await db.save(label)
 @app.get('/datasets/{label}/python')
 def get_python(label: str):
-    checkLabel(label)
+    checkDatasetExistence(label)
     if 'python' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not include python source code')
     return db[label]['python']
 @app.post('/datasets/{label}/python')
 async def add_python(label: str, file: UploadFile = File(...)):
-    checkLabel(label)
+    checkDatasetExistence(label)
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'python')
     await db.save(label)
 @app.get('/datasets/{label}/cpp')
 def get_cpp(label: str):
-    checkLabel(label)
+    checkDatasetExistence(label)
     if 'cpp' not in db[label]:
         raise HTTPException(status_code=404, detail='Dataset does not include C++ source code')
     return db[label]['cpp']
 @app.post('/datasets/{label}/cpp')
 async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
-    checkLabel(label)
+    checkDatasetExistence(label)
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
     await db.save(label)
 
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):
-    checkLabel(label)
-    return dict(db[label]['primitives'])
+    checkDatasetExistence(label)
+    return dict(db[label]['primitives'].items())
 
 class HistogramMode(str, Enum):
     utilization = 'utilization'
@@ -203,8 +203,8 @@ def histogram(label: str, \
               end: float = None, \
               location: str = None, \
               primitive: str = None):
-    checkLabel(label)
-    checkIntervals(label)
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
@@ -234,8 +234,8 @@ def histogram(label: str, \
 
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None):
-    checkLabel(label)
-    checkIntervals(label)
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
@@ -252,6 +252,89 @@ def intervals(label: str, begin: float = None, end: float = None):
             firstItem = False
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')
+
+@app.get('/datasets/{label}/intervals/{intervalId}/trace')
+def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):
+    # This streams back a list of string IDs, as well as two special metadata
+    # objects for drawing lines to the left and right of the queried range when
+    # the full traceback is not requested
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    def intervalIdGenerator():
+        yield '['
+        targetInterval = intervalObj = db[label]['intervals'][intervalId]
+        lastInterval = None
+        yieldComma = False
+
+        # First phase: from the targetInterval, step backward until we encounter
+        # an interval in the queried range (or we run out of intervals)
+        while 'lastParentInterval' in intervalObj and intervalObj['enter']['Timestamp'] > end:
+            lastInterval = intervalObj
+            parentId = intervalObj['lastParentInterval']['id']
+            intervalObj = db[label]['intervals'][parentId]
+
+        if targetInterval != intervalObj:
+            # Because the target interval isn't in the query window, yield some
+            # metadata about the interval beyond the end boundary, so the client
+            # can draw lines beyond the window (and won't need access to the
+            # interval beyond the window itself)
+            yield json.dumps({
+                'type': 'beyondRight',
+                'id': lastInterval['intervalId'],
+                'location': lastInterval['Location'],
+                'beginTimestamp': lastInterval['enter']['Timestamp']
+            })
+            yieldComma = True
+
+        # Second phase: yield interval ids until we encounter an interval beyond
+        # the queried range (or we run out)
+        while 'lastParentInterval' in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield '"%s"' % intervalObj['intervalId']
+            lastInterval = intervalObj
+            parentId = intervalObj['lastParentInterval']['id']
+            intervalObj = db[label]['intervals'][parentId]
+
+        if 'lastParentInterval' not in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
+            # We ran out of intervals, and the last one was in range; just yield
+            # its id (no beyondLeft metadata needed)
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield '"%s"' % intervalObj['intervalId']
+        elif lastInterval and lastInterval['leave']['Timestamp'] >= begin:
+            # Yield some metadata about the interval beyond the begin boundary,
+            # so the client can draw lines beyond the window (and won't need
+            # access to the interval itself)
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            yield json.dumps({
+                'type': 'beyondLeft',
+                'id': intervalObj['intervalId'],
+                'location': intervalObj['Location'],
+                'endTimestamp': intervalObj['leave']['Timestamp']
+            })
+
+        # Finished
+        yield ']'
+    return StreamingResponse(intervalIdGenerator(), media_type='application/json')
+
+@app.get('/datasets/{label}/guids/{guid}/intervalIds')
+def guidIntervalIds(label: str, guid: str):
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+    if guid not in db[label]['guids']:
+        raise HTTPException(status_code=404, detail='GUID %s not found' % guid)
+    return db[label]['guids'][guid]
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())

@@ -1,6 +1,6 @@
 @import '../../style/colors.less';
 
-.GanttView {
+.LineChartView {
   cursor: grab;
   touch-action: none; /* Don't zoom the browser when the user pinches */
   &:active {
@@ -42,12 +42,11 @@
     }
   }
 
-  .link {
+  .lines {
     .line {
       stroke-width: 1px;
       stroke: black; /* TODO: Unify me */
       vector-effect: non-scaling-stroke;
-      pointer-events: none;
     }
   }
 }
