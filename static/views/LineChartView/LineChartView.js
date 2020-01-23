@@ -23,12 +23,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.curMetric = 'PAPI_TOT_CYC';
     this.selectedLocation = '-1';
     this.baseOpacity = 0.3;
-    // Don't bother drawing bars if there are more than 10000 visible intervals
-    this.renderCutoff = 10000;
-
-    // Override uki's default .1 second debouncing of render() because we want
-    // to throttle incremental updates to at most once per second
-    // this.debounceWait = 1000;
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `LineChartView${LineChartView.DOM_COUNT}`;
@@ -202,7 +196,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
   drawLines (data) {
-    console.log('drawing again');
+    // console.log('drawing again');
     var _self = this;
     var locationPosition = {};
     var timePosition = {};
@@ -335,7 +329,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       })
       .on('click', (d) => {
         this.selectedLocation = d.value['Location'];
-        console.log('clicked ' + this.selectedLocation);
+        // console.log('clicked ' + this.selectedLocation);
         this.render();
       });
     // .on('mousedown', function(d) {
