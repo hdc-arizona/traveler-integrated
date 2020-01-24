@@ -41,5 +41,5 @@ RUN python3 install.py
 WORKDIR /traveler-integrated/notebook
 ENV PATH /usr/local/cli/bin:/traveler-integrated/notebook/agave-cli/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 
-# Default container command is to launch both traveler-integrated and jupyter
-CMD ["bash", "/traveler-integrated/docker.sh"]
+# Default container command is to launch jupyter
+CMD ["bash", "/traveler-integrated/jupyter.sh"]
