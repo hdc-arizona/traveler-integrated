@@ -17,15 +17,26 @@ class Tooltip extends View {
     this.show({ content: null });
   }
   /**
-     * @param  {String} [content='']
-     * The message that will be displayed; the empty string hides the tooltip
-     * @param  {[type]} [targetBounds=null]
-     * Specifies a target element that the tooltip should be positioned relative to
-     * @param  {[type]} [anchor=null]
-     * Specifies -1 to 1 positioning of the tooltip relative to targetBounds; for
-     * example, x = -1 would right-align the tooltip to the left edge of
-     * targetBounds, x = 0 would center the tooltip horizontally, and x = 1 would
-     * left-align the tooltip to the right edge of targetBounds
+     * @param  {String | Function} [content='']
+     * The message that will be displayed; an empty string hides the tooltip.
+     * If, instead of a string, a function is supplied, that function will be
+     * called with a d3-selected div as its first argument (useful for more
+     * complex, custom tooltip contents)
+     * @param  {Object} [targetBounds=null]
+     * Specifies a target rectangle that the tooltip should be positioned
+     * relative to; usually element.getBoundingClientRect() will do the trick,
+     * but you could also specify a similarly-formatted custom rectangle
+     * @param  {Object} [anchor=null]
+     * Specifies -1 to 1 positioning of the tooltip relative to targetBounds;
+     * for example, { x: -1 } would right-align the tooltip to the left edge of
+     * targetBounds, { x: 0 } would center the tooltip horizontally, and
+     * { x: 1 } would left-align the tooltip to the right edge of targetBounds
+     * @param  {Boolean} [interactive = false]
+     * Specifies whether pointer-events should register on the tooltip
+     * element(s); if false, pointer events will pass through
+     * @param  {Boolean} [nestNew = false]
+     * If true, adds an additional "tooltip"-classed eleemnt instead of
+     * replacing the existing one (useful for things like nested context menus)
      */
   show ({
     content = '',
@@ -135,6 +146,27 @@ class Tooltip extends View {
       }
     }
   }
+  /**
+     * @param  {Array} [menuEntries]
+     * A list of objects for each menu item. Each object should have two
+     * properties:
+     * - A content property that is a string or a function; this works the same
+     *   way as show()'s content argument
+     * - Either an onClick function that will be called when the menu entry is
+     *   clicked, or a subEntries list of additional menuEntries
+     * @param  {Object} [targetBounds=null]
+     * Specifies a target rectangle that the tooltip should be positioned
+     * relative to; usually element.getBoundingClientRect() will do the trick,
+     * but you could also specify a similarly-formatted custom rectangle
+     * @param  {Object} [anchor=null]
+     * Specifies -1 to 1 positioning of the tooltip relative to targetBounds;
+     * for example, { x: -1 } would right-align the tooltip to the left edge of
+     * targetBounds, { x: 0 } would center the tooltip horizontally, and
+     * { x: 1 } would left-align the tooltip to the right edge of targetBounds
+     * @param  {Boolean} [nestNew = false]
+     * This should be false for most use cases; it's used internally for nested
+     * context menus
+     */
   showContextMenu ({ menuEntries, targetBounds, anchor, nestNew } = {}) {
     const self = this;
     this.show({
@@ -168,6 +200,7 @@ class Tooltip extends View {
             self.showContextMenu({
               menuEntries: d.subEntries,
               targetBounds: this.getBoundingClientRect(),
+              anchor,
               nestNew: true
             });
           }
