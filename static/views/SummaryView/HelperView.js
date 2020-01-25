@@ -97,7 +97,7 @@ class HelperView extends LinkedMixin(View) {
       .on('mouseenter', function () {
         self._standardMousing = true;
         window.controller.tooltip.show({
-          content: `Color by...`,
+          content: `Show views...`,
           targetBounds: this.getBoundingClientRect()
         });
       })
