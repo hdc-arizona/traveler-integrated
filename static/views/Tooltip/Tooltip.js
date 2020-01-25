@@ -151,7 +151,12 @@ class Tooltip extends View {
      * A list of objects for each menu item. Each object should have two
      * properties:
      * - A content property that is a string or a function; this works the same
-     *   way as show()'s content argument
+     *   way as show()'s content argument, however a button will already have
+     *   been created by default with this structure:
+     *   <div class="button">
+     *     <a></a>
+     *     <div class="label"></div>
+     *   </div>
      * - Either an onClick function that will be called when the menu entry is
      *   clicked, or a subEntries list of additional menuEntries
      * @param  {Object} [targetBounds=null]
@@ -181,33 +186,45 @@ class Tooltip extends View {
         const menuItems = d3el.selectAll('.button')
           .data(menuEntries)
           .enter().append('div')
-          .classed('button', true);
+          .classed('button', true)
+          .classed('submenu', d => !!d.subEntries);
         menuItems.append('a');
         menuItems.append('div')
           .classed('label', true);
         menuItems.each(function (d) {
-          if (d.drawButton) {
-            d.drawButton(d3.select(this));
-          } else if (d.label) {
-            d3.select(this).select('.label').text(d.label);
+          if (typeof d.content === 'function') {
+            d.content(d3.select(this));
+          } else {
+            d3.select(this).select('.label').text(d.content);
           }
         });
-        menuItems.on('click', function (d) {
-          if (d.onClick) {
-            d.onClick();
-            self.hide();
-          } else if (d.subEntries) {
-            self.showContextMenu({
-              menuEntries: d.subEntries,
-              targetBounds: this.getBoundingClientRect(),
-              anchor,
-              nestNew: true
-            });
-          }
-        });
+        menuItems
+          .on('click', function (d) {
+            if (d.onClick) {
+              d.onClick();
+              self.hide();
+            } else if (d.subEntries) {
+              let targetBounds = this.getBoundingClientRect();
+              targetBounds = {
+                left: targetBounds.left,
+                right: targetBounds.right + Tooltip.SUBMENU_OFFSET,
+                top: targetBounds.top,
+                bottom: targetBounds.bottom,
+                width: targetBounds.width + Tooltip.SUBMENU_OFFSET,
+                height: targetBounds.height
+              };
+              self.showContextMenu({
+                menuEntries: d.subEntries,
+                targetBounds,
+                anchor,
+                nestNew: true
+              });
+            }
+          });
       }
     });
   }
 }
+Tooltip.SUBMENU_OFFSET = 20;
 
 export default Tooltip;

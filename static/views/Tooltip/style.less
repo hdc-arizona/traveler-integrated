@@ -32,5 +32,15 @@
         border: 1px solid @shadowColor;
       }
     }
+    &.submenu {
+      margin-right: 1em;
+      &:after {
+        content: '\25b6';
+        color: @invertedTextColor;
+        position: absolute;
+        right: -1em;
+        top: 0.5em;
+      }
+    }
   }
 }

@@ -21,7 +21,7 @@ class HelperView extends LinkedMixin(View) {
 
     // Delete button
     this.d3el.select('.delete.button')
-      .on('mouseenter', () => {
+      .on('mouseenter', function () {
         window.controller.tooltip.show({
           content: `Delete ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
@@ -67,7 +67,7 @@ class HelperView extends LinkedMixin(View) {
         self._standardMousing = false;
         const menuEntries = Object.entries(LinkedState.COLOR_SCHEMES).map(([label, colors]) => {
           return {
-            drawButton: d3el => {
+            content: d3el => {
               const labelWrapper = d3el.select('.label');
               labelWrapper.append('div')
                 .classed('colorSquare', true)
@@ -111,27 +111,38 @@ class HelperView extends LinkedMixin(View) {
         window.controller.tooltip.showContextMenu({
           menuEntries: [
             {
-              label: 'this',
+              content: 'this',
               onClick: () => {}
             },
             {
-              label: 'is',
-              onClick: () => {}
-            },
-            {
-              label: 'a',
+              content: 'is',
               subEntries: [
                 {
-                  label: 'test',
-                  onClick: () => {}
-                },
-                {
-                  label: 'context',
-                  onClick: () => {}
-                },
-                {
-                  label: 'menu',
-                  onClick: () => {}
+                  content: 'a',
+                  subEntries: [
+                    {
+                      content: 'test',
+                      subEntries: [
+                        {
+                          content: 'of',
+                          onClick: () => {}
+                        },
+                        {
+                          content: 'nested',
+                          subEntries: [
+                            {
+                              content: 'context',
+                              onClick: () => {}
+                            },
+                            {
+                              content: 'menus',
+                              onClick: () => {}
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
