@@ -18,15 +18,27 @@ class HelperView extends LinkedMixin(View) {
   }
   setupButtonListeners () {
     const self = this;
-    this.d3el.select('.delete.button').on('click', async d => {
-      if (window.confirm(`Are you sure you want to delete ${this.linkedState.label}?`)) {
-        await window.fetch(`/datasets/${encodeURIComponent(d)}`, {
-          method: 'delete'
+
+    // Delete button
+    this.d3el.select('.delete.button')
+      .on('mouseenter', () => {
+        window.controller.tooltip.show({
+          content: `Delete ${self.linkedState.label}`,
+          targetBounds: this.getBoundingClientRect()
         });
-        window.controller.closeAllViews(this.linkedState);
-        await window.controller.getDatasets();
-      }
-    });
+      })
+      .on('mouseleave', () => { window.controller.tooltip.hide(); })
+      .on('click', async d => {
+        if (window.confirm(`Are you sure you want to delete ${this.linkedState.label}?`)) {
+          await window.fetch(`/datasets/${encodeURIComponent(d)}`, {
+            method: 'delete'
+          });
+          window.controller.closeAllViews(this.linkedState);
+          await window.controller.getDatasets();
+        }
+      });
+
+    // Assemble views button
     this.d3el.select('.assemble.button')
       .on('mouseenter', function () {
         window.controller.tooltip.show({
@@ -36,6 +48,8 @@ class HelperView extends LinkedMixin(View) {
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', () => { window.controller.assembleViews(this.linkedState, this); });
+
+    // Color mode button
     this.d3el.select('.color.button')
       .on('mouseenter', function () {
         self._standardMousing = true;
@@ -75,6 +89,54 @@ class HelperView extends LinkedMixin(View) {
         window.controller.tooltip.showContextMenu({
           targetBounds: this.getBoundingClientRect(),
           menuEntries
+        });
+      });
+
+    // Hamburger menu
+    this.d3el.select('.hamburger.button')
+      .on('mouseenter', function () {
+        self._standardMousing = true;
+        window.controller.tooltip.show({
+          content: `Color by...`,
+          targetBounds: this.getBoundingClientRect()
+        });
+      })
+      .on('mouseleave', () => {
+        if (this._standardMousing) {
+          window.controller.tooltip.hide();
+        }
+      })
+      .on('click', function () {
+        self._standardMousing = false;
+        window.controller.tooltip.showContextMenu({
+          menuEntries: [
+            {
+              label: 'this',
+              onClick: () => {}
+            },
+            {
+              label: 'is',
+              onClick: () => {}
+            },
+            {
+              label: 'a',
+              subEntries: [
+                {
+                  label: 'test',
+                  onClick: () => {}
+                },
+                {
+                  label: 'context',
+                  onClick: () => {}
+                },
+                {
+                  label: 'menu',
+                  onClick: () => {}
+                }
+              ]
+            }
+          ],
+          targetBounds: this.getBoundingClientRect()
         });
       });
   }

@@ -32,7 +32,8 @@ class Tooltip extends View {
     targetBounds = null,
     anchor = null,
     hideAfterMs = 1000,
-    interactive = false
+    interactive = false,
+    nestNew = false
   } = {}) {
     window.clearTimeout(this._tooltipTimeout);
     const showEvent = d3.event;
@@ -44,7 +45,13 @@ class Tooltip extends View {
       }
     });
 
-    let tooltip = this.d3el
+    let tooltip = this.d3el;
+    if (nestNew) {
+      tooltip = tooltip.append('div')
+        .classed('tooltip', true);
+    }
+
+    tooltip
       .classed('interactive', interactive)
       .style('left', null)
       .style('top', null)
@@ -128,12 +135,14 @@ class Tooltip extends View {
       }
     }
   }
-  showContextMenu ({ menuEntries, targetBounds, anchor } = {}) {
+  showContextMenu ({ menuEntries, targetBounds, anchor, nestNew } = {}) {
+    const self = this;
     this.show({
       targetBounds,
       anchor,
       hideAfterMs: 0,
       interactive: true,
+      nestNew,
       content: d3el => {
         d3el.html('');
 
@@ -145,11 +154,23 @@ class Tooltip extends View {
         menuItems.append('div')
           .classed('label', true);
         menuItems.each(function (d) {
-          d.drawButton(d3.select(this));
+          if (d.drawButton) {
+            d.drawButton(d3.select(this));
+          } else if (d.label) {
+            d3.select(this).select('.label').text(d.label);
+          }
         });
-        menuItems.on('click', d => {
-          d.onClick();
-          this.hide();
+        menuItems.on('click', function (d) {
+          if (d.onClick) {
+            d.onClick();
+            self.hide();
+          } else if (d.subEntries) {
+            self.showContextMenu({
+              menuEntries: d.subEntries,
+              targetBounds: this.getBoundingClientRect(),
+              nestNew: true
+            });
+          }
         });
       }
     });
