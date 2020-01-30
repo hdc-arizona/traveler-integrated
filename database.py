@@ -409,7 +409,7 @@ class Database:
         skippedMetricsForMissingPrior = 0
         skippedMetricsForMismatch = 0
 
-        for line in file:
+        async for line in file:
             eventLineMatch = eventLineParser.match(line)
             addAttrLineMatch = addAttrLineParser.match(line)
             metricLineMatch = metricLineParser.match(line)
@@ -468,6 +468,10 @@ class Database:
                     currentEvent[attrMatch.group(1)] = attrMatch.group(2)
             else:
                 # This line contains additional event attributes
+                if currentEvent is None or addAttrLineMatch is None:
+                    print(currentEvent)
+                    print(addAttrLineMatch)
+                    print(line)
                 assert currentEvent is not None and addAttrLineMatch is not None
                 attrList = addAttrSplitter.split(addAttrLineMatch.group(1))
                 for attrStr in attrList:
