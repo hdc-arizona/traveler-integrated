@@ -10,7 +10,7 @@ from blist import sortedlist #pylint: disable=import-error
 from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 
 # Possible files / metadata structures that we create / open / update
-diskCacheIndices = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'metrics']
+diskCacheIndices = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
 requiredDiskCacheIndices = ['meta', 'primitives', 'primitiveLinks']
 pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
 requiredMetaLists = ['sourceFiles']
@@ -388,13 +388,13 @@ class Database:
         # Set up database files
         labelDir = os.path.join(self.dbDir, label)
         primitives = self.datasets[label]['primitives']
-        metrics = self.datasets[label]['metrics']
         intervals = self.datasets[label]['intervals'] = diskcache.Index(os.path.join(labelDir, 'intervals.diskCacheIndex'))
         intervalIndexes = self.datasets[label]['intervalIndexes'] = {
             'primitives': {},
             'locations': {},
             'both': {}
         }
+        procMetrics = self.datasets[label]['procMetrics'] = diskcache.Index(os.path.join(labelDir, 'procMetrics.diskCacheIndex'))
         guids = self.datasets[label]['guids'] = diskcache.Index(os.path.join(labelDir, 'guids.diskCacheIndex'))
         self.datasets[label]['meta']['storedEvents'] = storeEvents
         if storeEvents:
@@ -425,8 +425,6 @@ class Database:
                 metricType = metricLineMatch.group(3)
                 value = int(float(metricLineMatch.group(4)))
 
-                if metricType.startswith(metricPrefixes):
-                    await log(line)
                 if metricType.startswith('PAPI'):
                     if currentEvent is None:
                         skippedMetricsForMissingPrior += 1
@@ -436,7 +434,11 @@ class Database:
                         includedMetrics += 1
                         currentEvent['metrics'][metricType] = value
                 else: # do the other meminfo status io parsing here
-                    metrics[metricType][str(timestamp)] = value
+                    if metricType not in procMetrics:
+                        procMetrics[metricType] = {}
+                    val = procMetrics[metricType]
+                    val[str(timestamp)] = {'Timestamp': timestamp, 'Value':  value}
+                    procMetrics[metricType] = val
             elif eventLineMatch is not None:
                 # This is the beginning of a new event; process the previous one
                 if currentEvent is not None:

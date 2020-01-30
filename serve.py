@@ -253,6 +253,29 @@ def intervals(label: str, begin: float = None, end: float = None):
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
+@app.get('/datasets/{label}/procMetrics')
+def procMetrics(label: str, metric: str, begin: float = None, end: float = None):
+    checkDatasetExistence(label)
+    # checkDatasetHasIntervals(label)
+
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    def intervalGenerator():
+        yield '['
+        firstItem = True
+        for tm in db[label]['procMetrics'][metric]:
+            if float(tm) < begin or float(tm) > end:
+                continue
+            if not firstItem:
+                yield ','
+            yield json.dumps(db[label]['procMetrics'][metric][tm])
+            firstItem = False
+        yield ']'
+    return StreamingResponse(intervalGenerator(), media_type='application/json')
+
 @app.get('/datasets/{label}/intervals/{intervalId}/trace')
 def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):
     # This streams back a list of string IDs, as well as two special metadata
