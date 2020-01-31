@@ -190,7 +190,7 @@ async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):
     checkDatasetExistence(label)
-    return dict(db[label]['primitives'].items())
+    return dict(db[label]['primitives'])
 
 class HistogramMode(str, Enum):
     utilization = 'utilization'

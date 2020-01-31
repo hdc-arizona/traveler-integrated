@@ -121,7 +121,8 @@ class LinkedState extends Model {
       } else if (fileType === 'otf2') {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
-        views['LineChartView'] = true;
+        views['LineChartView'] = false;
+        views['ProcMetricView'] = true;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -386,8 +387,6 @@ class LinkedState extends Model {
         maxY = Math.max(maxY, rt);
       }
     }
-    // console.log("maximum value for " + metric + " : " + maxY);
-    // console.log(locationPosition);
     return maxY;
   }
 }

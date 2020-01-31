@@ -1,7 +1,7 @@
 @import '../../style/colors.less';
 
-#tooltip {
-  position: absolute;
+.tooltip {
+  position: fixed;
   z-index: 1001;
   padding: 0.5em;
   border-radius: 0.5em;
@@ -30,6 +30,16 @@
         width: 1em;
         height: 1em;
         border: 1px solid @shadowColor;
+      }
+    }
+    &.submenu {
+      margin-right: 1em;
+      &:after {
+        content: '\25b6';
+        color: @invertedTextColor;
+        position: absolute;
+        right: -1em;
+        top: 0.5em;
       }
     }
   }
