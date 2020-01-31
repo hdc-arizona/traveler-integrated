@@ -204,7 +204,7 @@ async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
 @app.get('/datasets/{label}/primitives')
 def primitives(label: str):
     checkDatasetExistence(label)
-    return dict(db[label]['primitives'].items())
+    return dict(db[label]['primitives'])
 
 class HistogramMode(str, Enum):
     utilization = 'utilization'
@@ -266,6 +266,37 @@ def intervals(label: str, begin: float = None, end: float = None):
             firstItem = False
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')
+
+@app.get('/datasets/{label}/procMetrics')
+def procMetrics(label: str, metric: str, begin: float = None, end: float = None):
+    checkDatasetExistence(label)
+    # checkDatasetHasIntervals(label)
+
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    def intervalGenerator():
+        yield '['
+        firstItem = True
+        for tm in db[label]['procMetrics'][metric]:
+            if float(tm) < begin or float(tm) > end:
+                continue
+            if not firstItem:
+                yield ','
+            yield json.dumps(db[label]['procMetrics'][metric][tm])
+            firstItem = False
+        yield ']'
+    return StreamingResponse(intervalGenerator(), media_type='application/json')
+
+@app.get('/datasets/{label}/procMetricTypes')
+def procMetrics(label: str):
+    checkDatasetExistence(label)
+
+    def procMetricListGenerator():
+        yield json.dumps(db[label]['procMetrics']['procMetricList'])
+    return StreamingResponse(procMetricListGenerator(), media_type='application/json')
 
 @app.get('/datasets/{label}/intervals/{intervalId}/trace')
 def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):

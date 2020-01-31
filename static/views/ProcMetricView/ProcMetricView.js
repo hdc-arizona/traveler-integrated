@@ -1,4 +1,4 @@
-/* globals d3 */
+/* globals d3, oboe ... */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
@@ -6,11 +6,11 @@ import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
-class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
+class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
   constructor (argObj) {
     argObj.resources = [
-      { type: 'less', url: 'views/LineChartView/style.less' },
-      { type: 'text', url: 'views/LineChartView/template.svg' }
+      {type: 'less', url: 'views/ProcMetricView/style.less'},
+      {type: 'text', url: 'views/ProcMetricView/template.svg'}
     ];
     super(argObj);
     this.xScale = d3.scaleLinear();
@@ -19,20 +19,19 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.stream = null;
     this.cache = {};
     this.newCache = null;
-    this.intervalCount = 0;
-    this.curMetric = 'PAPI_TOT_INS';
+    this.metricValueCount = 0;
+    this.hoverIndex = -1;
+    this.isMetricLoading = false;
+    this.curMetric = 'meminfo:MemFree';
     this.selectedLocation = '-1';
     this.baseOpacity = 0.3;
 
     // Some things like SVG clipPaths require ids instead of classes...
-    this.uniqueDomId = `LineChartView${LineChartView.DOM_COUNT}`;
-    LineChartView.DOM_COUNT++;
-  }
-  get isLoading () {
-    return super.isLoading || this.linkedState.isLoadingIntervals;
+    this.uniqueDomId = `ProcMetricView${ProcMetricView.DOM_COUNT}`;
+    ProcMetricView.DOM_COUNT++;
   }
   get isEmpty () {
-    return this.error || this.linkedState.loadedIntervalCount === 0;
+    return this.error || this.metricValueCount === 0;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
@@ -48,7 +47,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.yScale.range([0, result.height]);
     return result;
   }
-  
   setup () {
     super.setup();
 
@@ -61,15 +59,15 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       left: 40
     };
     this.content.select('.chart')
-        .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
+      .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
     // Create a view-specific clipPath id, as there can be more than one
-    // LineChartView in the app
+    // ProcMetricView in the app
     const clipId = this.uniqueDomId + 'clip';
     this.content.select('clipPath')
-        .attr('id', clipId);
+      .attr('id', clipId);
     this.content.select('.clippedStuff')
-        .attr('clip-path', `url(#${clipId})`);
+      .attr('clip-path', `url(#${clipId})`);
 
     var __self = this;
     // Set up zoom / pan interactions
@@ -77,19 +75,14 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.linkedState.getMaxMinOfMetric(this.curMetric);
     // // Update scales whenever something changes the brush
     this.linkedState.on('newIntervalWindow', () => {
-      this.xScale.domain(this.linkedState.intervalWindow);
-      // // this.yScale.domain([200, 100]);
-      // // Abort + re-start the stream
+      // this.xScale.domain(this.linkedState.intervalWindow);
       // this.getData();
-      var maxY = this.linkedState.getMaxMinOfMetric(this.curMetric);
-      // console.log('got maxY : ' + maxY);
-      this.yScale.domain([maxY + 3, 0]);
-      __self.render();
+      // __self.render();
     });
     // // Initialize the scales / stream
-    // this.xScale.domain(this.linkedState.intervalWindow);
+    this.xScale.domain(this.linkedState.intervalWindow);
     // // this.yScale.domain([200, 100]);
-    // this.getData();
+    this.getData();
     //
     // // Draw the axes right away (because we have a longer debounceWait than
     // // normal, there's an initial ugly flash before draw() gets called)
@@ -106,6 +99,66 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     //       this.render();
     //     });
   }
+  getData () {
+    // Debounce the start of this expensive process...
+    // (but flag that we're loading)
+    window.clearTimeout(this._resizeTimeout);
+    this._resizeTimeout = window.setTimeout(async () => {
+      const label = encodeURIComponent(this.layoutState.label);
+      // const intervalWindow = this.linkedState.intervalWindow;
+      const self = this;
+      // First check whether we're asking for too much data by getting a
+      // histogram with a single bin (TODO: draw per-location histograms instead
+      // of just saying "Too much data; scroll to zoom in?")
+      // this.curMetric = 'meminfo:MemFree';
+      console.log("found metric: " + this.curMetric);
+      // Okay, start the stream, and collect it in a separate cache to avoid
+      // old intervals from disappearing from incremental refreshes
+      this.newCache = {};
+      this.waitingOnIncrementalRender = false;
+      var maxY = Number.MIN_VALUE;
+      var minY = Number.MAX_VALUE;
+      this.metricValueCount = 0;
+      const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics?metric=${this.curMetric}`)
+      // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics?metric=${curMetric}&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+          .fail(error => {
+            this.metricValueCount = 0;
+            this.error = error;
+            console.log(error);
+          })
+          .node('!.*', function (metricList) {
+            if (currentStream !== self.stream) {
+              // A different stream has been started; abort this one
+              this.abort();
+            } else {
+              self.isMetricLoading = true;
+              var val = metricList['Value'];
+              self.newCache[metricList['Timestamp']] = val;
+              maxY = Math.max(maxY, val);
+              minY = Math.min(minY, val);
+              self.metricValueCount++;
+              if (!self.waitingOnIncrementalRender) {
+                // self.render() is debounced; this converts it to throttling,
+                // rate-limiting incremental refreshes by this.debounceWait
+                self.render();
+                self.waitingOnIncrementalRender = true;
+              }
+            }
+          })
+          .done(() => {
+            this.stream = null;
+            this.cache = this.newCache;
+            this.newCache = null;
+            this.isMetricLoading = false;
+            console.log("cache for proc metric loaded: " + self.metricValueCount);
+            var yOffset = (maxY - minY) / 10;
+            this.yScale.domain([maxY+yOffset, minY-yOffset]);
+            this.render();
+          });
+      this.yScale.domain([maxY, minY]);
+      this.render();
+    }, 100);
+  }
   draw () {
     super.draw();
 
@@ -114,7 +167,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     } else if (this.isEmpty) {
       if (this.error) {
         this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
-      } else if (this.intervalCount === 0) {
+      } else if (this.metricValueCount === 0) {
         this.emptyStateDiv.html('<p>No data in the current view</p>');
       } else {
         this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
@@ -126,7 +179,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this._bounds = this.getChartBounds();
 
     // Combine old data with any new data that's streaming in
-    const data = d3.entries(this.linkedState.getCurrentIntervals());
+    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
 
     // Hide the small spinner
     this.content.select('.small.spinner').style('display', 'none');
@@ -135,37 +188,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     // Update the axes (also updates scales)
     this.drawAxes();
 
-    // if (this.linkedState.selectedIntervalId) {
-    //   // This is partial clone code from drawLinks
-    //   // Collect only the links in the back-path of the selected IntervalId
-    //   // TODO Make me more efficient, this has a lot of passes
-    //   let workingId = this.linkedState.selectedIntervalId;
-    //   let inView = true;
-    //   while (inView) {
-    //     let interval = data.find(d => d.value.intervalId === workingId);
-    //
-    //     // Only continue if interval is found and has a link backwards
-    //     if (interval && interval.value.hasOwnProperty('lastParentInterval')) {
-    //       interval.value.inTraceBack = true;
-    //     } else {
-    //       inView = false;
-    //       continue;
-    //     }
-    //
-    //     workingId = interval.value.lastParentInterval.id;
-    //     // Only continue if previous interval is drawn
-    //     if (interval.value.lastParentInterval.endTimestamp < this.xScale.range()[0]) {
-    //       inView = false;
-    //     }
-    //   }
-    // } else {
-    //   data.map(d => { d.value.inTraceBack = false; return d; });
-    // }
-
-    // Update the bars
     this.drawLines(data);
-    // Update the links
-    // this.drawLinks(data);
 
     // Update the incremental flag so that we can call render again if needed
     this.waitingOnIncrementalRender = false;
@@ -199,153 +222,74 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
   drawLines (data) {
     // console.log('drawing again');
     var _self = this;
-    var locationPosition = {};
-    var timePosition = {};
-    var ratePosition = {};
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.dots').attr('transform', null);
     }
 
-    let cirlces = this.content.select('.dots')
-      .selectAll('.dot').data(data, d => d.key);
+    let cirlces = this.content.select('.metric_dots')
+      .selectAll('.metric_dot').data(data, d => d.key);
     cirlces.exit().remove();
     const cirlcesEnter = cirlces.enter().append('circle')
-      .classed('dot', true);
+      .classed('metric_dot', true);
     cirlces = cirlces.merge(cirlcesEnter);
 
-    var calcRate = function (d, i) {
-      if (d.value['Location'] in locationPosition) {
-        // do nothing
-      } else {
-        locationPosition[d.value['Location']] = [-1, -1];
-      }
-      var Xi = 0;
-      var Ti = 0;
-      if (locationPosition[d.value['Location']][0] > -1) {
-        var dd = cirlces.data()[locationPosition[d.value['Location']][0]];
-        Xi = dd.value['enter']['metrics'][_self.curMetric];
-        Ti = dd.value['enter']['Timestamp'];
-      }
-      var Xj = d.value['enter']['metrics'][_self.curMetric];
-      var Tj = d.value['enter']['Timestamp'];
-      if (locationPosition[d.value['Location']][1] === -1 && Xi === Xj) {
-        Xi = 0; Ti = 0;
-      }
-      var ret = Math.abs(Xj - Xi) / Math.abs(Tj - Ti);
-
-      var Xh = 0;
-      var Th = 0;
-      if (locationPosition[d.value['Location']][1] > -1) {
-        var pred = cirlces.data()[locationPosition[d.value['Location']][1]];
-        Xh = pred.value['enter']['metrics'][_self.curMetric];
-        Th = pred.value['enter']['Timestamp'];
-        ret += Math.abs(Xi - Xh) / Math.abs(Ti - Th);
-      }
-      locationPosition[d.value['Location']][1] = locationPosition[d.value['Location']][0];
-      locationPosition[d.value['Location']][0] = i;
-      return ret;
-    };
-
-    cirlces.attr('class', 'dot')
-      .attr('cx', d => this.xScale(d.value['enter']['Timestamp']))
+    cirlces.attr('class', 'metric_dot')
+      .attr('cx', d => this.xScale(d.key))
       .attr('cy', function (d, i) {
-        return _self.yScale(calcRate(d, i));
+        return _self.yScale(d.value);
       })
-      .attr('r', d => {
-        if (d.value['Location'] === _self.selectedLocation) {
-          return 5.0;
-        }
+      .attr('r', function (d, i) {
+        if(i === _self.hoverIndex)return 10.0;
         return 3.0;
       })
-      .style('opacity', d => {
-        if (d.value['Location'] === _self.selectedLocation) {
-          return 1.0;
-        }
-        return _self.baseOpacity;
-      });
-
-    locationPosition = {};
-
-    let lines = this.content.select('.lines')
-      .selectAll('.line').data(data, d => d.key);
-    lines.exit().remove();
-    const linesEnter = lines.enter().append('line')
-      .classed('line', true);
-    lines = lines.merge(linesEnter);
-
-    lines.attr('class', 'line')
-      .attr('x1', function (d, i) {
-        if (d.value['Location'] in timePosition) {
-          var prevData = lines.data()[timePosition[d.value['Location']]];
-          timePosition[d.value['Location']] = i;
-          return _self.xScale(prevData.value['enter']['Timestamp']);
-        } else {
-          timePosition[d.value['Location']] = i;
-        }
-        return _self.xScale(0);
-      })
-      .attr('y1', function (d, i) {
-        if (d.value['Location'] in ratePosition) {
-          var prevData = lines.data()[ratePosition[d.value['Location']]];
-          var retVal = _self.yScale(calcRate(prevData, ratePosition[d.value['Location']]));
-          ratePosition[d.value['Location']] = i;
-          return retVal;
-        } else {
-          ratePosition[d.value['Location']] = i;
-        }
-        return _self.yScale(0);
-      })
-      .attr('x2', function (d, i) {
-        return _self.xScale(d.value['enter']['Timestamp']);
-      })
-      .attr('y2', function (d, i) {
-        if (i === 0) {
-          locationPosition = {};
-        }
-        return _self.yScale(calcRate(d, i));
-      })
-      .style('stroke', d => {
-        if (d.value['Location'] === _self.selectedLocation) {
-          return 'blue';
-        }
-        return 'black';
-      })
-      .style('stroke-width', 3)
-      .style('opacity', d => {
-        if (d.value['Location'] === _self.selectedLocation) {
-          return 1.0;
-        }
-        return _self.baseOpacity;
-      })
-      .on('mouseenter', function (d) {
+      .style('opacity', 1.0)
+      .on('mouseenter', function (d,i) {
         window.controller.tooltip.show({
-          content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
+          content: `<span>Timestamp: ${d.key}<br/> Value: ${d.value}</span>`,
           targetBounds: this.getBoundingClientRect(),
           hideAfterMs: null
         });
+        _self.hoverIndex = i;
+        _self.render();
       })
       .on('mouseout', () => {
         window.controller.tooltip.hide();
-      })
-      .on('click', (d) => {
-        this.selectedLocation = d.value['Location'];
-        // console.log('clicked ' + this.selectedLocation);
+        this.hoverIndex = -1;
         this.render();
       });
-    // .on('mousedown', function(d) {
-    //   console.log('mousedown');
-    // })
-    // .on('mouseup', function(d) {
-    //   console.log('mouseup');
-    // })
-    // lines.select('.line')
-    //     .style('opacity', d => {
-    //       if (_self.selectedLocation !== '-1' && d.value.location === _self.selectedLocation) {
-    //         return 1.0;
-    //       }
-    //       return 0.1;
-    //     });
+
+    let lines = this.content.select('.metric_lines')
+        .selectAll('.metric_line').data(data, d => d.key);
+    lines.exit().remove();
+    const linesEnter = lines.enter().append('line')
+        .classed('metric_line', true);
+    lines = lines.merge(linesEnter);
+    lines.attr('class', 'metric_line')
+        .attr('x1', function (d, i) {
+          var ret = d;
+          if(i>0) {
+            ret = lines.data()[i-1];
+          }
+          return _self.xScale(ret.key);
+        })
+        .attr('y1', function (d, i) {
+          var ret = d;
+          if(i>0) {
+            ret = lines.data()[i-1];
+          }
+          return _self.yScale(ret.value);
+        })
+        .attr('x2', function (d) {
+          return _self.xScale(d.key);
+        })
+        .attr('y2', function (d) {
+          return _self.yScale(d.value);
+        })
+        .style('stroke', 'blue')
+        .style('stroke-width', 2)
+        .style('opacity', 1.0)
+        ;
   }
   setupZoomAndPan () {
     this.initialDragState = null;
@@ -450,5 +394,5 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         }));
   }
 }
-LineChartView.DOM_COUNT = 1;
-export default LineChartView;
+ProcMetricView.DOM_COUNT = 1;
+export default ProcMetricView;
