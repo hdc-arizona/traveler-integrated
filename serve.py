@@ -268,7 +268,13 @@ def intervals(label: str, begin: float = None, end: float = None):
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 @app.get('/datasets/{label}/procMetrics')
-def procMetrics(label: str, metric: str, begin: float = None, end: float = None):
+def procMetrics(label: str):
+    checkDatasetExistence(label)
+
+    return db[label]['procMetrics']['procMetricList']
+
+@app.get('/datasets/{label}/procMetrics/{metric}')
+def procMetricValues(label: str, metric: str, begin: float = None, end: float = None):
     checkDatasetExistence(label)
     # checkDatasetHasIntervals(label)
 
@@ -277,7 +283,7 @@ def procMetrics(label: str, metric: str, begin: float = None, end: float = None)
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
 
-    def intervalGenerator():
+    def procMetricGenerator():
         yield '['
         firstItem = True
         for tm in db[label]['procMetrics'][metric]:
@@ -288,15 +294,7 @@ def procMetrics(label: str, metric: str, begin: float = None, end: float = None)
             yield json.dumps(db[label]['procMetrics'][metric][tm])
             firstItem = False
         yield ']'
-    return StreamingResponse(intervalGenerator(), media_type='application/json')
-
-@app.get('/datasets/{label}/procMetricTypes')
-def procMetrics(label: str):
-    checkDatasetExistence(label)
-
-    def procMetricListGenerator():
-        yield json.dumps(db[label]['procMetrics']['procMetricList'])
-    return StreamingResponse(procMetricListGenerator(), media_type='application/json')
+    return StreamingResponse(procMetricGenerator(), media_type='application/json')
 
 @app.get('/datasets/{label}/intervals/{intervalId}/trace')
 def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):

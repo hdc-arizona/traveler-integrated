@@ -1,7 +1,8 @@
+/* globals d3 */
 import { View } from '../../node_modules/uki/dist/uki.esm.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 import LinkedState from '../../models/LinkedState.js';
-import ProcMetricView from "../ProcMetricView/ProcMetricView.js";
+import ProcMetricView from '../ProcMetricView/ProcMetricView.js';
 
 /**
  * HelperView represents a single dataset inside SummaryView
@@ -21,8 +22,8 @@ class HelperView extends LinkedMixin(View) {
     const self = this;
     var clearTooltipStyle = function () {
       d3.selectAll('.tooltip')
-          .style('overflow-y', null)
-          .style('height', null);
+        .style('overflow-y', null)
+        .style('height', null);
     };
 
     // Delete button
@@ -102,7 +103,7 @@ class HelperView extends LinkedMixin(View) {
       });
 
     this._intervalTimeout = window.setTimeout(async () => {
-      const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetricTypes`);
+      const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetrics`);
       var menuEntriesList = [];
       procMetricList.forEach(item => {
         menuEntriesList.push({
@@ -112,41 +113,41 @@ class HelperView extends LinkedMixin(View) {
 
             for (const viewList of Object.values(window.controller.views)) {
               for (const view of viewList) {
-                if(view instanceof ProcMetricView){
-                  console.log("found my puppy");
+                if (view instanceof ProcMetricView) {
+                  // console.log("found my puppy");
                   view.curMetric = item;
                   view.getData();
                 }
               }
             }
-            console.log("clciked button " + item);
+            // console.log("clciked button " + item);
           }
         });
       });
       self.d3el.select('.hamburger.button')
-          .on('mouseenter', function () {
-            self._standardMousing = true;
-            window.controller.tooltip.show({
-              content: `Show views...`,
-              targetBounds: this.getBoundingClientRect()
-            });
-          })
-          .on('mouseleave', () => {
-            if (self._standardMousing) {
-              window.controller.tooltip.hide();
-              clearTooltipStyle();
-            }
-          })
-          .on('click', function () {
-            self._standardMousing = false;
-            window.controller.tooltip.showContextMenu({
-              menuEntries: menuEntriesList,
-              targetBounds: this.getBoundingClientRect()
-            });
-            d3.selectAll('.tooltip')
-                .style('overflow-y', 'scroll')
-                .style('height', '200px');
+        .on('mouseenter', function () {
+          self._standardMousing = true;
+          window.controller.tooltip.show({
+            content: `Show views...`,
+            targetBounds: this.getBoundingClientRect()
           });
+        })
+        .on('mouseleave', () => {
+          if (self._standardMousing) {
+            window.controller.tooltip.hide();
+            clearTooltipStyle();
+          }
+        })
+        .on('click', function () {
+          self._standardMousing = false;
+          window.controller.tooltip.showContextMenu({
+            menuEntries: menuEntriesList,
+            targetBounds: this.getBoundingClientRect()
+          });
+          d3.selectAll('.tooltip')
+            .style('overflow-y', 'scroll')
+            .style('height', '200px');
+        });
     }, 100);
   }
   draw () {}

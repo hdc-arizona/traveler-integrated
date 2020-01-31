@@ -10,8 +10,8 @@ import PhyslView from './views/CodeView/PhyslView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
-import LineChartView from "./views/LineChartView/LineChartView.js";
-import ProcMetricView from "./views/ProcMetricView/ProcMetricView.js";
+import LineChartView from './views/LineChartView/LineChartView.js';
+import ProcMetricView from './views/ProcMetricView/ProcMetricView.js';
 
 const viewClassLookup = {
   TreeView,

@@ -368,19 +368,22 @@ class LinkedState extends Model {
       this.trigger('histogramUpdated');
     }, 100);
   }
-  getMaxMinOfMetric(metric){
-    var intervalList = Object.values(this.getCurrentIntervals());
-    var maxY = 0, curX = 0, curT = 0, rt = 0;
-    var locationPosition = {};
-    for(const interval of intervalList){
-      if('metrics' in interval && metric in interval['metrics']) {
+  getMaxMinOfMetric (metric) {
+    const intervalList = Object.values(this.getCurrentIntervals());
+    let maxY = 0;
+    let curX = 0;
+    let curT = 0;
+    let rt = 0;
+    const locationPosition = {};
+    for (const interval of intervalList) {
+      if ('metrics' in interval && metric in interval['metrics']) {
         curX = interval['metrics'][metric];
         curT = interval['enter']['Timestamp'];
-        if(interval['Location'] in locationPosition && locationPosition[interval['Location']][0] > -1) {
+        if (interval['Location'] in locationPosition && locationPosition[interval['Location']][0] > -1) {
           rt = Math.abs(curX - locationPosition[interval['Location']][0]) / Math.abs(curT - locationPosition[interval['Location']][1]);
         } else {
-          locationPosition[interval['Location']] = [-1,-1];
-          rt = curX/curT;
+          locationPosition[interval['Location']] = [-1, -1];
+          rt = curX / curT;
         }
         locationPosition[interval['Location']][0] = curX;
         locationPosition[interval['Location']][1] = curT;
