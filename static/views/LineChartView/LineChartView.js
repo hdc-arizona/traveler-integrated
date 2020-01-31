@@ -48,6 +48,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.yScale.range([0, result.height]);
     return result;
   }
+  
   setup () {
     super.setup();
 

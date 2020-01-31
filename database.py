@@ -436,6 +436,11 @@ class Database:
                 else: # do the other meminfo status io parsing here
                     if metricType not in procMetrics:
                         procMetrics[metricType] = {}
+                        if 'procMetricList' not in procMetrics:
+                            procMetrics['procMetricList'] = []
+                        pm = procMetrics['procMetricList']
+                        pm.append(metricType)
+                        procMetrics['procMetricList'] = pm
                     val = procMetrics[metricType]
                     val[str(timestamp)] = {'Timestamp': timestamp, 'Value':  value}
                     procMetrics[metricType] = val

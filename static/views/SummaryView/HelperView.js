@@ -1,6 +1,7 @@
 import { View } from '../../node_modules/uki/dist/uki.esm.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 import LinkedState from '../../models/LinkedState.js';
+import ProcMetricView from "../ProcMetricView/ProcMetricView.js";
 
 /**
  * HelperView represents a single dataset inside SummaryView
@@ -18,6 +19,11 @@ class HelperView extends LinkedMixin(View) {
   }
   setupButtonListeners () {
     const self = this;
+    var clearTooltipStyle = function () {
+      d3.selectAll('.tooltip')
+          .style('overflow-y', null)
+          .style('height', null);
+    };
 
     // Delete button
     this.d3el.select('.delete.button')
@@ -26,6 +32,7 @@ class HelperView extends LinkedMixin(View) {
           content: `Delete ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
+        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', async d => {
@@ -45,6 +52,7 @@ class HelperView extends LinkedMixin(View) {
           content: `Show all views for ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
+        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', () => { window.controller.assembleViews(this.linkedState, this); });
@@ -57,6 +65,7 @@ class HelperView extends LinkedMixin(View) {
           content: `Color by...`,
           targetBounds: this.getBoundingClientRect()
         });
+        clearTooltipStyle();
       })
       .on('mouseleave', () => {
         if (this._standardMousing) {
@@ -92,64 +101,53 @@ class HelperView extends LinkedMixin(View) {
         });
       });
 
-    // Hamburger menu
-    this.d3el.select('.hamburger.button')
-      .on('mouseenter', function () {
-        self._standardMousing = true;
-        window.controller.tooltip.show({
-          content: `Show views...`,
-          targetBounds: this.getBoundingClientRect()
-        });
-      })
-      .on('mouseleave', () => {
-        if (this._standardMousing) {
-          window.controller.tooltip.hide();
-        }
-      })
-      .on('click', function () {
-        self._standardMousing = false;
-        window.controller.tooltip.showContextMenu({
-          menuEntries: [
-            {
-              content: 'this',
-              onClick: () => {}
-            },
-            {
-              content: 'is',
-              subEntries: [
-                {
-                  content: 'a',
-                  subEntries: [
-                    {
-                      content: 'test',
-                      subEntries: [
-                        {
-                          content: 'of',
-                          onClick: () => {}
-                        },
-                        {
-                          content: 'nested',
-                          subEntries: [
-                            {
-                              content: 'context',
-                              onClick: () => {}
-                            },
-                            {
-                              content: 'menus',
-                              onClick: () => {}
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
+    this._intervalTimeout = window.setTimeout(async () => {
+      const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetricTypes`);
+      var menuEntriesList = [];
+      procMetricList.forEach(item => {
+        menuEntriesList.push({
+          content: item,
+          onClick: () => {
+            clearTooltipStyle();
+
+            for (const viewList of Object.values(window.controller.views)) {
+              for (const view of viewList) {
+                if(view instanceof ProcMetricView){
+                  console.log("found my puppy");
+                  view.curMetric = item;
+                  view.getData();
                 }
-              ]
+              }
             }
-          ],
-          targetBounds: this.getBoundingClientRect()
+            console.log("clciked button " + item);
+          }
         });
       });
+      self.d3el.select('.hamburger.button')
+          .on('mouseenter', function () {
+            self._standardMousing = true;
+            window.controller.tooltip.show({
+              content: `Show views...`,
+              targetBounds: this.getBoundingClientRect()
+            });
+          })
+          .on('mouseleave', () => {
+            if (self._standardMousing) {
+              window.controller.tooltip.hide();
+              clearTooltipStyle();
+            }
+          })
+          .on('click', function () {
+            self._standardMousing = false;
+            window.controller.tooltip.showContextMenu({
+              menuEntries: menuEntriesList,
+              targetBounds: this.getBoundingClientRect()
+            });
+            d3.selectAll('.tooltip')
+                .style('overflow-y', 'scroll')
+                .style('height', '200px');
+          });
+    }, 100);
   }
   draw () {}
 }

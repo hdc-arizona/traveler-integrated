@@ -276,6 +276,14 @@ def procMetrics(label: str, metric: str, begin: float = None, end: float = None)
         yield ']'
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
+@app.get('/datasets/{label}/procMetricTypes')
+def procMetrics(label: str):
+    checkDatasetExistence(label)
+
+    def procMetricListGenerator():
+        yield json.dumps(db[label]['procMetrics']['procMetricList'])
+    return StreamingResponse(procMetricListGenerator(), media_type='application/json')
+
 @app.get('/datasets/{label}/intervals/{intervalId}/trace')
 def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):
     # This streams back a list of string IDs, as well as two special metadata

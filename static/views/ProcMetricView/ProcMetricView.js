@@ -22,7 +22,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.metricValueCount = 0;
     this.hoverIndex = -1;
     this.isMetricLoading = false;
-    this.curMetric = 'PAPI_TOT_INS';
+    this.curMetric = 'meminfo:MemFree';
     this.selectedLocation = '-1';
     this.baseOpacity = 0.3;
 
@@ -110,8 +110,8 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       // First check whether we're asking for too much data by getting a
       // histogram with a single bin (TODO: draw per-location histograms instead
       // of just saying "Too much data; scroll to zoom in?")
-      const curMetric = 'meminfo:MemFree';
-
+      // this.curMetric = 'meminfo:MemFree';
+      console.log("found metric: " + this.curMetric);
       // Okay, start the stream, and collect it in a separate cache to avoid
       // old intervals from disappearing from incremental refreshes
       this.newCache = {};
@@ -119,7 +119,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       var maxY = Number.MIN_VALUE;
       var minY = Number.MAX_VALUE;
       this.metricValueCount = 0;
-      const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics?metric=${curMetric}`)
+      const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics?metric=${this.curMetric}`)
       // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics?metric=${curMetric}&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
           .fail(error => {
             this.metricValueCount = 0;
@@ -151,7 +151,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
             this.newCache = null;
             this.isMetricLoading = false;
             console.log("cache for proc metric loaded: " + self.metricValueCount);
-            var yOffset = 10000;
+            var yOffset = (maxY - minY) / 10;
             this.yScale.domain([maxY+yOffset, minY-yOffset]);
             this.render();
           });
