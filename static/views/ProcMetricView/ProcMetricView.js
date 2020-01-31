@@ -246,7 +246,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       .style('opacity', 1.0)
       .on('mouseenter', function (d,i) {
         window.controller.tooltip.show({
-          content: `<pre>${JSON.stringify({'Timestamp': d.key, 'Value': d.value}, null, 2)}</pre>`,
+          content: `<span>Timestamp: ${d.key}<br/> Value: ${d.value}</span>`,
           targetBounds: this.getBoundingClientRect(),
           hideAfterMs: null
         });
