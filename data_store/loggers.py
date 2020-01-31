@@ -1,3 +1,4 @@
+import sys
 import asyncio
 
 class ClientLogger:
@@ -20,3 +21,7 @@ class ClientLogger:
             await asyncio.sleep(0)
         yield self.message
         self.message = ''
+
+async def logToConsole(value, end='\n'):
+    sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
+    sys.stderr.flush()

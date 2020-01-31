@@ -9,8 +9,7 @@ from pydantic import BaseModel #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
-from database import Database
-from clientLogger import ClientLogger
+from data_store import DataStore, ClientLogger
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
@@ -19,7 +18,7 @@ parser.add_argument('-s', '--debug', dest='debug', action='store_true',
                     help='Store additional information for debugging source files, etc.')
 
 args = parser.parse_args()
-db = Database(args.dbDir, args.debug)
+db = DataStore(args.dbDir, args.debug)
 app = FastAPI(
     title=__name__,
     description='This is a test',

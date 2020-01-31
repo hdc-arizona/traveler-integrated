@@ -3,7 +3,7 @@ import re
 import argparse
 import subprocess
 import asyncio
-from database import Database, logToConsole
+from data_store import DataStore, logToConsole
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
 parser.add_argument('-l', '--label', dest='label', type=str, default='Latest',
@@ -34,14 +34,14 @@ parser.add_argument('-e', '--events', dest='events', action='store_true',
 class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
         self.name = name
-    def __iter__(self):
+    async def __aiter__(self):
         otfPipe = subprocess.Popen(['otf2-print', self.name], stdout=subprocess.PIPE)
         for line in otfPipe.stdout:
             yield line.decode()
 
 async def main():
     args = vars(parser.parse_args())
-    db = Database(args['dbDir'], args['debug'])
+    db = DataStore(args['dbDir'], args['debug'])
     await db.load()
 
     inputs = {}
