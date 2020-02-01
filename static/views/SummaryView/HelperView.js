@@ -100,29 +100,49 @@ class HelperView extends LinkedMixin(View) {
           menuEntries
         });
       });
+    var hamburgerItemSubContents = function(item, entries) {
+      return {
+        content: item,
+        subEntries: entries
+      };
+    };
+    var hamburgerItemContent = function(title, param) {
+      return {
+        content: title,
+        onClick: () => {
+          clearTooltipStyle();
+
+          for (const viewList of Object.values(window.controller.views)) {
+            for (const view of viewList) {
+              if (view instanceof ProcMetricView) {
+                view.curMetric = param;
+                view.getData();
+              }
+            }
+          }
+        }
+      };
+    };
 
     this._intervalTimeout = window.setTimeout(async () => {
       const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetricTypes`);
+      var menuEntriesNestedList = {};
       var menuEntriesList = [];
       procMetricList.forEach(item => {
-        menuEntriesList.push({
-          content: item,
-          onClick: () => {
-            clearTooltipStyle();
-
-            for (const viewList of Object.values(window.controller.views)) {
-              for (const view of viewList) {
-                if(view instanceof ProcMetricView){
-                  console.log("found my puppy");
-                  view.curMetric = item;
-                  view.getData();
-                }
-              }
-            }
-            console.log("clciked button " + item);
+        if(item.indexOf(':') > -1) {
+          var res = item.split(':');
+          if(!(res[0] in menuEntriesNestedList)) {
+            menuEntriesNestedList[res[0]] = [];
           }
-        });
+          menuEntriesNestedList[res[0]].push(hamburgerItemContent(res[1], item));
+        } else {
+          menuEntriesList.push(hamburgerItemContent(item, item));
+        }
       });
+      for(const key of Object.keys(menuEntriesNestedList)) {
+        menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
+      }
+
       self.d3el.select('.hamburger.button')
           .on('mouseenter', function () {
             self._standardMousing = true;
@@ -145,7 +165,7 @@ class HelperView extends LinkedMixin(View) {
             });
             d3.selectAll('.tooltip')
                 .style('overflow-y', 'scroll')
-                .style('height', '200px');
+                .style('height', '300px');
           });
     }, 100);
   }
