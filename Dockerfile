@@ -18,7 +18,28 @@ EXPOSE 8000
 RUN pip3 install jupyter requests
 EXPOSE 8789
 
-USER jovyan
+WORKDIR /files
+# COPY sweetnsassy.py ./
+# COPY config.py ./
+WORKDIR /traveler-integrated
 
-# Default container command is to launch both traveler-integrated and jupyter
-CMD ["bash", "/traveler-integrated/docker.sh"]
+RUN chown jovyan ~jovyan/.bashrc
+RUN dnf install -y jq
+WORKDIR /
+RUN git clone https://github.com/TACC-Cloud/tapis-cli-ng
+WORKDIR /tapis-cli-ng
+RUN pip3 install --upgrade .
+RUN ln -s /tapis-cli-ng /usr/local/cli
+RUN dnf install -y glibc-langpack-en
+ENV LC_ALL en_US.utf8
+
+USER jovyan
+WORKDIR /home/jovyan
+RUN git clone https://github.com/stevenrbrandt/workenv.git
+WORKDIR /home/jovyan/workenv
+RUN python3 install.py
+WORKDIR /traveler-integrated/notebook
+ENV PATH /usr/local/cli/bin:/traveler-integrated/notebook/agave-cli/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+# Default container command is to launch jupyter
+CMD ["bash", "/traveler-integrated/jupyter.sh"]

@@ -1,7 +1,8 @@
+/* globals d3 */
 import { View } from '../../node_modules/uki/dist/uki.esm.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 import LinkedState from '../../models/LinkedState.js';
-import ProcMetricView from "../ProcMetricView/ProcMetricView.js";
+import ProcMetricView from '../ProcMetricView/ProcMetricView.js';
 
 /**
  * HelperView represents a single dataset inside SummaryView
@@ -21,8 +22,8 @@ class HelperView extends LinkedMixin(View) {
     const self = this;
     var clearTooltipStyle = function () {
       d3.selectAll('.tooltip')
-          .style('overflow-y', null)
-          .style('height', null);
+        .style('overflow-y', null)
+        .style('height', null);
     };
 
     // Delete button
@@ -125,7 +126,7 @@ class HelperView extends LinkedMixin(View) {
     };
 
     this._intervalTimeout = window.setTimeout(async () => {
-      const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetricTypes`);
+      const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetrics`);
       var menuEntriesNestedList = {};
       var menuEntriesList = [];
       procMetricList.forEach(item => {
