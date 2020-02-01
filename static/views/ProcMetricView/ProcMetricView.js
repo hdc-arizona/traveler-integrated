@@ -1,4 +1,4 @@
-/* globals d3, oboe ... */
+/* globals d3, oboe */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 import SvgViewMixin from '../common/SvgViewMixin.js';
@@ -9,8 +9,8 @@ import cleanupAxis from '../../utils/cleanupAxis.js';
 class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
   constructor (argObj) {
     argObj.resources = [
-      {type: 'less', url: 'views/ProcMetricView/style.less'},
-      {type: 'text', url: 'views/ProcMetricView/template.svg'}
+      { type: 'less', url: 'views/ProcMetricView/style.less' },
+      { type: 'text', url: 'views/ProcMetricView/template.svg' }
     ];
     super(argObj);
     this.xScale = d3.scaleLinear();
@@ -69,7 +69,6 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.content.select('.clippedStuff')
       .attr('clip-path', `url(#${clipId})`);
 
-    var __self = this;
     // Set up zoom / pan interactions
     this.setupZoomAndPan();
     this.linkedState.getMaxMinOfMetric(this.curMetric);
@@ -111,7 +110,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       // histogram with a single bin (TODO: draw per-location histograms instead
       // of just saying "Too much data; scroll to zoom in?")
       // this.curMetric = 'meminfo:MemFree';
-      console.log("found metric: " + this.curMetric);
+      // console.log("found metric: " + this.curMetric);
       // Okay, start the stream, and collect it in a separate cache to avoid
       // old intervals from disappearing from incremental refreshes
       this.newCache = {};
@@ -119,42 +118,42 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       var maxY = Number.MIN_VALUE;
       var minY = Number.MAX_VALUE;
       this.metricValueCount = 0;
-      const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics?metric=${this.curMetric}`)
-      // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics?metric=${curMetric}&begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
-          .fail(error => {
-            this.metricValueCount = 0;
-            this.error = error;
-            console.log(error);
-          })
-          .node('!.*', function (metricList) {
-            if (currentStream !== self.stream) {
-              // A different stream has been started; abort this one
-              this.abort();
-            } else {
-              self.isMetricLoading = true;
-              var val = metricList['Value'];
-              self.newCache[metricList['Timestamp']] = val;
-              maxY = Math.max(maxY, val);
-              minY = Math.min(minY, val);
-              self.metricValueCount++;
-              if (!self.waitingOnIncrementalRender) {
-                // self.render() is debounced; this converts it to throttling,
-                // rate-limiting incremental refreshes by this.debounceWait
-                self.render();
-                self.waitingOnIncrementalRender = true;
-              }
+      const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}`)
+      // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${curMetric}?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+        .fail(error => {
+          this.metricValueCount = 0;
+          this.error = error;
+          // console.log(error);
+        })
+        .node('!.*', function (metricList) {
+          if (currentStream !== self.stream) {
+            // A different stream has been started; abort this one
+            this.abort();
+          } else {
+            self.isMetricLoading = true;
+            var val = metricList['Value'];
+            self.newCache[metricList['Timestamp']] = val;
+            maxY = Math.max(maxY, val);
+            minY = Math.min(minY, val);
+            self.metricValueCount++;
+            if (!self.waitingOnIncrementalRender) {
+              // self.render() is debounced; this converts it to throttling,
+              // rate-limiting incremental refreshes by this.debounceWait
+              self.render();
+              self.waitingOnIncrementalRender = true;
             }
-          })
-          .done(() => {
-            this.stream = null;
-            this.cache = this.newCache;
-            this.newCache = null;
-            this.isMetricLoading = false;
-            console.log("cache for proc metric loaded: " + self.metricValueCount);
-            var yOffset = (maxY - minY) / 10;
-            this.yScale.domain([maxY+yOffset, minY-yOffset]);
-            this.render();
-          });
+          }
+        })
+        .done(() => {
+          this.stream = null;
+          this.cache = this.newCache;
+          this.newCache = null;
+          this.isMetricLoading = false;
+          // console.log("cache for proc metric loaded: " + self.metricValueCount);
+          var yOffset = (maxY - minY) / 10;
+          this.yScale.domain([maxY + yOffset, minY - yOffset]);
+          this.render();
+        });
       this.yScale.domain([maxY, minY]);
       this.render();
     }, 100);
@@ -240,11 +239,11 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
         return _self.yScale(d.value);
       })
       .attr('r', function (d, i) {
-        if(i === _self.hoverIndex)return 10.0;
+        if (i === _self.hoverIndex) return 10.0;
         return 3.0;
       })
       .style('opacity', 1.0)
-      .on('mouseenter', function (d,i) {
+      .on('mouseenter', function (d, i) {
         window.controller.tooltip.show({
           content: `<span>Timestamp: ${d.key}<br/> Value: ${d.value}</span>`,
           targetBounds: this.getBoundingClientRect(),
@@ -260,36 +259,35 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       });
 
     let lines = this.content.select('.metric_lines')
-        .selectAll('.metric_line').data(data, d => d.key);
+      .selectAll('.metric_line').data(data, d => d.key);
     lines.exit().remove();
     const linesEnter = lines.enter().append('line')
-        .classed('metric_line', true);
+      .classed('metric_line', true);
     lines = lines.merge(linesEnter);
     lines.attr('class', 'metric_line')
-        .attr('x1', function (d, i) {
-          var ret = d;
-          if(i>0) {
-            ret = lines.data()[i-1];
-          }
-          return _self.xScale(ret.key);
-        })
-        .attr('y1', function (d, i) {
-          var ret = d;
-          if(i>0) {
-            ret = lines.data()[i-1];
-          }
-          return _self.yScale(ret.value);
-        })
-        .attr('x2', function (d) {
-          return _self.xScale(d.key);
-        })
-        .attr('y2', function (d) {
-          return _self.yScale(d.value);
-        })
-        .style('stroke', 'blue')
-        .style('stroke-width', 2)
-        .style('opacity', 1.0)
-        ;
+      .attr('x1', function (d, i) {
+        var ret = d;
+        if (i > 0) {
+          ret = lines.data()[i - 1];
+        }
+        return _self.xScale(ret.key);
+      })
+      .attr('y1', function (d, i) {
+        var ret = d;
+        if (i > 0) {
+          ret = lines.data()[i - 1];
+        }
+        return _self.yScale(ret.value);
+      })
+      .attr('x2', function (d) {
+        return _self.xScale(d.key);
+      })
+      .attr('y2', function (d) {
+        return _self.yScale(d.value);
+      })
+      .style('stroke', 'blue')
+      .style('stroke-width', 2)
+      .style('opacity', 1.0);
   }
   setupZoomAndPan () {
     this.initialDragState = null;

@@ -9,8 +9,7 @@ from pydantic import BaseModel #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
-from database import Database
-from clientLogger import ClientLogger
+from data_store import DataStore, ClientLogger
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
@@ -19,7 +18,7 @@ parser.add_argument('-s', '--debug', dest='debug', action='store_true',
                     help='Store additional information for debugging source files, etc.')
 
 args = parser.parse_args()
-db = Database(args.dbDir, args.debug)
+db = DataStore(args.dbDir, args.debug)
 app = FastAPI(
     title=__name__,
     description='This is a test',
@@ -50,7 +49,10 @@ def list_datasets():
 def get_dataset(label: str):
     checkDatasetExistence(label)
     return db[label]['meta']
-class BasicDataset(BaseModel):
+class BasicDataset(BaseModel): #pylint: disable=R0903
+    # TODO: ideally, these should all be UploadFile arguments instead of
+    # expecting pre-parsed strings, however, AFAIK there isn't a FastAPI way to
+    # allow optional UploadFile arguments
     newick: str = None
     csv: str = None
     dot: str = None
@@ -88,6 +90,7 @@ def create_dataset(label: str, dataset: BasicDataset = None):
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 @app.delete('/datasets/{label}')
 def delete_dataset(label: str):
+    checkDatasetExistence(label)
     db.purgeDataset(label)
 
 class TreeSource(str, Enum):
@@ -144,14 +147,24 @@ def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
         logger.finish()
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
+class FakeOtf2File: #pylint: disable=R0903
+    def __init__(self, request):
+        self.name = 'APEX.otf2'
+        self.request = request
+    async def __aiter__(self):
+        async for chunk in self.request.stream():
+            for line in chunk.decode().split('\n'):
+                if line != '':
+                    yield line
 @app.post('/datasets/{label}/otf2')
-async def add_otf2_trace(label: str, request: Request):
-    # TODO: I think we can accept a raw stream instead of a otf2-print dump
-    # (which would be a huge file):
-    # async for chunk in request.stream()
-    # ... but I'm not sure if this will even work with a linked Jupyter
-    # approach, nor how to best map chunks to lines in db.processOtf2()
-    raise HTTPException(status_code=501)
+async def add_otf2_trace(label: str, request: Request, storeEvents: bool = False): # request: Request
+    checkDatasetExistence(label)
+    logger = ClientLogger()
+    async def startProcess():
+        db.addSourceFile(label, 'APEX.otf2', 'otf2')
+        await db.processOtf2(label, FakeOtf2File(request), storeEvents, logger.log)
+        logger.finish()
+    return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 @app.get('/datasets/{label}/physl')
 def get_physl(label: str):
@@ -254,7 +267,13 @@ def intervals(label: str, begin: float = None, end: float = None):
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 @app.get('/datasets/{label}/procMetrics')
-def procMetrics(label: str, metric: str, begin: float = None, end: float = None):
+def procMetrics(label: str):
+    checkDatasetExistence(label)
+
+    return db[label]['procMetrics']['procMetricList']
+
+@app.get('/datasets/{label}/procMetrics/{metric}')
+def procMetricValues(label: str, metric: str, begin: float = None, end: float = None):
     checkDatasetExistence(label)
     # checkDatasetHasIntervals(label)
 
@@ -263,7 +282,7 @@ def procMetrics(label: str, metric: str, begin: float = None, end: float = None)
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
 
-    def intervalGenerator():
+    def procMetricGenerator():
         yield '['
         firstItem = True
         for tm in db[label]['procMetrics'][metric]:
@@ -274,15 +293,7 @@ def procMetrics(label: str, metric: str, begin: float = None, end: float = None)
             yield json.dumps(db[label]['procMetrics'][metric][tm])
             firstItem = False
         yield ']'
-    return StreamingResponse(intervalGenerator(), media_type='application/json')
-
-@app.get('/datasets/{label}/procMetricTypes')
-def procMetrics(label: str):
-    checkDatasetExistence(label)
-
-    def procMetricListGenerator():
-        yield json.dumps(db[label]['procMetrics']['procMetricList'])
-    return StreamingResponse(procMetricListGenerator(), media_type='application/json')
+    return StreamingResponse(procMetricGenerator(), media_type='application/json')
 
 @app.get('/datasets/{label}/intervals/{intervalId}/trace')
 def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):

@@ -8,6 +8,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: trav
     ports:
       - 8789:8789
       - 8000:8000
