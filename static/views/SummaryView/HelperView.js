@@ -21,19 +21,17 @@ class HelperView extends LinkedMixin(View) {
   setupButtonListeners () {
     const self = this;
     var clearTooltipStyle = function () {
-      d3.selectAll('.tooltip')
-        .style('overflow-y', null)
-        .style('height', null);
+      d3.selectAll('.tooltip').classed('proctip', false);
     };
 
     // Delete button
     this.d3el.select('.delete.button')
       .on('mouseenter', function () {
+        clearTooltipStyle();
         window.controller.tooltip.show({
           content: `Delete ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', async d => {
@@ -49,11 +47,11 @@ class HelperView extends LinkedMixin(View) {
     // Assemble views button
     this.d3el.select('.assemble.button')
       .on('mouseenter', function () {
+        clearTooltipStyle();
         window.controller.tooltip.show({
           content: `Show all views for ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', () => { window.controller.assembleViews(this.linkedState, this); });
@@ -61,12 +59,12 @@ class HelperView extends LinkedMixin(View) {
     // Color mode button
     this.d3el.select('.color.button')
       .on('mouseenter', function () {
+        clearTooltipStyle();
         self._standardMousing = true;
         window.controller.tooltip.show({
           content: `Color by...`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => {
         if (this._standardMousing) {
@@ -146,6 +144,7 @@ class HelperView extends LinkedMixin(View) {
 
       self.d3el.select('.hamburger.button')
           .on('mouseenter', function () {
+            clearTooltipStyle();
             self._standardMousing = true;
             window.controller.tooltip.show({
               content: `Show views...`,
@@ -164,9 +163,7 @@ class HelperView extends LinkedMixin(View) {
               menuEntries: menuEntriesList,
               targetBounds: this.getBoundingClientRect()
             });
-            d3.selectAll('.tooltip')
-                .style('overflow-y', 'scroll')
-                .style('height', '300px');
+            d3.selectAll('.tooltip').classed('proctip', true);
           });
     }, 100);
   }
