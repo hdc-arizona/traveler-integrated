@@ -21,6 +21,7 @@ class LinkedState extends Model {
     this.caches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
+    this.selectedProcMetric = 'meminfo:MemFree';
 
     // Start processes for collecting data
     (async () => {

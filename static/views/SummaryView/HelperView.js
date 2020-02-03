@@ -110,15 +110,21 @@ class HelperView extends LinkedMixin(View) {
         content: title,
         onClick: () => {
           clearTooltipStyle();
-
-          for (const viewList of Object.values(window.controller.views)) {
-            for (const view of viewList) {
-              if (view instanceof ProcMetricView) {
-                view.curMetric = param;
-                view.getData();
-              }
-            }
-          }
+            var newProcMetricView = {
+                type: 'component',
+                componentName: 'ProcMetricView',
+                componentState: { label: self.linkedState.label }
+            };
+            self.linkedState.selectedProcMetric = param;
+            // TODO: the following is a bad hack, need to do it properly by following goldenlayout API
+            let cLen = window.controller.goldenLayout.root.contentItems[0]
+                .contentItems[0].contentItems[0].contentItems.length;
+            window.controller.goldenLayout.root.contentItems[0].contentItems[0].contentItems[0].addChild(newProcMetricView);
+            console.log(window.controller.goldenLayout.root.contentItems[0]
+                .contentItems[0].contentItems[0].contentItems[cLen].contentItems[0].tab);
+            window.controller.goldenLayout.root.contentItems[0]
+                .contentItems[0].contentItems[0].contentItems[cLen].contentItems[0].tab.titleElement[0]
+                .outerText = self.linkedState.label + " " + param;
         }
       };
     };
