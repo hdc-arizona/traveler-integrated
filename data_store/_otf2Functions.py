@@ -88,7 +88,7 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
             location = metricLineMatch.group(1)
             timestamp = int(metricLineMatch.group(2))
             metricType = metricLineMatch.group(3)
-            value = int(float(metricLineMatch.group(4)))
+            value = float(metricLineMatch.group(4))
 
             if metricType.startswith('PAPI'):
                 if currentEvent is None:

@@ -123,7 +123,7 @@ class LinkedState extends Model {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
         views['LineChartView'] = false;
-        views['ProcMetricView'] = true;
+        views['ProcMetricView'] = false;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -385,6 +385,60 @@ class LinkedState extends Model {
       }
     }
     return {max: maxY, min: minY};
+  }
+  getCurrentMetricData (curMetric) {
+    var modifiedData = {maxY: Number.MIN_VALUE, minY: Number.MAX_VALUE, metricData: {}};
+    var intervalData = this.getCurrentIntervals();
+    var metricData = {};
+    var dataOfLocation = {};
+
+    var getPreviousKeyForLocation = function (i) {
+      if(i in dataOfLocation && dataOfLocation[i] in metricData)return dataOfLocation[i];
+      return null;
+    };
+
+    let maxY = Number.MIN_VALUE;
+    let minY = Number.MAX_VALUE;
+    for(const id in intervalData) {
+      let k = id + '_' + intervalData[id]['enter']['Timestamp'];
+      let preKey = getPreviousKeyForLocation(intervalData[id]['Location']);
+      let preX = 0;
+      let preY = 0;
+      let rate = 0;
+      if(preKey) {
+        preX = metricData[preKey].Timestamp;
+        preY = metricData[preKey].Value;
+        rate = metricData[preKey].Rate;
+      }
+      rate = Math.abs(intervalData[id]['enter']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['enter']['Timestamp'] - preX);
+      metricData[k] = {
+        Timestamp : intervalData[id]['enter']['Timestamp'],
+        Location : intervalData[id]['Location'],
+        Value : intervalData[id]['enter']['metrics'][curMetric],
+        Rate : rate
+      };
+      maxY = Math.max(maxY, rate);
+      minY = Math.min(minY, rate);
+
+      preKey = k;
+      preX = metricData[k].Timestamp;
+      preY = metricData[k].Value;
+      k = id + '_' + intervalData[id]['leave']['Timestamp'];
+      rate = Math.abs(intervalData[id]['leave']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['leave']['Timestamp'] - preX);
+      metricData[k] = {
+        Timestamp : intervalData[id]['leave']['Timestamp'],
+        Location : intervalData[id]['Location'],
+        Value : intervalData[id]['leave']['metrics'][curMetric],
+        Rate : rate
+      };
+      maxY = Math.max(maxY, rate);
+      minY = Math.min(minY, rate);
+      dataOfLocation[intervalData[id]['Location']] = k;
+    }
+    modifiedData.maxY = maxY;
+    modifiedData.minY = minY;
+    modifiedData.metricData = metricData;
+    return modifiedData;
   }
 }
 LinkedState.COLOR_SCHEMES = {

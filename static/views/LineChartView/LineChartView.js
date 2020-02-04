@@ -16,7 +16,10 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleLinear();
 
-    this.curMetric = this.linkedState.selectedProcMetric;
+    this.curMetric = 'PAPI_TOT_INS';
+    if(this.linkedState.selectedProcMetric.startsWith('PAPI')) {
+      this.curMetric = this.linkedState.selectedProcMetric;
+    }
     this.selectedLocation = '-1';
     this.baseOpacity = 0.3;
 
@@ -46,7 +49,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
   }
   setYDomain(maxMin) {
     var yOffset = (maxMin['max'] - maxMin['min']) / 10;
-    console.log(maxMin);
     this.yScale.domain([maxMin['max'] + yOffset, maxMin['min'] - yOffset]);
   }
   
@@ -115,35 +117,14 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
 
 
     // Combine old data with any new data that's streaming in
-    const intervalData = this.linkedState.getCurrentIntervals();
+    const intervalData = this.linkedState.getCurrentMetricData(this.curMetric);
+    if(intervalData.maxY === Number.MIN_VALUE)return; // presumed no data
 
-    var modifiedData = {};
-    let maxY = Number.MIN_VALUE;
-    let minY = Number.MAX_VALUE;
-    for(const id in intervalData) {
-      let k = id + '_' + intervalData[id]['enter']['Timestamp'];
-      modifiedData[k] = {
-        Timestamp : intervalData[id]['enter']['Timestamp'],
-        Location : intervalData[id]['Location'],
-        Value : intervalData[id]['enter']['metrics'][this.curMetric]
-      };
-      maxY = Math.max(maxY, intervalData[id]['enter']['metrics'][this.curMetric]);
-      minY = Math.min(minY, intervalData[id]['enter']['metrics'][this.curMetric]);
-
-      k = id + '_' + intervalData[id]['leave']['Timestamp'];
-      modifiedData[k] = {
-        Timestamp : intervalData[id]['leave']['Timestamp'],
-        Location : intervalData[id]['Location'],
-        Value : intervalData[id]['leave']['metrics'][this.curMetric]
-      };
-      maxY = Math.max(maxY, intervalData[id]['leave']['metrics'][this.curMetric]);
-      minY = Math.min(minY, intervalData[id]['leave']['metrics'][this.curMetric]);
-    }
-    this.setYDomain({max: maxY, min: minY});
+    this.setYDomain({max: intervalData.maxY, min: intervalData.minY});
     // Update the axes (also updates scales)
     this.drawAxes();
 
-    const data = d3.entries(modifiedData);
+    const data = d3.entries(intervalData.metricData);
     // Update the bars
     this.drawLines(data);
   }
@@ -179,9 +160,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
   drawLines (data) {
     // console.log('drawing again');
     var _self = this;
-    var locationPosition = {};
-    var timePosition = {};
-    var ratePosition = {};
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.dots').attr('transform', null);
@@ -196,7 +174,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
 
     cirlces.attr('class', 'dot')
       .attr('cx', d => this.xScale(d.value['Timestamp']))
-      .attr('cy', d => this.yScale(d.value['Value']))
+      .attr('cy', d => this.yScale(d.value['Rate']))
       .attr('r', d => {
         if (d.value['Location'] === _self.selectedLocation) {
           return 5.0;
@@ -214,22 +192,69 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           return 'blue';
         }
         return 'black';
-      })
-      .on('mouseenter', function (d) {
-        window.controller.tooltip.show({
-          content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-          targetBounds: this.getBoundingClientRect(),
-          hideAfterMs: null
-        });
-      })
-      .on('mouseout', () => {
-        window.controller.tooltip.hide();
-      })
-      .on('click', (d) => {
-        this.selectedLocation = d.value['Location'];
-        // console.log('clicked ' + this.selectedLocation);
-        this.render();
       });
+
+    var prevDataKey = {};
+
+    let lines = this.content.select('.lines')
+        .selectAll('.line').data(data, d => d.key);
+    lines.exit().remove();
+    const linesEnter = lines.enter().append('line')
+        .classed('line', true);
+    lines = lines.merge(linesEnter);
+
+    lines.attr('class', 'line')
+        .attr('x1', function (d, i) {
+          var retScale = _self.xScale(0);
+          if (d.value['Location'] in prevDataKey) {
+            var prevData = lines.data()[prevDataKey[d.value['Location']]];
+            retScale = _self.xScale(prevData.value['Timestamp']);
+          }
+          prevDataKey[d.value['Location']] = i;
+          return retScale;
+        })
+        .attr('y1', function (d, i) {
+          var retScale = _self.yScale(0);
+          if (d.value['Location'] in prevDataKey) {
+            var prevData = lines.data()[prevDataKey[d.value['Location']]];
+            retScale = _self.yScale(prevData.value['Rate']);
+          }
+          prevDataKey[d.value['Location']] = i;
+          return retScale;
+        })
+        .attr('x2', function (d, i) {
+          return _self.xScale(d.value['Timestamp']);
+        })
+        .attr('y2', function (d, i) {
+          return _self.yScale(d.value['Rate']);
+        })
+        .style('stroke', d => {
+          if (d.value['Location'] === _self.selectedLocation) {
+            return 'blue';
+          }
+          return 'black';
+        })
+        .style('stroke-width', 3)
+        .style('opacity', d => {
+          if (d.value['Location'] === _self.selectedLocation) {
+            return 1.0;
+          }
+          return _self.baseOpacity;
+        })
+        .on('mouseenter', function (d) {
+          window.controller.tooltip.show({
+            content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
+            targetBounds: this.getBoundingClientRect(),
+            hideAfterMs: null
+          });
+        })
+        .on('mouseout', () => {
+          window.controller.tooltip.hide();
+        })
+        .on('click', (d) => {
+          this.selectedLocation = d.value['Location'];
+          this.render();
+        });
   }
   setupZoomAndPan () {
     this.initialDragState = null;

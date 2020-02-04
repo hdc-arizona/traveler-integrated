@@ -21,7 +21,10 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.newCache = null;
     this.metricValueCount = 0;
     this.hoverIndex = -1;
-    this.curMetric = this.linkedState.selectedProcMetric;
+    this.curMetric = 'meminfo:MemFree';
+    if(this.linkedState.selectedProcMetric.startsWith('PAPI') === false) {
+      this.curMetric = this.linkedState.selectedProcMetric;
+    }
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `ProcMetricView${ProcMetricView.DOM_COUNT}`;
@@ -76,7 +79,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       // __self.render();
     });
     // // Initialize the scales / stream
-    this.xScale.domain(this.linkedState.intervalWindow);
+    this.xScale.domain(Array.from(this.linkedState.metadata.intervalDomain));
     this.getData();
   }
   getData () {

@@ -185,10 +185,6 @@ class Controller {
           type: 'component',
           componentName: 'UtilizationView',
           componentState: { label: linkedState.label }
-        }, {
-          type: 'component',
-          componentName: 'ProcMetricView',
-          componentState: { label: linkedState.label }
         }]
       });
     }
