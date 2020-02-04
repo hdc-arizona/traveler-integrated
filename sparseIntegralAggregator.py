@@ -1,3 +1,6 @@
+# Imports
+# We may want to consider using a numpy list
+
 class SparseUtilizationList():
     def __init__(self):
         self.intervalIntegralList = []
