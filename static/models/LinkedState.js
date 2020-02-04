@@ -371,27 +371,20 @@ class LinkedState extends Model {
   }
   getMaxMinOfMetric (metric) {
     const intervalList = Object.values(this.getCurrentIntervals());
-    let maxY = 0;
-    let curX = 0;
-    let curT = 0;
-    let rt = 0;
+    let maxY = Number.MIN_VALUE;
+    let minY = Number.MAX_VALUE;
     const locationPosition = {};
     for (const interval of intervalList) {
-      if ('metrics' in interval && metric in interval['metrics']) {
-        curX = interval['metrics'][metric];
-        curT = interval['enter']['Timestamp'];
-        if (interval['Location'] in locationPosition && locationPosition[interval['Location']][0] > -1) {
-          rt = Math.abs(curX - locationPosition[interval['Location']][0]) / Math.abs(curT - locationPosition[interval['Location']][1]);
-        } else {
-          locationPosition[interval['Location']] = [-1, -1];
-          rt = curX / curT;
-        }
-        locationPosition[interval['Location']][0] = curX;
-        locationPosition[interval['Location']][1] = curT;
-        maxY = Math.max(maxY, rt);
+      if ('metrics' in interval['enter'] && metric in interval['enter']['metrics']) {
+        maxY = Math.max(maxY, interval['enter']['metrics'][metric]);
+        minY = Math.min(minY, interval['enter']['metrics'][metric]);
+      }
+      if ('metrics' in interval['leave'] && metric in interval['leave']['metrics']) {
+        maxY = Math.max(maxY, interval['leave']['metrics'][metric]);
+        minY = Math.min(minY, interval['leave']['metrics'][metric]);
       }
     }
-    return maxY;
+    return {max: maxY, min: minY};
   }
 }
 LinkedState.COLOR_SCHEMES = {
