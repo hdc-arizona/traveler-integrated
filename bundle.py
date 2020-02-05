@@ -4,7 +4,7 @@ import argparse
 import subprocess
 import asyncio
 from data_store import DataStore, logToConsole
-from data_store import loadSUL
+from data_store.sparseUtilizationList import loadSUL
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
 parser.add_argument('-l', '--label', dest='label', type=str, default='Latest',
@@ -36,7 +36,7 @@ class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
         self.name = name
     async def __aiter__(self):
-        otfPipe = subprocess.Popen(['otf2-print', self.name], stdout=subprocess.PIPE)
+        otfPipe = subprocess.Popen(['/usr/local/otf2/bin/otf2-print', self.name], stdout=subprocess.PIPE)
         for line in otfPipe.stdout:
             yield line.decode()
 
@@ -44,8 +44,6 @@ async def main():
     args = vars(parser.parse_args())
     db = DataStore(args['dbDir'], args['debug'])
     await db.load()
-
-    sul = SparseUtilizationList()
 
     inputs = {}
     r = re.compile(args['label'])
@@ -133,7 +131,7 @@ async def main():
             # Handle otf2
             if 'otf2' in paths:
                 await db.processOtf2(label, FakeFile(paths['otf2']), args['events'])
-                await sul.loadSUL(label, db)
+                await loadSUL(label, db)
 
 
             # Save all the data

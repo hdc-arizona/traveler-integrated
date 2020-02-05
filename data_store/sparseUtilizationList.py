@@ -1,37 +1,6 @@
 # Imports
-from DataStore import DataStore
 import numpy as np
-
-# In charge of loading interval data into our integral list
-# I have no idea how we want to load interval data :/
-async def loadSUL(label, db):
-    # create sul obj
-    sul = SparseUtilizationList()
-    begin = db[label]['meta']['intervalDomain'][0]
-    end = db[label]['meta']['intervalDomain'][1]
-
-    # we extract relevant data from database
-    # intervals
-    for loc in db[label]['intervalIndexes']['location']:
-        counter = 0
-        for i in db[label]['intervalIndexes']['location'][loc].iterOverlap(begin, end):
-            # first is timetamp, second is counter, third is total utilization at timestamp
-            sul.setIntervalAtLocation({'index':i.begin, 'counter': 1, 'util': None}, loc)
-            sul.setIntervalAtLocation({'index':i.end, 'counter': -1, 'util': None}, loc)
-
-        sul.sortAtLoc(loc)
-
-        for criticalPt in sul[loc]:
-            counter += criticalPt['counter']
-            criticalPt['counter'] = counter
-            criticalPt['util'] = sul.calcCurrentUtil(loc, criticalPt['index'])
-
-    db[label]['sparseUtilizationList'] = sul
-
-
-
-
-    pass
+from .loggers import logToConsole
 
 class SparseUtilizationList():
     def __init__(self, locationDict={}):
@@ -50,7 +19,7 @@ class SparseUtilizationList():
             last = 0
         else:
             last = self.locationDict[location][len(self.locationDict[location])-1]
-        return ((i.begin - last['index']) * last['counter'])
+        return ((index - last['index']) * last['counter'])
 
     def setIntervalAtLocation(self, edgeUtilObj, location):
         # check if array exists
@@ -71,3 +40,34 @@ class SparseUtilizationList():
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart
     def calcUtilizationForLocation(self, bins=100, begin=None, end=None, Location=None):
         pass
+
+
+
+# In charge of loading interval data into our integral list
+# I have no idea how we want to load interval data :/
+async def loadSUL(label, db, log=logToConsole):
+    await log('Loading sparse utilization list.')
+    # create sul obj
+    sul = SparseUtilizationList()
+    begin = db[label]['meta']['intervalDomain'][0]
+    end = db[label]['meta']['intervalDomain'][1]
+
+    # we extract relevant data from database
+    # intervals
+    for loc in db[label]['intervalIndexes']['locations']:
+        counter = 0
+        for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
+            # first is timetamp, second is counter, third is total utilization at timestamp
+            sul.setIntervalAtLocation({'index':i.begin, 'counter': 1, 'util': None}, loc)
+            sul.setIntervalAtLocation({'index':i.end, 'counter': -1, 'util': None}, loc)
+
+        sul.sortAtLoc(loc)
+
+        for criticalPt in sul[loc]:
+            counter += criticalPt['counter']
+            criticalPt['counter'] = counter
+            criticalPt['util'] = sul.calcCurrentUtil(loc, criticalPt['index'])
+
+    db[label]['sparseUtilizationList'] = sul
+
+    return
