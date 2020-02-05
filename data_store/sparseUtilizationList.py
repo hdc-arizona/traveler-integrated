@@ -1,5 +1,6 @@
 # Imports
 import numpy as np
+import json
 from .loggers import logToConsole
 
 class SparseUtilizationList():
@@ -11,15 +12,15 @@ class SparseUtilizationList():
 
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
+        return
 
-    def calcCurrentUtil(self, location, index):
-        if location not in self.locationDict:
-            last = 0
-        elif len(self.locationDict[location]) is 0:
-            last = 0
+    def calcCurrentUtil(self, location, index, arrIndex):
+        if arrIndex is 0:
+            last = {'index': 0, 'counter': 0, 'util':0}
         else:
-            last = self.locationDict[location][len(self.locationDict[location])-1]
-        return ((index - last['index']) * last['counter'])
+            last = self.locationDict[location][arrIndex-1]
+
+        return (((index - last['index']) * last['counter'])+last['util'])
 
     def setIntervalAtLocation(self, edgeUtilObj, location):
         # check if array exists
@@ -27,13 +28,11 @@ class SparseUtilizationList():
             self.locationDict[location] = []
 
         self.locationDict[location].append(edgeUtilObj)
-
         return
 
 
     # Calculates utilization histogram for all intervals regardless of location
     def calcUtilizationHistogram(self, bins=100, begin=None, end=None):
-
         pass
 
     # Calulates utilization for one location in a Gantt chart
@@ -58,15 +57,17 @@ async def loadSUL(label, db, log=logToConsole):
         counter = 0
         for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
             # first is timetamp, second is counter, third is total utilization at timestamp
-            sul.setIntervalAtLocation({'index':i.begin, 'counter': 1, 'util': None}, loc)
-            sul.setIntervalAtLocation({'index':i.end, 'counter': -1, 'util': None}, loc)
+            sul.setIntervalAtLocation({'index':int(i.begin), 'counter': 1, 'util': None}, loc)
+            sul.setIntervalAtLocation({'index':int(i.end), 'counter': -1, 'util': None}, loc)
 
         sul.sortAtLoc(loc)
 
-        for criticalPt in sul[loc]:
+        for i, criticalPt in enumerate(sul[loc]):
             counter += criticalPt['counter']
             criticalPt['counter'] = counter
-            criticalPt['util'] = sul.calcCurrentUtil(loc, criticalPt['index'])
+            criticalPt['util'] = sul.calcCurrentUtil(loc, criticalPt['index'], i)
+
+
 
     db[label]['sparseUtilizationList'] = sul
 

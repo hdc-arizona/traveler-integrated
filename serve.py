@@ -380,4 +380,8 @@ def guidIntervalIds(label: str, guid: str):
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())
+    with open('log.log', 'w') as f:
+        for r in db["FIB20"]['sparseUtilizationList']['1']:
+            f.write(json.dumps(r))
+            f.write('\n')
     uvicorn.run(app, host='0.0.0.0')
