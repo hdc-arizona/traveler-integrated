@@ -378,13 +378,24 @@ def guidIntervalIds(label: str, guid: str):
         raise HTTPException(status_code=404, detail='GUID %s not found' % guid)
     return db[label]['guids'][guid]
 
+@app.get('/datasets/{label}/drawValues/{width}/{begin}/{end}')
+def getDrawValues(label: str, width: int, begin: int, end: int, location: str=None):
+    if location is None:
+        return json.dumps(db[label]['sparseUtilizationList'].calcUtilizationHistogram(width, begin, end).tolist())
+    else:
+        return json.dumps(db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[0])
+
+
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())
 
-    db['FIB20']['sparseUtilizationList'].calcUtilizationForLocation(5, 14825999, 25078005, "1")
+    # db['LRA Test Running']['sparseUtilizationList'].calcUtilizationHistogram(1, 95000000, 95100000)
+    # db['LRA Test Running']['sparseUtilizationList'].calcUtilizationForLocation(2, 94900000, 95000000, "1")
 
-    with open('log.log', 'w') as f:
-        for r in db["FIB20"]['sparseUtilizationList']['1']:
-            f.write(json.dumps(r))
-            f.write('\n')
+
+
+    # with open('log.log', 'w') as f:
+    #     for r in db["FIB20"]['sparseUtilizationList']['1']:
+    #         f.write(json.dumps(r))
+    #         f.write('\n')
     uvicorn.run(app, host='0.0.0.0')
