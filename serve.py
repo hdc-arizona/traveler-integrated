@@ -10,6 +10,8 @@ from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
 from data_store import DataStore, ClientLogger
+from profilier import profile
+import cProfile, pstats, io
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
@@ -229,7 +231,8 @@ def histogram(label: str, \
         # (d3.js doesn't have a good way to handle 204 error codes)
         # if indexObj.is_empty():
         #    raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
-        return getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
+        val = getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
+        return val
 
     if location is not None:
         if location not in db[label]['intervalIndexes']['locations']:
@@ -255,6 +258,9 @@ def intervals(label: str, begin: float = None, end: float = None):
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
 
+    # pr = cProfile.Profile()
+    # pr.enable()
+
     def intervalGenerator():
         yield '['
         firstItem = True
@@ -264,13 +270,23 @@ def intervals(label: str, begin: float = None, end: float = None):
             yield json.dumps(db[label]['intervals'][i.data])
             firstItem = False
         yield ']'
+
+    # pr.disable()
+    # s = io.StringIO()
+    # sortby = 'cumulative'
+    # ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    # ps.print_stats()
+    # print(s.getvalue())
+
     return StreamingResponse(intervalGenerator(), media_type='application/json')
+
 
 @app.get('/datasets/{label}/procMetrics')
 def procMetrics(label: str):
     checkDatasetExistence(label)
 
     return db[label]['procMetrics']['procMetricList']
+
 
 @app.get('/datasets/{label}/procMetrics/{metric}')
 def procMetricValues(label: str, metric: str, begin: float = None, end: float = None):
@@ -368,6 +384,9 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
 
         # Finished
         yield ']'
+
+
+
     return StreamingResponse(intervalIdGenerator(), media_type='application/json')
 
 @app.get('/datasets/{label}/guids/{guid}/intervalIds')
@@ -378,12 +397,25 @@ def guidIntervalIds(label: str, guid: str):
         raise HTTPException(status_code=404, detail='GUID %s not found' % guid)
     return db[label]['guids'][guid]
 
+
 @app.get('/datasets/{label}/drawValues/{width}/{begin}/{end}')
 def getDrawValues(label: str, width: int, begin: int, end: int, location: str=None):
+
+    pr = cProfile.Profile()
+    pr.enable()
     if location is None:
-        return json.dumps(db[label]['sparseUtilizationList'].calcUtilizationHistogram(width, begin, end).tolist())
+        ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationHistogram(width, begin, end).tolist())
     else:
-        return json.dumps(db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[0])
+        ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[0])
+    pr.disable()
+    s = io.StringIO()
+    sortby = 'cumulative'
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    print(s.getvalue())
+
+    return ret
+
 
 
 if __name__ == '__main__':
@@ -393,9 +425,4 @@ if __name__ == '__main__':
     # db['LRA Test Running']['sparseUtilizationList'].calcUtilizationForLocation(2, 94900000, 95000000, "1")
 
 
-
-    # with open('log.log', 'w') as f:
-    #     for r in db["FIB20"]['sparseUtilizationList']['1']:
-    #         f.write(json.dumps(r))
-    #         f.write('\n')
     uvicorn.run(app, host='0.0.0.0')
