@@ -2,6 +2,7 @@
 import numpy as np
 import json
 from .loggers import logToConsole
+from bisect import bisect_left
 
 class SparseUtilizationList():
     def __init__(self, locationDict={}):
@@ -9,6 +10,38 @@ class SparseUtilizationList():
 
     def __getitem__(self, loc):
         return self.locationDict[loc]
+
+
+    # Returns index of x in arr if present, else -1
+    # Modified to work with dictionaries
+    def binarySearch (self, arr, l, r, x):
+
+        # Check base case
+        if r >= l:
+
+            mid = l + (r - l)//2
+
+            # If element is present at the middle itself
+            if arr[mid]['index'] == x['index']:
+                return mid
+
+            elif x['index'] < arr[mid]['index'] and x['index'] > arr[mid-1]['index']:
+                return mid-1
+
+            # If element is smaller than mid, then it can only
+            # be present in left subarray
+            elif arr[mid]['index'] > x['index']:
+                return self.binarySearch(arr, l, mid-1, x)
+
+            # Else the element can only be present in right subarray
+            else:
+                return self.binarySearch(arr, mid+1, r, x)
+
+
+        else:
+            # Element is not present in the array
+            # Return index to the left
+            return r
 
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
@@ -34,7 +67,7 @@ class SparseUtilizationList():
     # Calculates utilization histogram for all intervals regardless of location
     def calcUtilizationHistogram(self, bins=100, begin=None, end=None):
 
-        array = np.empty(bins)
+        array = np.zeros(bins)
         for location in self.locationDict:
             temp = self.calcUtilizationForLocation(bins, begin, end, location)[1] #the second value returned is only an array of integrals
             array = np.add(array, temp)
@@ -61,19 +94,24 @@ class SparseUtilizationList():
             if pt['index'] < self.locationDict[Location][0]['index']:
                 histogram.append({'index': pt['index'], 'counter':0, 'util': 0})
             else:
-                nextRecordIndex = next(i for i, event in enumerate(self.locationDict[Location]) if event['index'] > pt['index'])
-                priorRecord = self.locationDict[Location][nextRecordIndex-1]
+                nextRecordIndex = self.binarySearch(self.locationDict[Location], 0, len(self.locationDict[Location]), pt)
+                # nextRecordIndex = next(i for i, event in enumerate(self.locationDict[Location]) if event['index'] > pt['index'])
+                #
+                # if not (nextRecordIndex-1 == nextRecordIndexB):
+                #     print(i, nextRecordIndex, nextRecordIndexB, pt['index'], self.locationDict[Location][nextRecordIndexB])
+                # else:
+                #     print(i, nextRecordIndex, nextRecordIndexB, pt['index'],  self.locationDict[Location][nextRecordIndexB])
+
+                priorRecord = self.locationDict[Location][nextRecordIndex]
                 histogram.append({'index': pt['index'], 'counter': priorRecord['counter'], 'util': self.calcCurrentUtil(pt['index'], priorRecord)})
 
         for i, bin in enumerate(histogram):
             if i is 0:
                 histogram[i]['integral'] = 0 #bin['util'] / bin['index']
             else:
-                #histogram[i]['integral'] = self.calcCurrentUtil(bin['index'], histogram[i-1]) / (bin['index'] - histogram[i-1]['index'])
                 histogram[i]['integral'] = (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index'])
                 onlyIntegrals.append( (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index']) )
 
-        print(histogram)
         return (histogram, onlyIntegrals)
 
 

@@ -231,7 +231,16 @@ def histogram(label: str, \
         # (d3.js doesn't have a good way to handle 204 error codes)
         # if indexObj.is_empty():
         #    raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
+        pr = cProfile.Profile()
+        pr.enable()
         val = getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
+        pr.disable()
+        s = io.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        print(s.getvalue())
+
         return val
 
     if location is not None:
@@ -266,6 +275,7 @@ def intervals(label: str, begin: float = None, end: float = None):
         firstItem = True
         for i in db[label]['intervalIndexes']['main'].iterOverlap(begin, end):
             if not firstItem:
+                ','
                 yield ','
             yield json.dumps(db[label]['intervals'][i.data])
             firstItem = False
@@ -403,10 +413,12 @@ def getDrawValues(label: str, width: int, begin: int, end: int, location: str=No
 
     pr = cProfile.Profile()
     pr.enable()
+
     if location is None:
         ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationHistogram(width, begin, end).tolist())
     else:
         ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[0])
+
     pr.disable()
     s = io.StringIO()
     sortby = 'cumulative'
