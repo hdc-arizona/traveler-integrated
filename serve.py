@@ -275,7 +275,6 @@ def intervals(label: str, begin: float = None, end: float = None):
         firstItem = True
         for i in db[label]['intervalIndexes']['main'].iterOverlap(begin, end):
             if not firstItem:
-                ','
                 yield ','
             yield json.dumps(db[label]['intervals'][i.data])
             firstItem = False
@@ -421,6 +420,11 @@ def getDrawValues(label: str, width: int, begin: int, end: int, location: str=No
 
     pr.disable()
     s = io.StringIO()
+    sortby = 'cumulative'
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    print(s.getvalue())
+
     sortby = 'cumulative'
     ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
     ps.print_stats()

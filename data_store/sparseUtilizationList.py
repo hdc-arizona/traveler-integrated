@@ -15,33 +15,37 @@ class SparseUtilizationList():
     # Returns index of x in arr if present, else -1
     # Modified to work with dictionaries
     def binarySearch (self, arr, l, r, x):
+        while True:
+            # Check base case
+            if r >= l:
 
-        # Check base case
-        if r >= l:
+                mid = l + (r - l)//2
 
-            mid = l + (r - l)//2
+                # If element is present at the middle itself
+                if arr[mid]['index'] == x:
+                    return mid
 
-            # If element is present at the middle itself
-            if arr[mid]['index'] == x['index']:
-                return mid
+                elif x < arr[mid]['index'] and x > arr[mid-1]['index']:
+                    return mid-1
 
-            elif x['index'] < arr[mid]['index'] and x['index'] > arr[mid-1]['index']:
-                return mid-1
+                # If element is smaller than mid, then it can only
+                # be present in left subarray
+                elif arr[mid]['index'] > x:
+                    r = mid-1
+                    continue
+                    # return self.binarySearch(arr, l, mid-1, x)
 
-            # If element is smaller than mid, then it can only
-            # be present in left subarray
-            elif arr[mid]['index'] > x['index']:
-                return self.binarySearch(arr, l, mid-1, x)
+                # Else the element can only be present in right subarray
+                else:
+                    l = mid+1
+                    continue
+                    # return self.binarySearch(arr, mid+1, r, x)
 
-            # Else the element can only be present in right subarray
+
             else:
-                return self.binarySearch(arr, mid+1, r, x)
-
-
-        else:
-            # Element is not present in the array
-            # Return index to the left
-            return r
+                # Element is not present in the array
+                # Return index to the left
+                return r
 
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
@@ -85,16 +89,18 @@ class SparseUtilizationList():
         # time indicies and stores them as critical points
         criticalPts = []
         for i in range(0, bins):
-            criticalPts.append({"index":(i * rangePerBin) + begin})
-        criticalPts.append({"index": end})
+            criticalPts.append((i * rangePerBin) + begin)
+        criticalPts.append(end)
 
         # searches
         histogram = []
-        for i, pt in enumerate(criticalPts):
-            if pt['index'] < self.locationDict[Location][0]['index']:
-                histogram.append({'index': pt['index'], 'counter':0, 'util': 0})
+        location = self.locationDict[Location]
+        length = len(location)
+        for pt in criticalPts:
+            if pt < location[0]['index']:
+                histogram.append({'index': pt, 'counter':0, 'util': 0})
             else:
-                nextRecordIndex = self.binarySearch(self.locationDict[Location], 0, len(self.locationDict[Location]), pt)
+                nextRecordIndex = self.binarySearch(location, 0, length, pt)
                 # nextRecordIndex = next(i for i, event in enumerate(self.locationDict[Location]) if event['index'] > pt['index'])
                 #
                 # if not (nextRecordIndex-1 == nextRecordIndexB):
@@ -102,17 +108,25 @@ class SparseUtilizationList():
                 # else:
                 #     print(i, nextRecordIndex, nextRecordIndexB, pt['index'],  self.locationDict[Location][nextRecordIndexB])
 
-                priorRecord = self.locationDict[Location][nextRecordIndex]
-                histogram.append({'index': pt['index'], 'counter': priorRecord['counter'], 'util': self.calcCurrentUtil(pt['index'], priorRecord)})
+                priorRecord = location[nextRecordIndex]
+                histogram.append({'index': pt, 'counter': priorRecord['counter'], 'util': self.calcCurrentUtil(pt, priorRecord)})
 
-        for i, bin in enumerate(histogram):
-            if i is 0:
-                histogram[i]['integral'] = 0 #bin['util'] / bin['index']
-            else:
-                histogram[i]['integral'] = (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index'])
-                onlyIntegrals.append( (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index']) )
+        histogram[0]['integral'] = 0
+        prev = histogram[0]
+        for i in range(1,len(histogram)):
+            current = histogram[i]
+            val = (current['util'] - prev['util']) / (current['index'] - prev['index'])
+            current['integral'] = val
+            # onlyIntegrals.append(val)
+            prev = current
+        #for i, bin in enumerate(histogram):
+        #    if i is 0:
+        #        histogram[i]['integral'] = 0 #bin['util'] / bin['index']
+        #    else:
+        #        histogram[i]['integral'] = (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index'])
+        #        onlyIntegrals.append( (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index']) )
 
-        return (histogram, onlyIntegrals)
+        return (histogram, list(current['integral'] for current in histogram[1:]))
 
 
 
