@@ -10,7 +10,7 @@ from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.requests import Request #pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
 from data_store import DataStore, ClientLogger
-from profilier import profile
+from profiling_tools.profilier import Profilier
 import cProfile, pstats, io
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
@@ -27,6 +27,8 @@ app = FastAPI(
     version='0.1.0'
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
+
+prf = Profilier()
 
 def checkDatasetExistence(label):
     if label not in db:
@@ -231,16 +233,7 @@ def histogram(label: str, \
         # (d3.js doesn't have a good way to handle 204 error codes)
         # if indexObj.is_empty():
         #    raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
-        pr = cProfile.Profile()
-        pr.enable()
         val = getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
-        pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
-
         return val
 
     if location is not None:
@@ -410,27 +403,53 @@ def guidIntervalIds(label: str, guid: str):
 @app.get('/datasets/{label}/drawValues/{width}/{begin}/{end}')
 def getDrawValues(label: str, width: int, begin: int, end: int, location: str=None):
 
-    pr = cProfile.Profile()
-    pr.enable()
-
     if location is None:
         ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationHistogram(width, begin, end).tolist())
     else:
         ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[0])
 
-    pr.disable()
-    s = io.StringIO()
-    sortby = 'cumulative'
-    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    print(s.getvalue())
+    return ret
 
-    sortby = 'cumulative'
-    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    print(s.getvalue())
+
+#####################
+# Profilier Wrappers#
+#####################
+
+@app.get('/profile/start')
+def profileStart():
+    global prf
+    prf = Profilier()
+
+@app.get('/profile/datasets/{label}/drawValues/{width}/{begin}/{end}')
+def profileGetDrawValues(label: str, width: int, begin: int, end: int, location: str=None):
+    prf.start()
+    ret = getDrawValues(label, width, begin, end, location)
+    prf.end()
 
     return ret
+
+@app.get('/profile/datasets/{label}/histogram')
+def profileHistogram(label: str, \
+              mode: HistogramMode = HistogramMode.utilization, \
+              bins: int = 100, \
+              begin: float = None, \
+              end: float = None, \
+              location: str = None, \
+              primitive: str = None):
+    global prf
+
+    prf.start()
+    ret = histogram(label, mode, bins, begin, end, location, primitive)
+    prf.end()
+
+    return ret
+
+
+@app.get('/profile/print/{sortby}/{filename}/{numberOfRuns}')
+def profilePrint(sortby: str, filename: str, numberOfRuns: int):
+    global prf
+    prf.dumpAverageStats(sortby, filename, numberOfRuns)
+
 
 
 
