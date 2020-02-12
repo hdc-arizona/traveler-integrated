@@ -96,11 +96,12 @@ class SparseUtilizationList():
         histogram = []
         location = self.locationDict[Location]
         length = len(location)
+        nextRecordIndex = 0
         for pt in criticalPts:
             if pt < location[0]['index']:
                 histogram.append({'index': pt, 'counter':0, 'util': 0})
             else:
-                nextRecordIndex = self.binarySearch(location, 0, length, pt)
+                nextRecordIndex = self.binarySearch(location, nextRecordIndex, length, pt)
                 # nextRecordIndex = next(i for i, event in enumerate(self.locationDict[Location]) if event['index'] > pt['index'])
                 #
                 # if not (nextRecordIndex-1 == nextRecordIndexB):

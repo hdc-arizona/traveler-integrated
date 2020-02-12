@@ -417,8 +417,7 @@ def getDrawValues(label: str, width: int, begin: int, end: int, location: str=No
 
 @app.get('/profile/start')
 def profileStart():
-    global prf
-    prf = Profilier()
+    prf.reset()
 
 @app.get('/profile/datasets/{label}/drawValues/{width}/{begin}/{end}')
 def profileGetDrawValues(label: str, width: int, begin: int, end: int, location: str=None):
@@ -436,18 +435,16 @@ def profileHistogram(label: str, \
               end: float = None, \
               location: str = None, \
               primitive: str = None):
-    global prf
-
     prf.start()
     ret = histogram(label, mode, bins, begin, end, location, primitive)
     prf.end()
+
 
     return ret
 
 
 @app.get('/profile/print/{sortby}/{filename}/{numberOfRuns}')
 def profilePrint(sortby: str, filename: str, numberOfRuns: int):
-    global prf
     prf.dumpAverageStats(sortby, filename, numberOfRuns)
 
 

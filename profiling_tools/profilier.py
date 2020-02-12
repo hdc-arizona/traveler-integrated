@@ -1,4 +1,5 @@
 import cProfile, pstats, io
+
 # class for profiling
 class Profilier():
     def __init__(self, prf=cProfile.Profile()):
@@ -9,6 +10,9 @@ class Profilier():
 
     def end(self):
         self.prf.disable()
+
+    def reset(self):
+        self.prf = cProfile.Profile()
 
     def getRuntime(self):
         return pstats.Stats(self.prf).__dict__['total_tt']
@@ -31,7 +35,13 @@ class Profilier():
         for stat in obj:
             lst = []
             for val in range(0,4):
-                 lst.append(obj[stat][val]/num_of_runs)
+                if val < 2:
+                    var = int(obj[stat][val])//num_of_runs
+                    with open('test.txt', 'a') as f:
+                        f.write('{},{},{}'.format(obj[stat][val], num_of_runs, var))
+                    lst.append(var)
+                else:
+                    lst.append(obj[stat][val]/num_of_runs)
             if len(obj[stat]) > 4:
                 lst.append(obj[stat][4])
 
