@@ -102,13 +102,6 @@ class SparseUtilizationList():
                 histogram.append({'index': pt, 'counter':0, 'util': 0})
             else:
                 nextRecordIndex = self.binarySearch(location, nextRecordIndex, length, pt)
-                # nextRecordIndex = next(i for i, event in enumerate(self.locationDict[Location]) if event['index'] > pt['index'])
-                #
-                # if not (nextRecordIndex-1 == nextRecordIndexB):
-                #     print(i, nextRecordIndex, nextRecordIndexB, pt['index'], self.locationDict[Location][nextRecordIndexB])
-                # else:
-                #     print(i, nextRecordIndex, nextRecordIndexB, pt['index'],  self.locationDict[Location][nextRecordIndexB])
-
                 priorRecord = location[nextRecordIndex]
                 histogram.append({'index': pt, 'counter': priorRecord['counter'], 'util': self.calcCurrentUtil(pt, priorRecord)})
 
@@ -118,14 +111,7 @@ class SparseUtilizationList():
             current = histogram[i]
             val = (current['util'] - prev['util']) / (current['index'] - prev['index'])
             current['integral'] = val
-            # onlyIntegrals.append(val)
             prev = current
-        #for i, bin in enumerate(histogram):
-        #    if i is 0:
-        #        histogram[i]['integral'] = 0 #bin['util'] / bin['index']
-        #    else:
-        #        histogram[i]['integral'] = (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index'])
-        #        onlyIntegrals.append( (bin['util'] - histogram[i-1]['util']) / (bin['index'] - histogram[i-1]['index']) )
 
         return (histogram, list(current['integral'] for current in histogram[1:]))
 

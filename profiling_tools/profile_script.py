@@ -37,11 +37,13 @@ def main():
         dataset_label = data["dataset_label"]
         sort_order = data["sort_order"]
         prof_output = data["prof_output"]
+        function = data["function"]
 
     # call profile start endpoint
     requests.get(endpt+'/profile/start')
 
-    requestString = endpt + '/profile/datasets/' + dataset_label + '/drawValues/' + str(bins) + '/' + str(begin) + '/' + str(end)
+    requestString = endpt + '/profile/datasets/{}/{}?bins={}&begin={}&end={}'.format(dataset_label, function, bins, begin, end)
+    # requestString = endpt + '/profile/datasets/' + dataset_label + '/{}'.format(function) + '?' + str(bins) + '/' + str(begin) + '/' + str(end)
     # loop over number of runs
     for n in range(0, n_trials):
         requests.get(requestString)

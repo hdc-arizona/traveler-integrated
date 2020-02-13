@@ -419,10 +419,10 @@ def getDrawValues(label: str, width: int, begin: int, end: int, location: str=No
 def profileStart():
     prf.reset()
 
-@app.get('/profile/datasets/{label}/drawValues/{width}/{begin}/{end}')
-def profileGetDrawValues(label: str, width: int, begin: int, end: int, location: str=None):
+@app.get('/profile/datasets/{label}/drawValues')
+def profileGetDrawValues(label: str, bins: int=100, begin: int=None, end: int=None, location: str=None):
     prf.start()
-    ret = getDrawValues(label, width, begin, end, location)
+    ret = getDrawValues(label, bins, begin, end, location)
     prf.end()
 
     return ret

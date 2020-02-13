@@ -1,10 +1,11 @@
 {
-  "n_trials": 1,
+  "n_trials": 100,
   "end_pt": "http://127.0.0.1:8000",
-  "begin": 95000000,
-  "end": 95100000,
-  "bins": 1,
-  "dataset_label": "LRAInstrumentedus",
+  "begin": 403059000,
+  "end":   1600000000,
+  "bins": 800,
+  "dataset_label": "FIB23",
   "sort_order": "cumulative",
-  "prof_output": "_.txt"
+  "prof_output": "_.txt",
+  "function": "drawValues"
 }
