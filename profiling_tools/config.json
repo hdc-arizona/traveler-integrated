@@ -1,0 +1,10 @@
+{
+  "n_trials": 1,
+  "end_pt": "http://127.0.0.1:8000",
+  "begin": 95000000,
+  "end": 95100000,
+  "bins": 1,
+  "dataset_label": "LRAInstrumentedus",
+  "sort_order": "cumulative",
+  "prof_output": "_.txt"
+}
