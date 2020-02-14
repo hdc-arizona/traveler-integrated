@@ -52,10 +52,11 @@ class Profilier():
     def dumpAverageStats(self, sortby, filename, num_of_runs):
         with open(filename, 'w') as f:
             sts = pstats.Stats(self.prf, stream=f)
-            self.calcAvgStatsHelper(sts.__dict__['stats'], num_of_runs)
-            sts.__dict__['total_tt'] = sts.__dict__['total_tt']/num_of_runs
-            sts.__dict__['total_calls'] = sts.__dict__['total_calls']//num_of_runs
-            sts.__dict__['prim_calls'] = sts.__dict__['prim_calls']//num_of_runs
+            if num_of_runs is not 1:
+                self.calcAvgStatsHelper(sts.__dict__['stats'], num_of_runs)
+                sts.__dict__['total_tt'] = sts.__dict__['total_tt']/num_of_runs
+                sts.__dict__['total_calls'] = sts.__dict__['total_calls']//num_of_runs
+                sts.__dict__['prim_calls'] = sts.__dict__['prim_calls']//num_of_runs
             sts.sort_stats(sortby)
             sts.print_stats()
 

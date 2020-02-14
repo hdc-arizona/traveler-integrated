@@ -18,9 +18,7 @@ class SparseUtilizationList():
         while True:
             # Check base case
             if r >= l:
-
                 mid = l + (r - l)//2
-
                 # If element is present at the middle itself
                 if arr[mid]['index'] == x:
                     return mid
@@ -33,14 +31,11 @@ class SparseUtilizationList():
                 elif arr[mid]['index'] > x:
                     r = mid-1
                     continue
-                    # return self.binarySearch(arr, l, mid-1, x)
 
                 # Else the element can only be present in right subarray
                 else:
                     l = mid+1
                     continue
-                    # return self.binarySearch(arr, mid+1, r, x)
-
 
             else:
                 # Element is not present in the array
@@ -95,7 +90,7 @@ class SparseUtilizationList():
         # searches
         histogram = []
         location = self.locationDict[Location]
-        length = len(location)
+        length = len(location) - 1
         nextRecordIndex = 0
         for pt in criticalPts:
             if pt < location[0]['index']:

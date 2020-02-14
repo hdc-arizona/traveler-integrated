@@ -1,10 +1,10 @@
 {
-  "n_trials": 100,
+  "n_trials": 10,
   "end_pt": "http://127.0.0.1:8000",
-  "begin": 403059000,
-  "end":   1600000000,
+  "begin": 50000000,
+  "end":   536000000,
   "bins": 800,
-  "dataset_label": "FIB23",
+  "dataset_label": "LRA Test Running",
   "sort_order": "cumulative",
   "prof_output": "_.txt",
   "function": "drawValues"
