@@ -20,15 +20,16 @@ class SparseUtilizationList():
             if r >= l:
                 mid = l + (r - l)//2
                 # If element is present at the middle itself
-                if arr[mid]['index'] == x:
+                midX = arr[mid]['index']
+                if midX == x:
                     return mid
 
-                elif x < arr[mid]['index'] and x > arr[mid-1]['index']:
+                elif x < midX and x > arr[mid-1]['index']:
                     return mid-1
 
                 # If element is smaller than mid, then it can only
                 # be present in left subarray
-                elif arr[mid]['index'] > x:
+                elif midX > x:
                     r = mid-1
                     continue
 
