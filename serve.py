@@ -29,6 +29,7 @@ app = FastAPI(
 app.mount('/static', StaticFiles(directory='static'), name='static')
 
 prf = Profilier()
+profile = False
 
 def checkDatasetExistence(label):
     if label not in db:
@@ -251,7 +252,7 @@ def histogram(label: str, \
     return modeHelper(db[label]['intervalIndexes']['main'])
 
 @app.get('/datasets/{label}/intervals')
-def intervals(label: str, begin: float = None, end: float = None):
+def intervals(label: str, begin: float = None, end: float = None, profile: bool = False):
     checkDatasetExistence(label)
     checkDatasetHasIntervals(label)
 
@@ -260,8 +261,6 @@ def intervals(label: str, begin: float = None, end: float = None):
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
 
-    # pr = cProfile.Profile()
-    # pr.enable()
 
     def intervalGenerator():
         yield '['
@@ -270,17 +269,24 @@ def intervals(label: str, begin: float = None, end: float = None):
             if not firstItem:
                 yield ','
             yield json.dumps(db[label]['intervals'][i.data])
+            json.dumps(db[label]['intervals'][i.data])
             firstItem = False
         yield ']'
 
-    # pr.disable()
-    # s = io.StringIO()
-    # sortby = 'cumulative'
-    # ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-    # ps.print_stats()
-    # print(s.getvalue())
+    def profIntervalGenerator():
+        firstItem = True
+        for i in db[label]['intervalIndexes']['main'].iterOverlap(begin, end):
+            if not firstItem:
+                pass
+            json.dumps(db[label]['intervals'][i.data])
+            firstItem = False
 
-    return StreamingResponse(intervalGenerator(), media_type='application/json')
+    if profile is True:
+        return profIntervalGenerator()
+    else:
+        return StreamingResponse(intervalGenerator(), media_type='application/json')
+
+
 
 
 @app.get('/datasets/{label}/procMetrics')
@@ -441,6 +447,15 @@ def profileHistogram(label: str, \
 
 
     return ret
+
+@app.get('/profile/datasets/{label}/intervals')
+def profileIntervals(label: str, begin: float = None, end: float = None):
+    prf.start()
+    intervals(label, begin, end, True)
+    prf.end()
+
+
+    return 0
 
 
 @app.get('/profile/print/{sortby}/{filename}/{numberOfRuns}')

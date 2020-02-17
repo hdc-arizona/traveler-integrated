@@ -37,8 +37,6 @@ class Profilier():
             for val in range(0,4):
                 if val < 2:
                     var = int(obj[stat][val])//num_of_runs
-                    with open('test.txt', 'a') as f:
-                        f.write('{},{},{}'.format(obj[stat][val], num_of_runs, var))
                     lst.append(var)
                 else:
                     lst.append(obj[stat][val]/num_of_runs)
@@ -50,7 +48,9 @@ class Profilier():
                 self.calcAvgStatsHelper(obj[stat][4], num_of_runs)
 
     def dumpAverageStats(self, sortby, filename, num_of_runs):
+        filename = '/traveler-dev/profiling_tools/profiles/' + filename
         with open(filename, 'w') as f:
+            f.write("\n\n Averaged over {} trials \n\n".format(num_of_runs+1))
             sts = pstats.Stats(self.prf, stream=f)
             if num_of_runs is not 1:
                 self.calcAvgStatsHelper(sts.__dict__['stats'], num_of_runs)

@@ -11,6 +11,8 @@ class SparseUtilizationList():
     def __getitem__(self, loc):
         return self.locationDict[loc]
 
+    def __setitem__(self, loc, val):
+        self.locationDict[loc] = val
 
     # Returns index of x in arr if present, else -1
     # Modified to work with dictionaries
@@ -18,7 +20,8 @@ class SparseUtilizationList():
         while True:
             # Check base case
             if r >= l:
-                mid = l + (r - l)//2
+                mid = ( l + ((r - l)  >> 1) )
+
                 # If element is present at the middle itself
                 midX = arr[mid]['index']
                 if midX == x:
@@ -79,27 +82,35 @@ class SparseUtilizationList():
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart
     def calcUtilizationForLocation(self, bins=100, begin=None, end=None, Location=None):
         rangePerBin = (end-begin)/bins
-        onlyIntegrals =[]
 
         # caclulates the beginning of each each bin evenly divided over the range of
         # time indicies and stores them as critical points
-        criticalPts = []
+        criticalPts = np.empty(bins+1)
         for i in range(0, bins):
-            criticalPts.append((i * rangePerBin) + begin)
-        criticalPts.append(end)
+            criticalPts[i] = (i * rangePerBin) + begin
+        criticalPts[len(criticalPts)-1] = end
 
         # searches
-        histogram = []
+        histogram = np.empty_like(criticalPts, dtype=object)
         location = self.locationDict[Location]
         length = len(location) - 1
         nextRecordIndex = 0
-        for pt in criticalPts:
+        for i, pt in enumerate(criticalPts):
             if pt < location[0]['index']:
-                histogram.append({'index': pt, 'counter':0, 'util': 0})
+                histogram[i] = {'index': pt, 'counter':0, 'util': 0}
             else:
                 nextRecordIndex = self.binarySearch(location, nextRecordIndex, length, pt)
                 priorRecord = location[nextRecordIndex]
-                histogram.append({'index': pt, 'counter': priorRecord['counter'], 'util': self.calcCurrentUtil(pt, priorRecord)})
+
+                # pulling out of calc current util to reduce overhead
+                if priorRecord is None:
+                    last = {'index': 0, 'counter': 0, 'util': 0}
+                else:
+                    last = priorRecord
+
+                util = (((pt - last['index']) * last['counter'])+last['util'])
+
+                histogram[i] = {'index': pt, 'counter': priorRecord['counter'], 'util': util}
 
         histogram[0]['integral'] = 0
         prev = histogram[0]
@@ -132,6 +143,7 @@ async def loadSUL(label, db, log=logToConsole):
             sul.setIntervalAtLocation({'index':int(i.end), 'counter': -1, 'util': None}, loc)
 
         sul.sortAtLoc(loc)
+        sul[loc] = np.array(sul[loc])
 
         for i, criticalPt in enumerate(sul[loc]):
             counter += criticalPt['counter']
