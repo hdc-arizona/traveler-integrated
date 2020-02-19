@@ -95,9 +95,32 @@ class SparseUtilizationList():
         location = self.locationDict[Location]
         length = len(location) - 1
         nextRecordIndex = 0
+
+        # we want to replace this call to C
+        # we can create three arrays to replace these dictionary objects when passing over
+        # three num py arrays intergers and floats
+        # -> we pass array of critical points
+        # From c we are writing back into our 3 arrays
+        # Basically passing in 5 pointers to arrays in and prof_output
+
+        # This way forces allocation and deallocation to occur in python
+        # This makes out lives easier
+        # Calling malloc can be slow
+
+        # Search fo C code  <-> python code integration
+        # CTypes?
+
+        # We need to be considerate when compiling this to a libaray and make it sympathetic to dynamic loading etc.
+        # Boost for this? Boost.python
+        # Getting them to work together may be really rough; but could be worth an investment if we do this a lot
+
+        #CFFI Python
+            # Put a serving into a script that also does our library compilation beforehand
+            # Start with small self contained python and c-scripts toy examples and work up to this
+
         for i, pt in enumerate(criticalPts):
             if pt < location[0]['index']:
-                histogram[i] = {'index': pt, 'counter':0, 'util': 0}
+                histogram[i] = {'index': pt, 'counter':0, 'util': 0} #This has overhead of creating a disctionary each time; looks nice but can be slow
             else:
                 nextRecordIndex = self.binarySearch(location, nextRecordIndex, length, pt)
                 priorRecord = location[nextRecordIndex]
