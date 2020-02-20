@@ -2,9 +2,9 @@
 # include <stdlib.h>
 # include <math.h>
 
-int binary_srch(long *arr, int l, int r, long x) {
+int binary_srch(long long *arr, int l, int r, long long x) {
 	int mid;
-	long midX;
+	long long midX;
 	while(1) {
 		if( r >= l) {
 			mid = l + ((r-l)>>1);
@@ -22,10 +22,10 @@ int binary_srch(long *arr, int l, int r, long x) {
 }
 
 void calcHistogram(int *histogram_counter, int histogram_size,
-		long *histogram_index,
+		long long *histogram_index,
 		double *histogram_util, 
-		long *critical_points, int critical_points_size,
-		long *location_index, int location_size,
+		long long *critical_points, int critical_points_size,
+		long long *location_index, int location_size,
 		int *location_counter,
 		double *location_util) {
 	int i;
@@ -33,7 +33,7 @@ void calcHistogram(int *histogram_counter, int histogram_size,
 	double util = 0.0;
 	
 	for(i=0;i<critical_points_size;i++){
-		long pt = critical_points[i];
+		long long pt = critical_points[i];
 		if(pt < location_index[0]) {
 			histogram_index[i] = pt;
 			histogram_counter[i] = 0;
@@ -41,8 +41,7 @@ void calcHistogram(int *histogram_counter, int histogram_size,
 		} else {
 			nextRecordIndex = binary_srch(location_index, nextRecordIndex, location_size, pt);
 			util = (((pt - location_index[nextRecordIndex]) * location_counter[nextRecordIndex]) + location_util[nextRecordIndex]);
-			
-			histogram_index[i] = pt;
+            histogram_index[i] = pt;
 			histogram_counter[i] = location_counter[nextRecordIndex];
 			histogram_util[i] = util;
 		}

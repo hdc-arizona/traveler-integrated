@@ -94,7 +94,7 @@ class SparseUtilizationList():
         # time indicies and stores them as critical points
         criticalPts = np.empty(bins + 1, dtype=np.int64)
         critical_length = len(criticalPts)
-        critical_points = ffi.new("long[]", critical_length)
+        critical_points = ffi.new("long long[]", critical_length)
         for i in range(0, bins):
             criticalPts[i] = (i * rangePerBin) + begin
             critical_points[i] = int((i * rangePerBin) + begin)
@@ -107,7 +107,7 @@ class SparseUtilizationList():
         length = len(location)
         histogram_length = len(histogram)
 
-        histogram_index = ffi.new("long int[]", histogram_length)
+        histogram_index = ffi.new("long long[]", histogram_length)
         histogram_counter = ffi.new("int[]", histogram_length)
         histogram_util = ffi.new("double[]", histogram_length)
 
@@ -116,7 +116,7 @@ class SparseUtilizationList():
         #     critical_points[i] = criticalPts[i]
 
         cLocationStruct = self.getCLocation(Location)
-        location_index = ffi.cast("long int*", cLocationStruct['index'].ctypes.data)
+        location_index = ffi.cast("long long*", cLocationStruct['index'].ctypes.data)
         location_counter = ffi.cast("int*", cLocationStruct['counter'].ctypes.data)
         location_util = ffi.cast("double*", cLocationStruct['util'].ctypes.data)
 
@@ -149,8 +149,8 @@ async def loadSUL(label, db, log=logToConsole):
         counter = 0
         for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
             # first is timetamp, second is counter, third is total utilization at timestamp
-            sul.setIntervalAtLocation({'index':int(i.begin), 'counter': 1, 'util': 0}, loc)
-            sul.setIntervalAtLocation({'index':int(i.end), 'counter': -1, 'util': 0}, loc)
+            sul.setIntervalAtLocation({'index': int(i.begin), 'counter': 1, 'util': 0}, loc)
+            sul.setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0}, loc)
 
         sul.sortAtLoc(loc)
         sul[loc] = np.array(sul[loc])
@@ -167,9 +167,9 @@ async def loadSUL(label, db, log=logToConsole):
 
         locStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int32), 'util': np.zeros(length, dtype=np.double)}
         for i in range(length):
-            locStruct['index'][i] = sul[loc][i]['index']
-            locStruct['counter'][i] = sul[loc][i]['counter']
-            locStruct['util'][i] = sul[loc][i]['util']
+            locStruct['index'][i] = sul.locationDict[loc][i]['index']
+            locStruct['counter'][i] = sul.locationDict[loc][i]['counter']
+            locStruct['util'][i] = sul.locationDict[loc][i]['util']
 
             sul.setCLocation(loc, locStruct)
 
