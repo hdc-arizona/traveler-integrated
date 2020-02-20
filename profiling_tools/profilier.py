@@ -48,7 +48,6 @@ class Profilier():
                 self.calcAvgStatsHelper(obj[stat][4], num_of_runs)
 
     def dumpAverageStats(self, sortby, filename, num_of_runs):
-        filename = '/traveler-dev/profiling_tools/profiles/' + filename
         with open(filename, 'w') as f:
             f.write("\n\n Averaged over {} trials \n\n".format(num_of_runs+1))
             sts = pstats.Stats(self.prf, stream=f)

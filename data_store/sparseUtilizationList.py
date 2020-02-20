@@ -2,17 +2,24 @@
 import numpy as np
 import json
 from .loggers import logToConsole
-from bisect import bisect_left
+from profiling_tools._cCalcBin import ffi, lib
 
 class SparseUtilizationList():
     def __init__(self, locationDict={}):
         self.locationDict = locationDict
+        self.cLocationDict = {}
 
     def __getitem__(self, loc):
         return self.locationDict[loc]
 
     def __setitem__(self, loc, val):
         self.locationDict[loc] = val
+
+    def getCLocation(self, loc):
+        return self.cLocationDict[loc]
+
+    def setCLocation(self, loc, val):
+        self.cLocationDict[loc] = val
 
     # Returns index of x in arr if present, else -1
     # Modified to work with dictionaries
@@ -85,41 +92,44 @@ class SparseUtilizationList():
 
         # caclulates the beginning of each each bin evenly divided over the range of
         # time indicies and stores them as critical points
-        criticalPts = np.empty(bins+1)
+        criticalPts = np.empty(bins + 1, dtype=np.int64)
+        critical_length = len(criticalPts)
+        critical_points = ffi.new("long[]", critical_length)
         for i in range(0, bins):
             criticalPts[i] = (i * rangePerBin) + begin
+            critical_points[i] = int((i * rangePerBin) + begin)
         criticalPts[len(criticalPts)-1] = end
+        critical_points[len(criticalPts)-1] = end
 
         # searches
         histogram = np.empty_like(criticalPts, dtype=object)
         location = self.locationDict[Location]
-        length = len(location) - 1
-        nextRecordIndex = 0
-        for i, pt in enumerate(criticalPts):
-            if pt < location[0]['index']:
-                histogram[i] = {'index': pt, 'counter':0, 'util': 0}
-            else:
-                nextRecordIndex = self.binarySearch(location, nextRecordIndex, length, pt)
-                priorRecord = location[nextRecordIndex]
+        length = len(location)
+        histogram_length = len(histogram)
 
-                # pulling out of calc current util to reduce overhead
-                if priorRecord is None:
-                    last = {'index': 0, 'counter': 0, 'util': 0}
-                else:
-                    last = priorRecord
+        histogram_index = ffi.new("long int[]", histogram_length)
+        histogram_counter = ffi.new("int[]", histogram_length)
+        histogram_util = ffi.new("double[]", histogram_length)
 
-                util = (((pt - last['index']) * last['counter'])+last['util'])
+        # critical_points = ffi.new("int[]", critical_length)
+        # for i in range(critical_length):
+        #     critical_points[i] = criticalPts[i]
 
-                histogram[i] = {'index': pt, 'counter': priorRecord['counter'], 'util': util}
+        cLocationStruct = self.getCLocation(Location)
+        location_index = ffi.cast("long int*", cLocationStruct['index'].ctypes.data)
+        location_counter = ffi.cast("int*", cLocationStruct['counter'].ctypes.data)
+        location_util = ffi.cast("double*", cLocationStruct['util'].ctypes.data)
 
-        histogram[0]['integral'] = 0
+        lib.calcHistogram(histogram_counter, histogram_length, histogram_index, histogram_util, critical_points, critical_length, location_index, length-1, location_counter, location_util)
+
+        histogram[0] = {'integral': 0, 'index': histogram_index[0], 'util': histogram_util[0], 'counter': histogram_counter[0]}
         prev = histogram[0]
-        for i in range(1,len(histogram)):
+        for i in range(1, len(histogram)):
+            histogram[i] = {'index': histogram_index[i], 'util': histogram_util[i], 'counter': histogram_counter[i]}
             current = histogram[i]
             val = (current['util'] - prev['util']) / (current['index'] - prev['index'])
             current['integral'] = val
             prev = current
-
         return (histogram, list(current['integral'] for current in histogram[1:]))
 
 
@@ -139,11 +149,13 @@ async def loadSUL(label, db, log=logToConsole):
         counter = 0
         for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
             # first is timetamp, second is counter, third is total utilization at timestamp
-            sul.setIntervalAtLocation({'index':int(i.begin), 'counter': 1, 'util': None}, loc)
-            sul.setIntervalAtLocation({'index':int(i.end), 'counter': -1, 'util': None}, loc)
+            sul.setIntervalAtLocation({'index':int(i.begin), 'counter': 1, 'util': 0}, loc)
+            sul.setIntervalAtLocation({'index':int(i.end), 'counter': -1, 'util': 0}, loc)
 
         sul.sortAtLoc(loc)
         sul[loc] = np.array(sul[loc])
+        length = len(sul[loc])
+
 
         for i, criticalPt in enumerate(sul[loc]):
             counter += criticalPt['counter']
@@ -153,7 +165,13 @@ async def loadSUL(label, db, log=logToConsole):
             else:
                 criticalPt['util'] = sul.calcCurrentUtil(criticalPt['index'], sul.locationDict[loc][i-1])
 
+        locStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int32), 'util': np.zeros(length, dtype=np.double)}
+        for i in range(length):
+            locStruct['index'][i] = sul[loc][i]['index']
+            locStruct['counter'][i] = sul[loc][i]['counter']
+            locStruct['util'][i] = sul[loc][i]['util']
 
+            sul.setCLocation(loc, locStruct)
 
     db[label]['sparseUtilizationList'] = sul
 

@@ -3,6 +3,8 @@ import argparse
 import json
 import asyncio
 from enum import Enum
+
+import numpy as np
 import uvicorn #pylint: disable=import-error
 from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
 from pydantic import BaseModel #pylint: disable=import-error
@@ -412,7 +414,10 @@ def getDrawValues(label: str, width: int, begin: int, end: int, location: str=No
     if location is None:
         ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationHistogram(width, begin, end).tolist())
     else:
-        ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[0])
+        array = np.zeros(width)
+        retV = db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[1]
+        array = np.add(array, retV)
+        ret = json.dumps(array.tolist())
 
     return ret
 

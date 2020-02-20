@@ -1,0 +1,11 @@
+{
+  "n_trials": 10,
+  "end_pt": "http://127.0.0.1:8000",
+  "begin": 1000000000,
+  "end":   10000000000,
+  "bins": 2000,
+  "dataset_label": "LRAcsv51219",
+  "sort_order": "cumulative",
+  "prof_output": "drawValuesSmallNewerWithOpt.txt",
+  "function": "drawValues"
+}
