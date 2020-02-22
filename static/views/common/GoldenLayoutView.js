@@ -59,7 +59,9 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
     this.tabElement.classed(this.type, true);
   }
   drawTab () {
-    this.tabElement.select(':scope > .lm_title')
+    this.tabElement
+      .attr('title', this.title)
+      .select(':scope > .lm_title')
       .text(this.title);
   }
   setupContentElement () {
