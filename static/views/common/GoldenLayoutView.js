@@ -15,6 +15,14 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
     this.container.on('tab', tab => {
       this.tabElement = d3.select(tab.element[0]);
       this.setupTab();
+
+      // GoldenLayout creates a separate DragProxy element that needs our
+      // custom tab modifications while dragging
+      tab._dragListener.on('dragStart', () => {
+        const draggedTabElement = d3.select('.lm_dragProxy .lm_tab');
+        this.setupTab(draggedTabElement);
+        this.drawTab(draggedTabElement);
+      });
     });
     this.container.on('open', () => {
       this.render(d3.select(this.container.getElement()[0]));
@@ -55,11 +63,11 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
       .classed('spinner', true)
       .style('display', 'none');
   }
-  setupTab () {
-    this.tabElement.classed(this.type, true);
+  setupTab (tabElement = this.tabElement) {
+    tabElement.classed(this.type, true);
   }
-  drawTab () {
-    this.tabElement
+  drawTab (tabElement = this.tabElement) {
+    tabElement
       .attr('title', this.title)
       .select(':scope > .lm_title')
       .text(this.title);
