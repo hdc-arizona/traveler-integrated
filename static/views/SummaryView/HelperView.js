@@ -20,11 +20,6 @@ class HelperView extends LinkedMixin(View) {
   }
   setupButtonListeners () {
     const self = this;
-    var clearTooltipStyle = function () {
-      d3.selectAll('.tooltip')
-        .style('overflow-y', null)
-        .style('height', null);
-    };
 
     // Delete button
     this.d3el.select('.delete.button')
@@ -33,7 +28,6 @@ class HelperView extends LinkedMixin(View) {
           content: `Delete ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', async d => {
@@ -53,7 +47,6 @@ class HelperView extends LinkedMixin(View) {
           content: `Show all views for ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', () => { window.controller.assembleViews(this.linkedState, this); });
@@ -66,7 +59,6 @@ class HelperView extends LinkedMixin(View) {
           content: `Color by...`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => {
         if (this._standardMousing) {
@@ -109,8 +101,6 @@ class HelperView extends LinkedMixin(View) {
         menuEntriesList.push({
           content: item,
           onClick: () => {
-            clearTooltipStyle();
-
             for (const viewList of Object.values(window.controller.views)) {
               for (const view of viewList) {
                 if (view instanceof ProcMetricView) {
@@ -135,7 +125,6 @@ class HelperView extends LinkedMixin(View) {
         .on('mouseleave', () => {
           if (self._standardMousing) {
             window.controller.tooltip.hide();
-            clearTooltipStyle();
           }
         })
         .on('click', function () {
@@ -144,9 +133,6 @@ class HelperView extends LinkedMixin(View) {
             menuEntries: menuEntriesList,
             targetBounds: this.getBoundingClientRect()
           });
-          d3.selectAll('.tooltip')
-            .style('overflow-y', 'scroll')
-            .style('height', '200px');
         });
     }, 100);
   }
