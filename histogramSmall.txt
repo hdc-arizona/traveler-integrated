@@ -1,0 +1,32 @@
+
+
+ Averaged over 10 trials 
+
+         500380 function calls (483864 primitive calls) in 0.309 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.309    0.309 ./serve.py:218(histogram)
+        1    0.000    0.000    0.309    0.309 ./serve.py:234(modeHelper)
+        1    0.002    0.002    0.309    0.309 /home/sayefsakin/.local/lib/python3.6/site-packages/intervaltree/intervaltree.py:1229(computeUtilizationHistogram)
+  16516/1    0.094    0.000    0.303    0.303 /home/sayefsakin/.local/lib/python3.6/site-packages/intervaltree/intervaltree.py:1265(recurse)
+    85657    0.073    0.000    0.116    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/intervaltree/intervaltree.py:1250(getBin)
+    52624    0.040    0.000    0.071    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/intervaltree/intervaltree.py:1260(clampBin)
+   171315    0.044    0.000    0.044    0.000 {built-in method math.floor}
+    82681    0.027    0.000    0.027    0.000 {built-in method builtins.max}
+    82681    0.025    0.000    0.025    0.000 {built-in method builtins.min}
+     2222    0.002    0.000    0.003    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/intervaltree/interval.py:33(__new__)
+     2222    0.001    0.000    0.002    0.000 <string>:12(__new__)
+     2222    0.001    0.000    0.001    0.000 {built-in method __new__ of type object at 0x9d12c0}
+     2222    0.001    0.000    0.001    0.000 {method 'append' of 'list' objects}
+        1    0.000    0.000    0.000    0.000 ./serve.py:36(checkDatasetExistence)
+        1    0.000    0.000    0.000    0.000 ./serve.py:39(checkDatasetHasIntervals)
+        1    0.000    0.000    0.000    0.000 /mnt/d/Documents/traveler-integrated/profiling_tools/profilier.py:11(end)
+        1    0.000    0.000    0.000    0.000 {method 'title' of 'str' objects}
+        1    0.000    0.000    0.000    0.000 {built-in method builtins.getattr}
+        1    0.000    0.000    0.000    0.000 /mnt/d/Documents/traveler-integrated/data_store/__init__.py:55(__contains__)
+        3    0.000    0.000    0.000    0.000 /mnt/d/Documents/traveler-integrated/data_store/__init__.py:52(__getitem__)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+
+

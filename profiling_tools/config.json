@@ -6,6 +6,6 @@
   "bins": 2000,
   "dataset_label": "LRA21Feb19R2",
   "sort_order": "cumulative",
-  "prof_output": "drawValuesBigNewerWithOpt.txt",
-  "function": "drawValues"
+  "prof_output": "histogramBig.txt",
+  "function": "histogram"
 }
