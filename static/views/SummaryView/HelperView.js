@@ -115,24 +115,18 @@ class HelperView extends LinkedMixin(View) {
           var newProcMetricView = {
             type: 'component',
             componentName: 'LineChartView',
-            componentState: {label: self.linkedState.label}
+            componentState: {label: self.linkedState.label, metricType: metricType}
           };
-          if(param.startsWith('PAPI') == false) {
+          if(param.startsWith('PAPI') === false) {
             metricType = param;
             newProcMetricView = {
               type: 'component',
               componentName: 'ProcMetricView',
-              componentState: {label: self.linkedState.label}
+              componentState: {label: self.linkedState.label, metricType: metricType}
             };
           }
           self.linkedState.selectedProcMetric = metricType;
-          // TODO: the following is a bad hack, need to do it properly by following goldenlayout API
-          let cLen = window.controller.goldenLayout.root.contentItems[0]
-              .contentItems[0].contentItems[0].contentItems.length;
           window.controller.goldenLayout.root.contentItems[0].contentItems[0].contentItems[0].addChild(newProcMetricView);
-          window.controller.goldenLayout.root.contentItems[0]
-              .contentItems[0].contentItems[0].contentItems[cLen].contentItems[0].tab.titleElement[0]
-              .outerText = self.linkedState.label + " " + metricType;
         }
       };
     };
