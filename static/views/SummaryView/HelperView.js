@@ -21,19 +21,17 @@ class HelperView extends LinkedMixin(View) {
   setupButtonListeners () {
     const self = this;
     var clearTooltipStyle = function () {
-      d3.selectAll('.tooltip')
-        .style('overflow-y', null)
-        .style('height', null);
+      d3.selectAll('.tooltip').classed('proctip', false);
     };
 
     // Delete button
     this.d3el.select('.delete.button')
       .on('mouseenter', function () {
+        clearTooltipStyle();
         window.controller.tooltip.show({
           content: `Delete ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', async d => {
@@ -49,11 +47,11 @@ class HelperView extends LinkedMixin(View) {
     // Assemble views button
     this.d3el.select('.assemble.button')
       .on('mouseenter', function () {
+        clearTooltipStyle();
         window.controller.tooltip.show({
           content: `Show all views for ${self.linkedState.label}`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => { window.controller.tooltip.hide(); })
       .on('click', () => { window.controller.assembleViews(this.linkedState, this); });
@@ -61,12 +59,12 @@ class HelperView extends LinkedMixin(View) {
     // Color mode button
     this.d3el.select('.color.button')
       .on('mouseenter', function () {
+        clearTooltipStyle();
         self._standardMousing = true;
         window.controller.tooltip.show({
           content: `Color by...`,
           targetBounds: this.getBoundingClientRect()
         });
-        clearTooltipStyle();
       })
       .on('mouseleave', () => {
         if (this._standardMousing) {
@@ -101,53 +99,80 @@ class HelperView extends LinkedMixin(View) {
           menuEntries
         });
       });
+    var hamburgerItemSubContents = function(item, entries) {
+      return {
+        content: item,
+        subEntries: entries
+      };
+    };
+    var hamburgerItemContent = function(title, param) {
+      return {
+        content: title,
+        onClick: () => {
+          clearTooltipStyle();
+          var metric = param.split(':');
+          var metricType = metric[1];
+          var newProcMetricView = {
+            type: 'component',
+            componentName: 'LineChartView',
+            componentState: {label: self.linkedState.label, metricType: metricType}
+          };
+          if(param.startsWith('PAPI') === false) {
+            metricType = param;
+            newProcMetricView = {
+              type: 'component',
+              componentName: 'ProcMetricView',
+              componentState: {label: self.linkedState.label, metricType: metricType}
+            };
+          }
+          self.linkedState.selectedProcMetric = metricType;
+          window.controller.goldenLayout.root.contentItems[0].contentItems[0].contentItems[0].addChild(newProcMetricView);
+        }
+      };
+    };
 
     this._intervalTimeout = window.setTimeout(async () => {
       const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetrics`);
+      var menuEntriesNestedList = {};
       var menuEntriesList = [];
       procMetricList.forEach(item => {
-        menuEntriesList.push({
-          content: item,
-          onClick: () => {
-            clearTooltipStyle();
-
-            for (const viewList of Object.values(window.controller.views)) {
-              for (const view of viewList) {
-                if (view instanceof ProcMetricView) {
-                  // console.log("found my puppy");
-                  view.curMetric = item;
-                  view.getData();
-                }
-              }
-            }
-            // console.log("clciked button " + item);
+        if(item.indexOf(':') > -1) {
+          var res = item.split(':');
+          if(!(res[0] in menuEntriesNestedList)) {
+            menuEntriesNestedList[res[0]] = [];
           }
-        });
+          menuEntriesNestedList[res[0]].push(hamburgerItemContent(res[1], item));
+        } else {
+          menuEntriesList.push(hamburgerItemContent(item, item));
+        }
       });
+      for(const key of Object.keys(menuEntriesNestedList)) {
+        menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
+      }
+
       self.d3el.select('.hamburger.button')
-        .on('mouseenter', function () {
-          self._standardMousing = true;
-          window.controller.tooltip.show({
-            content: `Show views...`,
-            targetBounds: this.getBoundingClientRect()
-          });
-        })
-        .on('mouseleave', () => {
-          if (self._standardMousing) {
-            window.controller.tooltip.hide();
+          .on('mouseenter', function () {
             clearTooltipStyle();
-          }
-        })
-        .on('click', function () {
-          self._standardMousing = false;
-          window.controller.tooltip.showContextMenu({
-            menuEntries: menuEntriesList,
-            targetBounds: this.getBoundingClientRect()
+            self._standardMousing = true;
+            window.controller.tooltip.show({
+              content: `Show views...`,
+              targetBounds: this.getBoundingClientRect()
+            });
+          })
+          .on('mouseleave', () => {
+            if (self._standardMousing) {
+              window.controller.tooltip.hide();
+              clearTooltipStyle();
+            }
+          })
+          .on('click', function () {
+            self._standardMousing = false;
+            window.controller.tooltip.showContextMenu({
+              menuEntries: menuEntriesList,
+              targetBounds: this.getBoundingClientRect()
+            });
+            d3.selectAll('.tooltip').classed('proctip', true);
           });
-          d3.selectAll('.tooltip')
-            .style('overflow-y', 'scroll')
-            .style('height', '200px');
-        });
     }, 100);
   }
   draw () {}

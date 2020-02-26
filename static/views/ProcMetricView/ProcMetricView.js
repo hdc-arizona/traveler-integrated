@@ -21,10 +21,10 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.newCache = null;
     this.metricValueCount = 0;
     this.hoverIndex = -1;
-    this.isMetricLoading = false;
     this.curMetric = 'meminfo:MemFree';
-    this.selectedLocation = '-1';
-    this.baseOpacity = 0.3;
+    if(this.linkedState.selectedProcMetric.startsWith('PAPI') === false) {
+      this.curMetric = this.linkedState.selectedProcMetric;
+    }
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `ProcMetricView${ProcMetricView.DOM_COUNT}`;
@@ -79,24 +79,8 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       // __self.render();
     });
     // // Initialize the scales / stream
-    this.xScale.domain(this.linkedState.intervalWindow);
-    // // this.yScale.domain([200, 100]);
+    this.xScale.domain(Array.from(this.linkedState.metadata.intervalDomain));
     this.getData();
-    //
-    // // Draw the axes right away (because we have a longer debounceWait than
-    // // normal, there's an initial ugly flash before draw() gets called)
-    // this._bounds = this.getChartBounds();
-    // this.drawAxes();
-    //
-    // // Redraw when a new primitive is selected
-    // // TODO: can probably do this immediately in a more light-weight way?
-    // this.linkedState.on('primitiveSelected', () => { this.render(); });
-    //
-    // this.content.select('.background')
-    //     .on('click', () => {
-    //       this.selectedLocation = '-1';
-    //       this.render();
-    //     });
   }
   getData () {
     // Debounce the start of this expensive process...
@@ -106,13 +90,6 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       const label = encodeURIComponent(this.layoutState.label);
       // const intervalWindow = this.linkedState.intervalWindow;
       const self = this;
-      // First check whether we're asking for too much data by getting a
-      // histogram with a single bin (TODO: draw per-location histograms instead
-      // of just saying "Too much data; scroll to zoom in?")
-      // this.curMetric = 'meminfo:MemFree';
-      // console.log("found metric: " + this.curMetric);
-      // Okay, start the stream, and collect it in a separate cache to avoid
-      // old intervals from disappearing from incremental refreshes
       this.newCache = {};
       this.waitingOnIncrementalRender = false;
       var maxY = Number.MIN_VALUE;
