@@ -19,6 +19,7 @@ class LinkedState extends Model {
     this.selectedGUID = null;
     this.selectedIntervalId = null;
     this.caches = {};
+    this.newCaches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
 
@@ -29,6 +30,7 @@ class LinkedState extends Model {
     this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
+    this.updateHistogramNew();
   }
   get begin () {
     return this.intervalWindow[0];
@@ -52,6 +54,7 @@ class LinkedState extends Model {
   setHistogramResolution (value) {
     this.histogramResolution = value;
     this.updateHistogram();
+    this.updateHistogramNew();
   }
   setIntervalWindow ({
     begin = this.begin,
@@ -67,6 +70,7 @@ class LinkedState extends Model {
     end = Math.min(this.endLimit, end);
     this.intervalWindow = [begin, end];
     this.updateHistogram();
+    this.updateHistogramNew();
     this.startIntervalStream();
     this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
@@ -77,6 +81,7 @@ class LinkedState extends Model {
     if (primitive !== this.selectedPrimitive) {
       this.selectedPrimitive = primitive;
       this.updateHistogram();
+      this.updateHistogramNew();
       this.trigger('primitiveSelected', { primitive });
     }
   }
@@ -122,7 +127,7 @@ class LinkedState extends Model {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
         views['LineChartView'] = false;
-        views['ProcMetricView'] = true;
+        views['UtilizationViewNew'] = true;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -147,6 +152,9 @@ class LinkedState extends Model {
     return !!this.caches.intervalStream;
   }
   get isLoadingHistogram () {
+    return !this.caches.histogram;
+  }
+  get isLoadingHistogramNew () {
     return !this.caches.histogram;
   }
   getCurrentIntervals () {
@@ -366,6 +374,46 @@ class LinkedState extends Model {
       this.caches.histogramDomain = domain;
       this.caches.histogramMaxCount = maxCount;
       this.trigger('histogramUpdated');
+    }, 100);
+  }
+  getCurrentHistogramDataNew () {
+    return {
+      histogram: this.newCaches.histogram,
+      domain: this.newCaches.histogramDomain,
+      maxCount: this.newCaches.histogramMaxCount,
+      error: this.newCaches.histogramError
+    };
+  }
+  updateHistogramNew () {
+    console.log("its called");
+    // Debounce...
+    window.clearTimeout(this._histogramTimeoutNew);
+    this._histogramTimeoutNew = window.setTimeout(async () => {
+      delete this.newCaches.histogram;
+      delete this.newCaches.histogramDomain;
+      delete this.newCaches.histogramMaxCount;
+
+      const label = encodeURIComponent(this.label);
+      const urls = [`/datasets/${label}/drawValues?bins=${this.histogramResolution}`];
+      // const urls = [`/datasets/${label}/histogram?mode=utilization&bins=${this.histogramResolution}`];
+      try {
+        [this.newCaches.histogram] = await Promise.all(urls.map(url => d3.json(url)));
+      } catch (e) {
+        this.histogramError = e;
+        return;
+      }
+      delete this.histogramError;
+
+      let maxCount = 0;
+      const domain = [Infinity, -Infinity];
+      for (const [begin, end, count] of this.newCaches.histogram) {
+        maxCount = Math.max(maxCount, count);
+        domain[0] = Math.min(begin, domain[0]);
+        domain[1] = Math.max(end, domain[1]);
+      }
+      this.newCaches.histogramDomain = domain;
+      this.newCaches.histogramMaxCount = maxCount;
+      this.trigger('histogramsUpdated');
     }, 100);
   }
   getMaxMinOfMetric (metric) {

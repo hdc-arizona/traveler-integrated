@@ -408,16 +408,17 @@ def guidIntervalIds(label: str, guid: str):
     return db[label]['guids'][guid]
 
 
-@app.get('/datasets/{label}/drawValues/{width}/{begin}/{end}')
-def getDrawValues(label: str, width: int, begin: int, end: int, location: str=None):
+@app.get('/datasets/{label}/drawValues')
+def getDrawValues(label: str, bins: int=100, begin: int=None, end: int=None, location: str=None):
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
 
     if location is None:
-        ret = json.dumps(db[label]['sparseUtilizationList'].calcUtilizationHistogram(width, begin, end).tolist())
+        ret = db[label]['sparseUtilizationList'].calcUtilizationHistogram(bins, begin, end)
     else:
-        array = np.zeros(width)
-        retV = db[label]['sparseUtilizationList'].calcUtilizationForLocation(width, begin, end, location)[1]
-        array = np.add(array, retV)
-        ret = json.dumps(array.tolist())
+        ret = db[label]['sparseUtilizationList'].calcUtilizationForLocation(bins, begin, end, location)
 
     return ret
 

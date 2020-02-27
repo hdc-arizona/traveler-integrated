@@ -9,6 +9,7 @@ import PythonView from './views/CodeView/PythonView.js';
 import PhyslView from './views/CodeView/PhyslView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
+import UtilizationViewNew from './views/UtilizationViewNew/UtilizationViewNew.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 import LineChartView from './views/LineChartView/LineChartView.js';
 import ProcMetricView from './views/ProcMetricView/ProcMetricView.js';
@@ -21,6 +22,7 @@ const viewClassLookup = {
   PhyslView,
   GanttView,
   UtilizationView,
+  UtilizationViewNew,
   LineChartView,
   ProcMetricView
 };
@@ -173,6 +175,7 @@ class Controller {
     if (views.GanttView && views.UtilizationView) {
       delete views.GanttView;
       delete views.UtilizationView;
+      delete views.UtilizationViewNew;
       delete views.LineChartView;
       delete views.ProcMetricView;
       newLayout.content.push({
@@ -187,7 +190,7 @@ class Controller {
           componentState: { label: linkedState.label }
         }, {
           type: 'component',
-          componentName: 'ProcMetricView',
+          componentName: 'UtilizationViewNew',
           componentState: { label: linkedState.label }
         }]
       });
