@@ -163,6 +163,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
       this.content.select('.dots').attr('transform', null);
+      this.content.select('.lines').attr('transform', null);
     }
 
     let cirlces = this.content.select('.dots')
@@ -302,7 +303,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         }
         const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
         const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-        this.content.selectAll('.dots')
+        this.content.selectAll('.dots, .lines')
           .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
         // Show the small spinner to indicate that some of the stuff the user
         // sees may be inaccurate (will be hidden once the full draw() call
@@ -335,8 +336,8 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
-              this.initialDragState.scale(actualBounds.begin);
-          this.content.selectAll('.dots')
+            this.initialDragState.scale(actualBounds.begin);
+          this.content.selectAll('.dots, .lines')
             .attr('transform', `translate(${shift}, 0)`);
 
           // Show the small spinner to indicate that some of the stuff the user

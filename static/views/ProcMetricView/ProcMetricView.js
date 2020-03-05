@@ -203,7 +203,8 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     var _self = this;
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
-      this.content.select('.dots').attr('transform', null);
+      this.content.select('.metric_dots').attr('transform', null);
+      this.content.select('.metric_lines').attr('transform', null);
     }
 
     let cirlces = this.content.select('.metric_dots')
@@ -310,13 +311,13 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
 
         // Patch a temporary scale transform to the bars / links layers (this
         // gets removed by full drawBars() / drawLinks() calls)
-        // if (!this.content.select('.metric_dots').attr('transform')) {
-        //   latentWidth = originalWidth;
-        // }
+        if (!this.content.select('.metric_dots').attr('transform')) {
+          latentWidth = originalWidth;
+        }
         const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
         const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-        // this.content.selectAll('.metric_dots', '.metric_lines')
-        //   .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
+        this.content.selectAll('.metric_dots, .metric_lines')
+          .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
         // Show the small spinner to indicate that some of the stuff the user
         // sees may be inaccurate (will be hidden once the full draw() call
         // happens)
@@ -348,9 +349,9 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
-              this.initialDragState.scale(actualBounds.begin);
-          // this.content.selectAll('.metric_dots')
-          //   .attr('transform', `translate(${shift}, 0)`);
+            this.initialDragState.scale(actualBounds.begin);
+          this.content.selectAll('.metric_dots, .metric_lines')
+            .attr('transform', `translate(${shift}, 0)`);
 
           // Show the small spinner to indicate that some of the stuff the user
           // sees may be inaccurate (will be hidden once the full draw() call
@@ -367,7 +368,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
           const begin = this.initialDragState.begin + dx;
           const end = this.initialDragState.end + dx;
           this.initialDragState = null;
-          console.log(begin + " " + end);
+
           this.linkedState.setIntervalWindow(clampWindow(begin, end));
         }));
   }
