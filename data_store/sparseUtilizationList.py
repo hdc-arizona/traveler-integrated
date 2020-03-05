@@ -140,6 +140,19 @@ class SparseUtilizationList():
         return prettyHistogram
 
 
+#Required args: metricName, begin, end, db, label
+def computeMetricRate():
+
+    # Calc and load per location
+        # Extract relevant metric information between beginning and end of data (arg: begin&end)
+            # define arbitry class method for loading metric data at a location
+        # sorting
+        # calc rate at point with class method
+        # store all per location
+
+
+
+
 
 # In charge of loading interval data into our integral list
 # I have no idea how we want to load interval data :/
