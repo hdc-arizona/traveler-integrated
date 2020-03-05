@@ -63,6 +63,8 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
     if storeEvents:
         self.datasets[label]['events'] = diskcache.Index(os.path.join(labelDir, 'events.diskCacheIndex'))
 
+    if 'procMetricList' not in procMetrics:
+        procMetrics['procMetricList'] = []
     # Temporary counters / lists for sorting
     numEvents = 0
     self.sortedEventsByLocation = {}
@@ -86,7 +88,7 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
             location = metricLineMatch.group(1)
             timestamp = int(metricLineMatch.group(2))
             metricType = metricLineMatch.group(3)
-            value = int(float(metricLineMatch.group(4)))
+            value = float(metricLineMatch.group(4))
 
             if metricType.startswith('PAPI'):
                 if currentEvent is None:
@@ -96,11 +98,14 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                 else:
                     includedMetrics += 1
                     currentEvent['metrics'][metricType] = value #pylint: disable=unsubscriptable-object
+                metricTypePapi = 'PAPI' + ':' + metricType
+                pm = procMetrics['procMetricList']
+                if metricTypePapi not in pm:
+                    pm.append(metricTypePapi)
+                    procMetrics['procMetricList'] = pm
             else: # do the other meminfo status io parsing here
                 if metricType not in procMetrics:
                     procMetrics[metricType] = {}
-                    if 'procMetricList' not in procMetrics:
-                        procMetrics['procMetricList'] = []
                     pm = procMetrics['procMetricList']
                     pm.append(metricType)
                     procMetrics['procMetricList'] = pm

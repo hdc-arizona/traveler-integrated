@@ -21,10 +21,10 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.newCache = null;
     this.metricValueCount = 0;
     this.hoverIndex = -1;
-    this.isMetricLoading = false;
     this.curMetric = 'meminfo:MemFree';
-    this.selectedLocation = '-1';
-    this.baseOpacity = 0.3;
+    if(this.linkedState.selectedProcMetric.startsWith('PAPI') === false) {
+      this.curMetric = this.linkedState.selectedProcMetric;
+    }
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `ProcMetricView${ProcMetricView.DOM_COUNT}`;
@@ -49,6 +49,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
   }
   setup () {
     super.setup();
+    var __self = this;
 
     this.content.html(this.resources[1]);
 
@@ -71,32 +72,15 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
 
     // Set up zoom / pan interactions
     this.setupZoomAndPan();
-    this.linkedState.getMaxMinOfMetric(this.curMetric);
     // // Update scales whenever something changes the brush
     this.linkedState.on('newIntervalWindow', () => {
-      // this.xScale.domain(this.linkedState.intervalWindow);
-      // this.getData();
-      // __self.render();
+      __self.updateTheView();
     });
-    // // Initialize the scales / stream
-    this.xScale.domain(this.linkedState.intervalWindow);
-    // // this.yScale.domain([200, 100]);
+    this.updateTheView();
+  }
+  updateTheView() {
     this.getData();
-    //
-    // // Draw the axes right away (because we have a longer debounceWait than
-    // // normal, there's an initial ugly flash before draw() gets called)
-    // this._bounds = this.getChartBounds();
-    // this.drawAxes();
-    //
-    // // Redraw when a new primitive is selected
-    // // TODO: can probably do this immediately in a more light-weight way?
-    // this.linkedState.on('primitiveSelected', () => { this.render(); });
-    //
-    // this.content.select('.background')
-    //     .on('click', () => {
-    //       this.selectedLocation = '-1';
-    //       this.render();
-    //     });
+    this.xScale.domain(this.linkedState.intervalWindow);
   }
   getData () {
     // Debounce the start of this expensive process...
@@ -106,20 +90,16 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       const label = encodeURIComponent(this.layoutState.label);
       // const intervalWindow = this.linkedState.intervalWindow;
       const self = this;
-      // First check whether we're asking for too much data by getting a
-      // histogram with a single bin (TODO: draw per-location histograms instead
-      // of just saying "Too much data; scroll to zoom in?")
-      // this.curMetric = 'meminfo:MemFree';
-      // console.log("found metric: " + this.curMetric);
-      // Okay, start the stream, and collect it in a separate cache to avoid
-      // old intervals from disappearing from incremental refreshes
       this.newCache = {};
       this.waitingOnIncrementalRender = false;
       var maxY = Number.MIN_VALUE;
       var minY = Number.MAX_VALUE;
       this.metricValueCount = 0;
-      const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}`)
-      // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${curMetric}?begin=${intervalWindow[0]}&end=${intervalWindow[1]}`)
+      // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}`)
+      var begin = Math.floor(this.linkedState.intervalWindow[0]);
+      var end = Math.ceil(this.linkedState.intervalWindow[1]);
+      console.log(begin + " " + end);
+      const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}?begin=${begin}&end=${end}`)
         .fail(error => {
           this.metricValueCount = 0;
           this.error = error;
@@ -223,7 +203,8 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     var _self = this;
     if (!this.initialDragState) {
       // Remove temporarily patched transformations
-      this.content.select('.dots').attr('transform', null);
+      this.content.select('.metric_dots').attr('transform', null);
+      this.content.select('.metric_lines').attr('transform', null);
     }
 
     let cirlces = this.content.select('.metric_dots')
@@ -293,17 +274,17 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.initialDragState = null;
     let latentWidth = null;
     const clampWindow = (begin, end) => {
-      // clamp to the lowest / highest possible values
-      if (begin <= this.linkedState.beginLimit) {
-        const offset = this.linkedState.beginLimit - begin;
-        begin += offset;
-        end += offset;
-      }
-      if (end >= this.linkedState.endLimit) {
-        const offset = end - this.linkedState.endLimit;
-        begin -= offset;
-        end -= offset;
-      }
+      // // clamp to the lowest / highest possible values
+      // if (begin <= this.linkedState.beginLimit) {
+      //   const offset = this.linkedState.beginLimit - begin;
+      //   begin += offset;
+      //   end += offset;
+      // }
+      // if (end >= this.linkedState.endLimit) {
+      //   const offset = end - this.linkedState.endLimit;
+      //   begin -= offset;
+      //   end -= offset;
+      // }
       return { begin, end };
     };
     this.content
@@ -330,12 +311,12 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
 
         // Patch a temporary scale transform to the bars / links layers (this
         // gets removed by full drawBars() / drawLinks() calls)
-        if (!this.content.select('.dots').attr('transform')) {
+        if (!this.content.select('.metric_dots').attr('transform')) {
           latentWidth = originalWidth;
         }
         const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
         const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-        this.content.selectAll('.dots')
+        this.content.selectAll('.metric_dots, .metric_lines')
           .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
         // Show the small spinner to indicate that some of the stuff the user
         // sees may be inaccurate (will be hidden once the full draw() call
@@ -368,8 +349,8 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
-              this.initialDragState.scale(actualBounds.begin);
-          this.content.selectAll('.dots')
+            this.initialDragState.scale(actualBounds.begin);
+          this.content.selectAll('.metric_dots, .metric_lines')
             .attr('transform', `translate(${shift}, 0)`);
 
           // Show the small spinner to indicate that some of the stuff the user
