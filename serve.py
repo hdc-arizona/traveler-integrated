@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import argparse
 import json
 import asyncio
@@ -16,6 +17,8 @@ parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integ
                     help='Directory where the bundled data is already / will be stored (default: /tmp/traveler-integrated)')
 parser.add_argument('-s', '--debug', dest='debug', action='store_true',
                     help='Store additional information for debugging source files, etc.')
+parser.add_argument('-p', '--port', dest='port', default=os.environ.get('TRAVELER_PORT', '8000'),
+                    help='Port to serve the interface from. Will override TRAVELER_PORT if specified.')
 
 args = parser.parse_args()
 db = DataStore(args.dbDir, args.debug)
@@ -380,4 +383,4 @@ def guidIntervalIds(label: str, guid: str):
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())
-    uvicorn.run(app, host='0.0.0.0')
+    uvicorn.run(app, host='0.0.0.0', port=int(args.port))
