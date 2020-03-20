@@ -100,7 +100,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // new interval)
       window.clearTimeout(this._incrementalIntervalTimeout);
       this._incrementalIntervalTimeout = window.setTimeout(() => {
-        this.drawBars(this.linkedState.getCurrentIntervals());
+        // this.drawBars(this.linkedState.getCurrentIntervals());
       });
     });
     this.linkedState.on('tracebackUpdated', () => {
@@ -145,7 +145,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.drawAxes();
 
     // Update the bars
-    this.drawBars(this.linkedState.getCurrentIntervals());
+    // this.drawBars(this.linkedState.getCurrentIntervals());
     // Update the links
     this.drawLinks(this.linkedState.getCurrentTraceback());
   }

@@ -15,6 +15,8 @@ from data_store import DataStore, ClientLogger
 from profiling_tools.profilier import Profilier
 import cProfile, pstats, io
 
+
+
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
                     help='Directory where the bundled data is already / will be stored (default: /tmp/traveler-integrated)')
@@ -29,6 +31,8 @@ app = FastAPI(
     version='0.1.0'
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
+
+
 
 prf = Profilier()
 profile = False
@@ -252,6 +256,7 @@ def histogram(label: str, \
             raise HTTPException(status_code=404, detail='No index for primitive: %s' % primitive)
         return modeHelper(db[label]['intervalIndexes']['primitives'][primitive])
     return modeHelper(db[label]['intervalIndexes']['main'])
+
 
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None, profile: bool = False):
