@@ -58,8 +58,12 @@ class Tooltip extends View {
 
     let tooltip = this.d3el;
     if (nestNew) {
+      if (this._appendedDiv) {
+        this._appendedDiv.remove();
+      }
       tooltip = tooltip.append('div')
         .classed('tooltip', true);
+      this._appendedDiv = tooltip;
     }
 
     tooltip

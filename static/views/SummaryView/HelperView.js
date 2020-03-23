@@ -54,19 +54,12 @@ class HelperView extends LinkedMixin(View) {
     // Color mode button
     this.d3el.select('.color.button')
       .on('mouseenter', function () {
-        self._standardMousing = true;
         window.controller.tooltip.show({
           content: `Color by...`,
           targetBounds: this.getBoundingClientRect()
         });
       })
-      .on('mouseleave', () => {
-        if (this._standardMousing) {
-          window.controller.tooltip.hide();
-        }
-      })
       .on('click', function () {
-        self._standardMousing = false;
         const menuEntries = Object.entries(LinkedState.COLOR_SCHEMES).map(([label, colors]) => {
           return {
             content: d3el => {
@@ -93,42 +86,64 @@ class HelperView extends LinkedMixin(View) {
           menuEntries
         });
       });
+    var hamburgerItemSubContents = function (item, entries) {
+      return {
+        content: item,
+        subEntries: entries
+      };
+    };
+    var hamburgerItemContent = function (title, param) {
+      return {
+        content: title,
+        onClick: () => {
+          var metric = param.split(':');
+          var metricType = metric[1];
+          var newProcMetricView = {
+            type: 'component',
+            componentName: 'LineChartView',
+            componentState: { label: self.linkedState.label, metricType: metricType }
+          };
+          if (param.startsWith('PAPI') === false) {
+            metricType = param;
+            newProcMetricView = {
+              type: 'component',
+              componentName: 'ProcMetricView',
+              componentState: { label: self.linkedState.label, metricType: metricType }
+            };
+          }
+          self.linkedState.selectedProcMetric = metricType;
+          window.controller.goldenLayout.root.contentItems[0].contentItems[0].contentItems[0].addChild(newProcMetricView);
+        }
+      };
+    };
 
     this._intervalTimeout = window.setTimeout(async () => {
       const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetrics`);
+      var menuEntriesNestedList = {};
       var menuEntriesList = [];
       procMetricList.forEach(item => {
-        menuEntriesList.push({
-          content: item,
-          onClick: () => {
-            for (const viewList of Object.values(window.controller.views)) {
-              for (const view of viewList) {
-                if (view instanceof ProcMetricView) {
-                  // console.log("found my puppy");
-                  view.curMetric = item;
-                  view.getData();
-                }
-              }
-            }
-            // console.log("clciked button " + item);
+        if (item.indexOf(':') > -1) {
+          var res = item.split(':');
+          if (!(res[0] in menuEntriesNestedList)) {
+            menuEntriesNestedList[res[0]] = [];
           }
-        });
+          menuEntriesNestedList[res[0]].push(hamburgerItemContent(res[1], item));
+        } else {
+          menuEntriesList.push(hamburgerItemContent(item, item));
+        }
       });
+      for (const key of Object.keys(menuEntriesNestedList)) {
+        menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
+      }
+
       self.d3el.select('.hamburger.button')
         .on('mouseenter', function () {
-          self._standardMousing = true;
           window.controller.tooltip.show({
             content: `Show views...`,
             targetBounds: this.getBoundingClientRect()
           });
         })
-        .on('mouseleave', () => {
-          if (self._standardMousing) {
-            window.controller.tooltip.hide();
-          }
-        })
         .on('click', function () {
-          self._standardMousing = false;
           window.controller.tooltip.showContextMenu({
             menuEntries: menuEntriesList,
             targetBounds: this.getBoundingClientRect()

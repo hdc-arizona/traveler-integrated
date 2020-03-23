@@ -1,8 +1,7 @@
 traveler-integrated
 ===================
 
-An integrated visualization system for connecting OTF2 stack traces and
-aggregate expression trees
+An integrated visualization system for parallel execution data, including OTF2 traces annd HPX execution trees
 
 - [Basic setup](#basic-setup)
 - [Development setup](#development-setup)
