@@ -42,7 +42,7 @@ def main():
     # call profile start endpoint
     requests.get(endpt+'/profile/start')
 
-    requestString = endpt + '/profile/datasets/{}/{}?bins={}&begin={}&end={}'.format(dataset_label, function, bins, begin, end)
+    requestString = endpt + '/profile/datasets/{}/{}?bins={}&begin={}&end={}&location=1'.format(dataset_label, function, bins, begin, end)
     # requestString = endpt + '/profile/datasets/' + dataset_label + '/{}'.format(function) + '?' + str(bins) + '/' + str(begin) + '/' + str(end)
     # loop over number of runs
     for n in range(0, n_trials):
