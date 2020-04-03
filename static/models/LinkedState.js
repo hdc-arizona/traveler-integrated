@@ -439,6 +439,7 @@ class LinkedState extends Model {
     var intervalData = this.getCurrentIntervals();
     var metricData = {};
     var dataOfLocation = {};
+    var printLocation = '1';
 
     var getPreviousKeyForLocation = function (i) {
       if(i in dataOfLocation && dataOfLocation[i] in metricData)return dataOfLocation[i];
@@ -447,6 +448,8 @@ class LinkedState extends Model {
 
     let maxY = Number.MIN_VALUE;
     let minY = Number.MAX_VALUE;
+    console.log("start printing metric data - " + curMetric);
+
     for(const id in intervalData) {
       let k = id + '_' + intervalData[id]['enter']['Timestamp'];
       let preKey = getPreviousKeyForLocation(intervalData[id]['Location']);
@@ -459,6 +462,10 @@ class LinkedState extends Model {
         rate = metricData[preKey].Rate;
       }
       rate = Math.abs(intervalData[id]['enter']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['enter']['Timestamp'] - preX);
+      if(intervalData[id]['Location'] === printLocation) {
+        console.log("Time: " + intervalData[id]['enter']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
+      }
+
       metricData[k] = {
         Timestamp : intervalData[id]['enter']['Timestamp'],
         Location : intervalData[id]['Location'],
@@ -473,6 +480,10 @@ class LinkedState extends Model {
       preY = metricData[k].Value;
       k = id + '_' + intervalData[id]['leave']['Timestamp'];
       rate = Math.abs(intervalData[id]['leave']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['leave']['Timestamp'] - preX);
+      if(intervalData[id]['Location'] === printLocation) {
+        console.log("Time: " + intervalData[id]['leave']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
+      }
+
       metricData[k] = {
         Timestamp : intervalData[id]['leave']['Timestamp'],
         Location : intervalData[id]['Location'],
@@ -483,6 +494,7 @@ class LinkedState extends Model {
       minY = Math.min(minY, rate);
       dataOfLocation[intervalData[id]['Location']] = k;
     }
+    console.log("printing done");
     modifiedData.maxY = maxY;
     modifiedData.minY = minY;
     modifiedData.metricData = metricData;
