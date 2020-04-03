@@ -128,6 +128,7 @@ class LinkedState extends Model {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
         views['LineChartView'] = false;
+        views['LineChartViewNew'] = true;
         views['UtilizationViewNew'] = true;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
@@ -386,7 +387,6 @@ class LinkedState extends Model {
     };
   }
   updateHistogramNew () {
-    console.log("its called");
     // Debounce...
     window.clearTimeout(this._histogramTimeoutNew);
     this._histogramTimeoutNew = window.setTimeout(async () => {
@@ -452,6 +452,7 @@ class LinkedState extends Model {
 
     for(const id in intervalData) {
       let k = id + '_' + intervalData[id]['enter']['Timestamp'];
+      if(intervalData[id]['Location'] !== '1')continue;
       let preKey = getPreviousKeyForLocation(intervalData[id]['Location']);
       let preX = 0;
       let preY = 0;
