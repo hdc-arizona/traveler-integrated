@@ -70,8 +70,6 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     super.setup();
 
     this.content.html(this.resources[1]);
-    // this.canvasElement = this.content.node();
-    // this.canvasContext = this.canvasElement.getContext("2d");
 
     this.margin = {
       top: 20,
@@ -82,51 +80,14 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this._bounds = this.getChartBounds();
     this.content.select('.chart')
         .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
-    // var xbody = this.content.append("xhtml:body");
-    // this.canvasElement = xbody.append('canvas')
-    //     .attr('width', this._bounds.width)
-    //     .attr('height', this._bounds.height)
-    //     .style('margin-left', this.margin.left + 'px')
-    //     .style('margin-top', this.margin.top + 'px')
-    //     .attr('class', 'canvas-plot');
-
-
-//     // Init svg
-//     this.svgElement = this.content.append('svg:svg')
-//         .attr('width', this._bounds.width)
-//         .attr('height', this._bounds.height)
-//         .attr('class', 'svg-plot')
-//         .style('position', 'absolute')
-//         .append('g')
-//         .attr('transform', `translate(${this.margin.left}, ${this.margin.top})`);
-//
-// // Init Canvas
-//     this.canvasElement = this.content.append('canvas')
-//         .attr('width', this._bounds.width)
-//         .attr('height', this._bounds.height)
-//         .style('position', 'absolute')
-//         .style('margin-left', this.margin.left + 'px')
-//         .style('margin-top', this.margin.top + 'px')
-//         .attr('class', 'canvas-plot');
 
     this.svgElement = this.content.select('.svg-plot');
-        // .attr('width', '100%')
-        // .attr('height', '100%');
-        // .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
-
     this.canvasElement = this.content.select('.canvas-plot')
         .attr('width', this._bounds.width)
         .attr('height', this._bounds.height)
         .style('margin-left', this.margin.left + 'px')
         .style('margin-top', this.margin.top + 'px');
-
-    console.log(this.canvasElement);
     this.canvasContext = this.canvasElement.node().getContext('2d');
-    console.log(this.canvasContext);
-
-
-
-
     // this.canvasContext.transform(1, 0, 0, -1, 0, this.canvasElement.height); // move the y0 to bottom, uncomment it later
     // this.canvasContext.transform(1, 0, 0, 0, this.margin.left, this.margin.top); // move to margin
 
@@ -145,11 +106,11 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
 
     var __self = this;
     this.setupZoomAndPan();
-    // // // Update scales whenever something changes the brush
-    // this.linkedState.on('newIntervalWindow', () => {
-    //   __self.updateTheView();
-    // });
-    // this.updateTheView();
+    // // Update scales whenever something changes the brush
+    this.linkedState.on('newIntervalWindow', () => {
+      __self.updateTheView();
+    });
+    this.updateTheView();
   }
   updateTheView() {
     this.getData();
@@ -213,41 +174,48 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     super.draw();
     console.log("draw called");
 
-    this.canvasContext.fillStyle = 'green';
-    this.canvasContext.fillRect(0, 0, 80, 80);
-    // if (this.isHidden) {
-    //   return;
-    // } else if (this.isEmpty) {
-    //   if (this.error) {
-    //     this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
-    //     return;
-    //   }
-    //   // else if (this.linkedState.tooManyIntervals) {
-    //   //   this.emptyStateDiv.html('<p>No data in the current view</p>');
-    //   // } else {
-    //   //   this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
-    //   // }
-    // }
-    // // Update the dimensions of the plot in case we were resized (NOT updated by
-    // // immediately-drawn things like drawAxes that get executed repeatedly by
-    // // scrolling / panning)
-    // this._bounds = this.getChartBounds();
-    // // Update whether we're showing the spinner
-    // // this.drawSpinner();
-    // // Update the clip rect
-    // // this.drawSpinner();
-    // this.drawClip();
-    //
-    //
-    // // Combine old data with any new data that's streaming in
-    // const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
-    // // Hide the small spinner
-    //
-    // // Update the axes (also updates scales)
+    // this.canvasContext.fillStyle = 'green';
+    // this.canvasContext.fillRect(0, 0, 80, 80);
+    if (this.isHidden) {
+      return;
+    } else if (this.isEmpty) {
+      if (this.error) {
+        this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
+        return;
+      }
+      // else if (this.linkedState.tooManyIntervals) {
+      //   this.emptyStateDiv.html('<p>No data in the current view</p>');
+      // } else {
+      //   this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
+      // }
+    }
+    // Update the dimensions of the plot in case we were resized (NOT updated by
+    // immediately-drawn things like drawAxes that get executed repeatedly by
+    // scrolling / panning)
+    this._bounds = this.getChartBounds();
+    // Update whether we're showing the spinner
+    // this.drawSpinner();
+    // Update the clip rect
+    this.drawClip();
+
+
+    // Combine old data with any new data that's streaming in
+    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
+    // Hide the small spinner
+
+    // Update the axes (also updates scales)
     this.drawAxes();
-    // // Update the bars
+    // Update the lines
+    this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
+    data.forEach((d, i) => {
+      var preD = d;
+      if(i>0) {
+        preD = data[i-1];
+      }
+      this.drawLines(d, preD);
+    });
     // this.drawLines(data);
-    // // this.drawSpinner();
+    // this.drawSpinner();
   }
   drawSpinner () {
     this.content.select('.small.spinner').style('display', this.isMetricLoading ? null : 'none');
@@ -279,86 +247,20 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this.svgElement.select('.yAxisLabel')
       .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
-  drawLines (data) {
-    console.log('drawing again ' + data.length);
-    var _self = this;
-    if (!this.initialDragState) {
-      // Remove temporarily patched transformations
-      this.content.select('.dots').attr('transform', null);
-      this.content.select('.lines').attr('transform', null);
-    }
+  drawLines (d, preD) {
+    console.log('drawing again ' + d.key);
 
-    let cirlces = this.content.select('.dots')
-      .selectAll('.dot').data(data, d => d.key);
-    cirlces.exit().remove();
-    const cirlcesEnter = cirlces.enter().append('circle')
-      .classed('dot', true);
-    cirlces = cirlces.merge(cirlcesEnter);
+    // this.canvasContext.beginPath();
+    // this.canvasContext.arc(this.xScale(d.key), this.yScale(d.value), 1, 0, 2 * Math.PI, false);
+    // this.canvasContext.closePath();
+    // this.canvasContext.fillStyle = 'black';
+    // this.canvasContext.fill();
 
-    cirlces.attr('class', 'dot')
-      .attr('cx', d => this.xScale(d.key))
-      .attr('cy', d => this.yScale(d.value))
-      .attr('r', d => {
-        return 1.0;
-      })
-      .style('opacity', d => {
-        return _self.baseOpacity;
-      })
-      .style('fill', d => {
-        return 'black';
-      });
-
-    var prevDataKey = {};
-
-    let lines = this.content.select('.lines')
-        .selectAll('.line').data(data, d => d.key);
-    lines.exit().remove();
-    const linesEnter = lines.enter().append('line')
-        .classed('line', true);
-    lines = lines.merge(linesEnter);
-
-    lines.attr('class', 'line')
-        .attr('x1', function (d, i) {
-          var ret = d;
-          if (i > 0) {
-            ret = lines.data()[i - 1];
-          }
-          return _self.xScale(ret.key);
-        })
-        .attr('y1', function (d, i) {
-          var ret = d;
-          if (i > 0) {
-            ret = lines.data()[i - 1];
-          }
-          return _self.yScale(ret.value);
-        })
-        .attr('x2', function (d, i) {
-          return _self.xScale(d.key);
-        })
-        .attr('y2', function (d, i) {
-          return _self.yScale(d.value);
-        })
-        .style('stroke', d => {
-          return 'black';
-        })
-        .style('stroke-width', 3)
-        .style('opacity', d => {
-          return _self.baseOpacity;
-        });
-        // .on('mouseenter', function (d) {
-        //   window.controller.tooltip.show({
-        //     content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-        //     targetBounds: this.getBoundingClientRect(),
-        //     hideAfterMs: null
-        //   });
-        // })
-        // .on('mouseout', () => {
-        //   window.controller.tooltip.hide();
-        // })
-        // .on('click', (d) => {
-        //   this.selectedLocation = d.value['Location'];
-        //   this.render();
-        // });
+    this.canvasContext.beginPath();
+    this.canvasContext.strokeStyle = 'black';
+    this.canvasContext.moveTo(this.xScale(preD.key), this.yScale(preD.value));
+    this.canvasContext.lineTo(this.xScale(d.key), this.yScale(d.value));
+    this.canvasContext.stroke();
   }
   setupZoomAndPan () {
     this.initialDragState = null;
@@ -399,18 +301,18 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
         // render() triggered by changing linkedState may take a while)
         this.drawAxes();
 
-        // Patch a temporary scale transform to the bars / links layers (this
-        // gets removed by full drawBars() / drawLinks() calls)
-        if (!this.content.select('.dots').attr('transform')) {
-          latentWidth = originalWidth;
-        }
-        const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
-        const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-        this.content.selectAll('.dots, .lines')
-          .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
-        // Show the small spinner to indicate that some of the stuff the user
-        // sees may be inaccurate (will be hidden once the full draw() call
-        // happens)
+        // // Patch a temporary scale transform to the bars / links layers (this
+        // // gets removed by full drawBars() / drawLinks() calls)
+        // if (!this.content.select('.dots').attr('transform')) {
+        //   latentWidth = originalWidth;
+        // }
+        // const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
+        // const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
+        // this.content.selectAll('.dots, .lines')
+        //   .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
+        // // Show the small spinner to indicate that some of the stuff the user
+        // // sees may be inaccurate (will be hidden once the full draw() call
+        // // happens)
         // this.content.select('.small.spinner').style('display', null);
       }).call(d3.drag()
         .on('start', () => {
@@ -440,12 +342,12 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
             this.initialDragState.scale(actualBounds.begin);
-          this.content.selectAll('.dots, .lines')
-            .attr('transform', `translate(${shift}, 0)`);
-
-          // Show the small spinner to indicate that some of the stuff the user
-          // sees may be inaccurate (will be hidden once the full draw() call
-          // happens)
+          // this.content.selectAll('.dots, .lines')
+          //   .attr('transform', `translate(${shift}, 0)`);
+          //
+          // // Show the small spinner to indicate that some of the stuff the user
+          // // sees may be inaccurate (will be hidden once the full draw() call
+          // // happens)
           // this.content.select('.small.spinner').style('display', null);
 
           // d3's drag behavior captures + prevents updating the cursor, so do
