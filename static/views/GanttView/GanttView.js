@@ -58,6 +58,12 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
+
+    //add width of gantt chart to model
+    // for leightweight querying and aggregating
+    this.linkedState.setGanttXResolution(this._bounds.width);
+
+
     // Create a view-specific clipPath id, as there can be more than one
     // GanttView in the app
     const clipId = this.uniqueDomId + 'clip';
@@ -73,6 +79,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         this.linkedState.selectPrimitive(null);
         this.linkedState.selectIntervalId(null);
       });
+
 
     // Initialize the scales / stream
     this.xScale.domain(this.linkedState.intervalWindow);
@@ -100,7 +107,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // new interval)
       window.clearTimeout(this._incrementalIntervalTimeout);
       this._incrementalIntervalTimeout = window.setTimeout(() => {
-        this.drawBars(this.linkedState.getCurrentIntervals());
+        // this.drawBars(this.linkedState.getCurrentIntervals());
+        this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
       });
     });
     this.linkedState.on('tracebackUpdated', () => {
@@ -136,6 +144,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // this during incremental / immediate draw calls in setup()'s listeners or
     // zooming / panning that need more responsiveness)
     this._bounds = this.getChartBounds();
+    this.linkedState.setGanttXResolution(this._bounds.width);
 
     // Update whether we're showing the spinner
     this.drawSpinner();
@@ -145,7 +154,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.drawAxes();
 
     // Update the bars
-    this.drawBars(this.linkedState.getCurrentIntervals());
+    // this.drawBars(this.linkedState.getCurrentIntervals());
+    this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
     // Update the links
     this.drawLinks(this.linkedState.getCurrentTraceback());
   }
@@ -197,9 +207,48 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.content.select('.yAxisLabel')
       .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
   }
-  drawBarsCanvas(intervals){
+  drawBarsCanvas(aggBins){
+      var border = 1;
+      var fillColor = "#D9D9D9"//temp hack for now
+      var borderColor = "#737373"
+
       // we need a canvas already
       // first we focus on moving canvas to the correct place
+      if (!this.initialDragState) {
+        this.content.select('.canvas-container')
+          .attr('width', this._bounds.width)
+          .attr('height', this._bounds.height);
+
+        var canvas = this.content.select('.gantt-canvas')
+                    .attr('width', this._bounds.width)
+                    .attr('height', this._bounds.height);
+
+
+        var ctx = canvas.node().getContext("2d");
+
+
+        for (var location in aggBins.locationList){
+          var loc_offset = this.yScale(parseInt(aggBins.locationList[location].location));
+          for (var bucket in aggBins.locationList[location].histogram){
+            var pixel = aggBins.locationList[location].histogram[bucket];
+            if (pixel === 1){
+              ctx.fillStyle = borderColor;
+              ctx.fillRect(bucket, loc_offset, 1, border);
+              ctx.fillRect(bucket, (loc_offset-border)+this.yScale.bandwidth(), 1, border);
+              ctx.fillStyle = fillColor;
+              ctx.rect(bucket, loc_offset+border, 1, this.yScale.bandwidth()-(2*border));
+            }
+            if (pixel < 1 && pixel > 0){
+              ctx.fillStyle = borderColor;
+              ctx.fillRect(bucket, loc_offset, border, this.yScale.bandwidth());
+            }
+          }
+        }
+
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+
+      }
   }
   drawBars (intervals) {
     if (!this.initialDragState) {

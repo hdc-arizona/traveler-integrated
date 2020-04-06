@@ -28,7 +28,8 @@ class LinkedState extends Model {
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
     })();
-    this.startIntervalStream();
+    this.fetchGanttAggBins();
+    // this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
     this.updateHistogramNew();
@@ -52,6 +53,10 @@ class LinkedState extends Model {
     this._mode = newMode;
     this.trigger('changeMode');
   }
+  setGanttXResolution(value){
+    this.ganttXResolution = value;
+    this.fetchGanttAggBins();
+  }
   setHistogramResolution (value) {
     this.histogramResolution = value;
     this.updateHistogram();
@@ -72,7 +77,8 @@ class LinkedState extends Model {
     this.intervalWindow = [begin, end];
     this.updateHistogram();
     this.updateHistogramNew();
-    this.startIntervalStream();
+    this.fetchGanttAggBins();
+    // this.startIntervalStream();
     this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalWindow', { begin, end });
@@ -165,6 +171,12 @@ class LinkedState extends Model {
     const newIntervals = this.caches.newIntervals || {};
     return Object.assign({}, oldIntervals, newIntervals);
   }
+  getCurrentGanttAggregrateBins () {
+    // Combine old data with any new data that's streaming in for more
+    // seamless zooming / panning
+    const ganttAggBins = this.caches.ganttAggBins || {};
+    return Object.assign({}, ganttAggBins);
+  }
   getCurrentTraceback () {
     // Returns a right-to-left list of intervals
     let traceback = this.caches.traceback ||
@@ -225,6 +237,33 @@ class LinkedState extends Model {
       }
     }
     return linkData;
+  }
+  //we query intervals as a set of pre-aggregrated pixel-wide bins
+  // the drawing process is significantly simplified and sped up from this
+  fetchGanttAggBins(){
+    var bins = this.ganttXResolution;
+    //this function will replace the fetching of intervals
+    // window.clearTimeout(this._ganttAggTimeout);
+    // this._ganttAggTimeout = window.setTimeout(async () => {
+      //*****NetworkError on reload is here somewhere******//
+      if (bins){
+        const label = encodeURIComponent(this.label);
+        var endpt = `/datasets/${label}/ganttChartValues?bins=${bins}&begin=${Math.floor(this.intervalWindow[0])}&end=${Math.ceil(this.intervalWindow[1])}`
+        fetch(endpt)
+          .then((response) => {
+            console.log(response)
+            return response.json();
+          })
+          .then((data) => {
+            this.caches.ganttAggBins = JSON.parse(data);
+          })
+          .catch(err => {
+            err.text.then( errorMessage => {
+              console.warn(errorMessage)
+            });
+          });
+      }
+    // }, 100);
   }
   startIntervalStream () {
     // Debounce the start of this expensive process...

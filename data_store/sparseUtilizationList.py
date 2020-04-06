@@ -73,6 +73,15 @@ class SparseUtilizationList():
         self.locationDict[location].append(edgeUtilObj)
         return
 
+    # Calculates utilization histogram for all intervals regardless of location
+    def calcGanttHistogram(self, bins=100, begin=None, end=None):
+        listOfLocations = []
+
+        for location in self.locationDict:
+            temp = self.calcUtilizationForLocation(bins, begin, end, location)
+            listOfLocations.append({"location":location, "histogram":temp})
+
+        return listOfLocations
 
     # Calculates utilization histogram for all intervals regardless of location
     def calcUtilizationHistogram(self, bins=100, begin=None, end=None):
@@ -85,7 +94,7 @@ class SparseUtilizationList():
                 isFirst = False
                 array = temp
             for i in range(bins):
-                array[i][2] = array[i][2] + temp[i][2]
+                array[i] = array[i] + temp[i]
 
         return array
 
@@ -136,7 +145,7 @@ class SparseUtilizationList():
             val = (current['util'] - prev['util']) / (current['index'] - prev['index'])
             current['integral'] = val
             prev = current
-            prettyHistogram.append([histogram[i-1]['index'], histogram[i]['index'], histogram[i]['integral']])
+            prettyHistogram.append(histogram[i]['integral'])
         return prettyHistogram
 
 

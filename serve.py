@@ -6,11 +6,13 @@ from enum import Enum
 
 import numpy as np
 import uvicorn #pylint: disable=import-error
-from fastapi import FastAPI, File, UploadFile, HTTPException #pylint: disable=import-error
+import fastapi as f; print(f.__path__)
+from fastapi import FastAPI, File, UploadFile, HTTPException; #pylint: disable=import-error
 from pydantic import BaseModel #pylint: disable=import-error
 from starlette.staticfiles import StaticFiles #pylint: disable=import-error
 from starlette.requests import Request #pylint: disable=import-error
-from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
+from starlette.responses import RedirectResponse, StreamingResponse, JSONResponse #pylint: disable=import-error
+from starlette.middleware.cors import CORSMiddleware
 from data_store import DataStore, ClientLogger
 from profiling_tools.profilier import Profilier
 import cProfile, pstats, io
@@ -32,6 +34,21 @@ app = FastAPI(
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
 
+origins = [
+    "http://localhost.tiangolo.com",
+    "https://localhost.tiangolo.com",
+    "http://localhost",
+    "http://localhost:8080",
+    "*"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 prf = Profilier()
@@ -425,8 +442,29 @@ def getDrawValues(label: str, bins: int=100, begin: int=None, end: int=None, loc
     else:
         ret = db[label]['sparseUtilizationList'].calcUtilizationForLocation(bins, begin, end, location)
 
-    return ret
+    ret = {"location":location, "begin":begin, "end":end, "return":ret}
 
+    # print(type(ret), type(json.dumps(ret)), json.dumps(ret))
+
+    return json.dumps(ret)
+
+
+@app.get('/datasets/{label}/ganttChartValues')
+def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    ret = {}
+    ret['locationList'] = db[label]['sparseUtilizationList'].calcGanttHistogram(bins, begin, end)
+
+    ret['metadata'] = {}
+    ret['metadata']['begin'] = begin
+    ret['metadata']['end'] = end
+    ret['metadata']['bins'] = bins
+
+    return json.dumps(ret)
 
 #####################
 # Profilier Wrappers#
