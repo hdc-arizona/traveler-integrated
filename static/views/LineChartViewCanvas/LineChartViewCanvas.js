@@ -80,16 +80,10 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this._bounds = this.getChartBounds();
     this.content.select('.chart')
         .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
-
+    console.log("setup called");
     this.svgElement = this.content.select('.svg-plot');
-    this.canvasElement = this.content.select('.canvas-plot')
-        .attr('width', this._bounds.width)
-        .attr('height', this._bounds.height)
-        .style('margin-left', this.margin.left + 'px')
-        .style('margin-top', this.margin.top + 'px');
+    this.canvasElement = this.content.select('.canvas-plot');
     this.canvasContext = this.canvasElement.node().getContext('2d');
-    // this.canvasContext.transform(1, 0, 0, -1, 0, this.canvasElement.height); // move the y0 to bottom, uncomment it later
-    // this.canvasContext.transform(1, 0, 0, 0, this.margin.left, this.margin.top); // move to margin
 
     // // Create a view-specific clipPath id, as there can be more than one
     // // LineChartViewCanvas in the app
@@ -193,6 +187,10 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     // immediately-drawn things like drawAxes that get executed repeatedly by
     // scrolling / panning)
     this._bounds = this.getChartBounds();
+    this.canvasElement.attr('width', this._bounds.width)
+        .attr('height', this._bounds.height)
+        .style('margin-left', this.margin.left + 'px')
+        .style('margin-top', this.margin.top + 'px');
     // Update whether we're showing the spinner
     // this.drawSpinner();
     // Update the clip rect
@@ -231,7 +229,6 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     const xAxisGroup = this.svgElement.select('.xAxis')
       .attr('transform', `translate(0, ${this._bounds.height})`)
       .call(d3.axisBottom(this.xScale));
-    console.log(xAxisGroup);
     cleanupAxis(xAxisGroup);
 
     // Position the x label
@@ -248,8 +245,6 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
       .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
   drawLines (d, preD) {
-    console.log('drawing again ' + d.key);
-
     // this.canvasContext.beginPath();
     // this.canvasContext.arc(this.xScale(d.key), this.yScale(d.value), 1, 0, 2 * Math.PI, false);
     // this.canvasContext.closePath();
