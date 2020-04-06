@@ -85,7 +85,7 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
   }
   draw () {
     this.emptyStateDiv.style('display', this.isEmpty ? null : 'none');
-    this.spinner.style('display', this.isLoading ? null : 'none');
+    // this.spinner.style('display', this.isLoading ? null : 'none');
     if (this.tabElement) {
       this.drawTab();
     }
