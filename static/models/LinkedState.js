@@ -129,7 +129,8 @@ class LinkedState extends Model {
         views['UtilizationView'] = true;
         views['LineChartView'] = false;
         views['LineChartViewNew'] = true;
-        views['UtilizationViewNew'] = true;
+        views['LineChartViewCanvas'] = true;
+        views['UtilizationViewNew'] = false;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
