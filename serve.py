@@ -542,5 +542,6 @@ if __name__ == '__main__':
     # db['LRA Test Running']['sparseUtilizationList'].calcUtilizationHistogram(1, 95000000, 95100000)
     # db['LRA Test Running']['sparseUtilizationList'].calcUtilizationForLocation(2, 94900000, 95000000, "1")
     # db['LRA_CSV']['sparseUtilizationList']['intervals'].calcUtilizationHistogram(1, 5560000000, 5565000000)
+    # db['ALS_2020_papi']['sparseUtilizationList']['metrics']['PAPI_L2_DCM'].calcUtilizationForLocation(1000, 26579000, 9867625001, 1, False)
 
     uvicorn.run(app, host='0.0.0.0')

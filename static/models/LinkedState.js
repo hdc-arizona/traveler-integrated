@@ -127,8 +127,8 @@ class LinkedState extends Model {
       } else if (fileType === 'otf2') {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
-        views['LineChartView'] = false;
-        views['LineChartViewNew'] = true;
+        views['LineChartView'] = true;
+        views['LineChartViewNew'] = false;
         views['LineChartViewCanvas'] = true;
         views['UtilizationViewNew'] = false;
       } else if (fileType === 'cpp') {
@@ -463,15 +463,15 @@ class LinkedState extends Model {
         preY = metricData[preKey].Value;
         rate = metricData[preKey].Rate;
       }
-      rate = Math.abs(intervalData[id]['enter']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['enter']['Timestamp'] - preX);
+      rate = Math.abs(intervalData[id]['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['enter']['Timestamp'] - preX);
       if(intervalData[id]['Location'] === printLocation) {
-        console.log("Time: " + intervalData[id]['enter']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
+        // console.log("Time: " + intervalData[id]['enter']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
       }
 
       metricData[k] = {
         Timestamp : intervalData[id]['enter']['Timestamp'],
         Location : intervalData[id]['Location'],
-        Value : intervalData[id]['enter']['metrics'][curMetric],
+        Value : intervalData[id]['metrics'][curMetric],
         Rate : rate
       };
       maxY = Math.max(maxY, rate);
@@ -481,15 +481,15 @@ class LinkedState extends Model {
       preX = metricData[k].Timestamp;
       preY = metricData[k].Value;
       k = id + '_' + intervalData[id]['leave']['Timestamp'];
-      rate = Math.abs(intervalData[id]['leave']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['leave']['Timestamp'] - preX);
+      rate = Math.abs(intervalData[id]['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['leave']['Timestamp'] - preX);
       if(intervalData[id]['Location'] === printLocation) {
-        console.log("Time: " + intervalData[id]['leave']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
+        // console.log("Time: " + intervalData[id]['leave']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
       }
 
       metricData[k] = {
         Timestamp : intervalData[id]['leave']['Timestamp'],
         Location : intervalData[id]['Location'],
-        Value : intervalData[id]['leave']['metrics'][curMetric],
+        Value : intervalData[id]['metrics'][curMetric],
         Rate : rate
       };
       maxY = Math.max(maxY, rate);

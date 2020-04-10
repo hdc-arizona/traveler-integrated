@@ -30,7 +30,7 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this.metricValueCount = 0;
     this.isMetricLoading = false;
     this.hoverIndex = -1;
-    this.curMetric = 'PAPI_TOT_INS';
+    this.curMetric = 'PAPI_TOT_CYC';
     if(this.linkedState.selectedProcMetric.startsWith('PAPI')) {
       this.curMetric = this.linkedState.selectedProcMetric;
     }
@@ -127,7 +127,7 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
       // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}`)
       var begin = Math.floor(this.linkedState.intervalWindow[0]);
       var end = Math.ceil(this.linkedState.intervalWindow[1]);
-      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=1000&location=1&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
+      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=100&location=1&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
           .fail(error => {
             this.metricValueCount = 0;
             this.error = error;
@@ -204,6 +204,7 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     // this.drawLines(data);
   }
   drawWrapper(shift) {
+    console.log("clearing the data");
     this._bounds = this.getChartBounds();
     // Combine old data with any new data that's streaming in
     const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));

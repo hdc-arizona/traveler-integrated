@@ -200,7 +200,7 @@ class Controller {
         //   componentState: { label: linkedState.label }
         }, {
           type: 'component',
-          componentName: 'LineChartViewNew',
+          componentName: 'LineChartView',
           componentState: { label: linkedState.label }
         }, {
           type: 'component',

@@ -16,7 +16,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleLinear();
 
-    this.curMetric = 'PAPI_TOT_INS';
+    this.curMetric = 'PAPI_TOT_CYC';
     if(this.linkedState.selectedProcMetric.startsWith('PAPI')) {
       this.curMetric = this.linkedState.selectedProcMetric;
     }
