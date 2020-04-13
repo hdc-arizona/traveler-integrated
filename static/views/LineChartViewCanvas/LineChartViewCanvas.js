@@ -85,8 +85,8 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this.canvasElement = this.content.select('.canvas-plot');
     this.canvasContext = this.canvasElement.node().getContext('2d');
 
-    // // Create a view-specific clipPath id, as there can be more than one
-    // // LineChartViewCanvas in the app
+    // Create a view-specific clipPath id, as there can be more than one
+    // LineChartViewCanvas in the app
     const clipId = this.uniqueDomId + 'clip';
     this.content.select('clipPath')
         .attr('id', clipId);
@@ -96,13 +96,13 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this.content.select('.canvas-plot')
         .on('click', () => {
           console.log("background clicked");
-          // this.drawWrapper(-100);
         });
 
     var __self = this;
     this.setupZoomAndPan();
-    // // Update scales whenever something changes the brush
+    // Update scales whenever something changes the brush
     this.linkedState.on('newIntervalWindow', () => {
+      // console.log("new interval triggered");
       __self.updateTheView();
     });
     this.updateTheView();
@@ -124,10 +124,9 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
       var maxY = Number.MIN_VALUE;
       var minY = Number.MAX_VALUE;
       this.metricValueCount = 0;
-      // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}`)
       var begin = Math.floor(this.linkedState.intervalWindow[0]);
       var end = Math.ceil(this.linkedState.intervalWindow[1]);
-      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=100&location=1&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
+      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=1000&location=1&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
           .fail(error => {
             this.metricValueCount = 0;
             this.error = error;
@@ -161,8 +160,6 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
             self.setYDomain({'max':maxY, 'min':minY});
             this.render();
           });
-      self.setYDomain({'max':maxY, 'min':minY});
-      this.render();
     }, 100);
   }
   draw () {
@@ -204,11 +201,11 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     // this.drawLines(data);
   }
   drawWrapper(shift) {
-    console.log("clearing the data");
+
     this._bounds = this.getChartBounds();
     // Combine old data with any new data that's streaming in
     const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
-
+    console.log("clearing the data: " + data.length);
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
     data.forEach((d, i) => {
@@ -304,6 +301,7 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
         // this.content.selectAll('.dots, .lines')
         //   .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
         this.drawWrapper(zoomCenter);
+        // this.updateTheView();
       }).call(d3.drag()
         .on('start', () => {
           this.initialDragState = {
@@ -326,13 +324,14 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
 
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
-          this.drawAxes();
+          // this.drawAxes();
 
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
             this.initialDragState.scale(actualBounds.begin);
           this.drawWrapper(shift);
+          // this.updateTheView();
 
           // d3's drag behavior captures + prevents updating the cursor, so do
           // that manually

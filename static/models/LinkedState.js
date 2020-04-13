@@ -449,7 +449,7 @@ class LinkedState extends Model {
 
     let maxY = Number.MIN_VALUE;
     let minY = Number.MAX_VALUE;
-    console.log("start printing metric data - " + curMetric);
+    // console.log("start printing metric data - " + curMetric);
 
     for(const id in intervalData) {
       let k = id + '_' + intervalData[id]['enter']['Timestamp'];
@@ -496,7 +496,7 @@ class LinkedState extends Model {
       minY = Math.min(minY, rate);
       dataOfLocation[intervalData[id]['Location']] = k;
     }
-    console.log("printing done");
+    // console.log("printing done");
     modifiedData.maxY = maxY;
     modifiedData.minY = minY;
     modifiedData.metricData = metricData;
