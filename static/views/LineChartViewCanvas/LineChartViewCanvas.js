@@ -126,7 +126,7 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
       this.metricValueCount = 0;
       var begin = Math.floor(this.linkedState.intervalWindow[0]);
       var end = Math.ceil(this.linkedState.intervalWindow[1]);
-      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=1000&location=1&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
+      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=1000&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
           .fail(error => {
             this.metricValueCount = 0;
             this.error = error;
@@ -139,7 +139,10 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
             } else {
               self.isMetricLoading = true;
               var val = metricList[2];
-              self.newCache[metricList[1]] = val;
+              if(self.newCache[metricList[1]] === undefined) {
+                self.newCache[metricList[1]] = {};
+              }
+              self.newCache[metricList[1]][metricList[3]] = val;
               maxY = Math.max(maxY, val);
               minY = Math.min(minY, val);
               self.metricValueCount++;
@@ -213,14 +216,20 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
       if(i>0) {
         preD = data[i-1];
       }
-      this.drawLines(d, preD, shift);
+      var k = Object.keys(d.value);
+      for(const loc of k) {
+        this.drawLines(d, preD, shift, loc);
+      }
+      // d.value.forEach(location => {
+      //   this.drawLines(d, preD, shift, location);
+      // });
     });
   }
-  drawLines (d, preD, shift) {
+  drawLines (d, preD, shift, location) {
     this.canvasContext.beginPath();
     this.canvasContext.strokeStyle = 'black';
-    this.canvasContext.moveTo(this.xScale(parseInt(preD.key))+parseInt(shift), this.yScale(preD.value));
-    this.canvasContext.lineTo(this.xScale(parseInt(d.key))+parseInt(shift), this.yScale(d.value));
+    this.canvasContext.moveTo(this.xScale(parseInt(preD.key))+parseInt(shift), this.yScale(preD.value[location]));
+    this.canvasContext.lineTo(this.xScale(parseInt(d.key))+parseInt(shift), this.yScale(d.value[location]));
     this.canvasContext.stroke();
   }
   drawSpinner () {

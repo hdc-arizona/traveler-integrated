@@ -482,7 +482,7 @@ def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = Non
         end = db[label]['meta']['intervalDomain'][1]
 
     if location is None:
-        raise HTTPException(status_code=404, detail='Location cannot be none')
+        ret = db[label]['sparseUtilizationList']['metrics'][metric_type].calcMetricUtilization(bins, begin, end)
     else:
         ret = db[label]['sparseUtilizationList']['metrics'][metric_type].calcUtilizationForLocation(bins, begin, end, location, False)
 

@@ -45,17 +45,31 @@ class SparseUtilizationList():
         return
 
     # Calculates utilization histogram for all intervals regardless of location
-    def calcUtilizationHistogram(self, bins=100, begin=None, end=None):
+    def calcUtilizationHistogram(self, bins=100, begin=None, end=None, isInterval=True):
 
         array = []
         isFirst = True
         for location in self.locationDict:
-            temp = self.calcUtilizationForLocation(bins, begin, end, location)
+            temp = self.calcUtilizationForLocation(bins, begin, end, location, isInterval)
             if isFirst is True:
                 isFirst = False
                 array = temp
             for i in range(bins):
                 array[i][2] = array[i][2] + temp[i][2]
+
+        return array
+
+    # Calculates utilization histogram for all intervals regardless of location
+    def calcMetricUtilization(self, bins=100, begin=None, end=None):
+        array = []
+        isFirst = True
+        for location in self.locationDict:
+            temp = self.calcUtilizationForLocation(bins, begin, end, location, False)
+            if isFirst is True:
+                isFirst = False
+                array = temp
+            else:
+                array = array + temp
 
         return array
 
@@ -106,7 +120,7 @@ class SparseUtilizationList():
                 val = (current['util'] - prev['util']) / (current['index'] - prev['index'])
             current['integral'] = val
             prev = current
-            prettyHistogram.append([histogram[i-1]['index'], histogram[i]['index'], histogram[i]['integral']])
+            prettyHistogram.append([histogram[i-1]['index'], histogram[i]['index'], histogram[i]['integral'], Location])
         return prettyHistogram
 
 
