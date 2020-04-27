@@ -21,13 +21,15 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
     GanttView.DOM_COUNT++;
+    this.wasRerendered = false;
   }
 
   get isLoading () {
     return super.isLoading || this.linkedState.isLoadingIntervals || this.linkedState.isLoadingTraceback;
   }
   get isEmpty () {
-    return this.error || this.linkedState.loadedIntervalCount === 0;
+    return this.error || !this.linkedState.isAggBinsLoaded;
+    // return this.error || this.linkedState.loadedIntervalCount === 0;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
@@ -42,6 +44,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.xScale.range([0, result.width]);
     this.yScale.range([0, result.height]);
     return result;
+  }
+  getSpilloverWidth(width){
+    return width*3;
   }
   setup () {
     super.setup();
@@ -61,7 +66,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
     //add width of gantt chart to model
     // for leightweight querying and aggregating
-    this.linkedState.setGanttXResolution(this._bounds.width);
+    this.linkedState.setGanttXResolution(this.getSpilloverWidth(this._bounds.width));
 
 
     // Create a view-specific clipPath id, as there can be more than one
@@ -105,11 +110,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // This is an incremental update; we don't need to do a full render()...
       // (but still debounce this, as we don't want to call drawBars() for every
       // new interval)
-      window.clearTimeout(this._incrementalIntervalTimeout);
-      this._incrementalIntervalTimeout = window.setTimeout(() => {
-        // this.drawBars(this.linkedState.getCurrentIntervals());
-        this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
-      });
+      // window.clearTimeout(this._incrementalIntervalTimeout);
+      // this._incrementalIntervalTimeout = window.setTimeout(() => {
+      //     this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
+      // });
     });
     this.linkedState.on('tracebackUpdated', () => {
       // This is an incremental update; we don't need to do a full render()...
@@ -144,7 +148,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // this during incremental / immediate draw calls in setup()'s listeners or
     // zooming / panning that need more responsiveness)
     this._bounds = this.getChartBounds();
-    this.linkedState.setGanttXResolution(this._bounds.width);
+    this.linkedState.setGanttXResolution(this.getSpilloverWidth(this._bounds.width));
 
     // Update whether we're showing the spinner
     this.drawSpinner();
@@ -211,36 +215,46 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       var border = 1;
       var fillColor = "#D9D9D9"//temp hack for now
       var borderColor = "#737373"
+      var localXScale = d3.scaleLinear();
+
+      localXScale.domain(this.xScale.domain());
+      localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width])
+
+      /***** DONT FORGET TO ADD FLAG FOR IF USING NATIVE OR OVERLOADED VIEW SCALE****/
 
       // we need a canvas already
       // first we focus on moving canvas to the correct place
       if (!this.initialDragState) {
         this.content.select('.canvas-container')
-          .attr('width', this._bounds.width)
-          .attr('height', this._bounds.height);
+          .attr('width', this.getSpilloverWidth(this._bounds.width))
+          .attr('height', this._bounds.height)
+          .attr('transform', `translate(${-this._bounds.width}, 0)`);
 
         var canvas = this.content.select('.gantt-canvas')
-                    .attr('width', this._bounds.width)
+                    .attr('width', this.getSpilloverWidth(this._bounds.width))
                     .attr('height', this._bounds.height);
 
-
         var ctx = canvas.node().getContext("2d");
+
+        ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
 
 
         for (var location in aggBins.locationList){
           var loc_offset = this.yScale(parseInt(aggBins.locationList[location].location));
           for (var bucket in aggBins.locationList[location].histogram){
+
+            var bucket_pix_offset = localXScale(this.linkedState.getTimeStampFromBin(bucket));
             var pixel = aggBins.locationList[location].histogram[bucket];
             if (pixel === 1){
               ctx.fillStyle = borderColor;
-              ctx.fillRect(bucket, loc_offset, 1, border);
-              ctx.fillRect(bucket, (loc_offset-border)+this.yScale.bandwidth(), 1, border);
+              ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
+              ctx.fillRect(bucket_pix_offset, (loc_offset-border)+this.yScale.bandwidth(), 1, border);
               ctx.fillStyle = fillColor;
-              ctx.rect(bucket, loc_offset+border, 1, this.yScale.bandwidth()-(2*border));
+              ctx.rect(bucket_pix_offset, loc_offset+border, 1, this.yScale.bandwidth()-(2*border));
             }
             if (pixel < 1 && pixel > 0){
               ctx.fillStyle = borderColor;
-              ctx.fillRect(bucket, loc_offset, border, this.yScale.bandwidth());
+              ctx.fillRect(bucket_pix_offset, loc_offset, border, this.yScale.bandwidth());
             }
           }
         }
@@ -249,6 +263,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         ctx.fill();
 
       }
+      this.ctx = ctx;
+      this.wasRerendered = true;
+
   }
   drawBars (intervals) {
     if (!this.initialDragState) {
@@ -387,21 +404,27 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     };
     this.content
       .on('wheel', () => {
+
+
         const zoomFactor = 1.05 ** (normalizeWheel(d3.event).pixelY / 100);
         const originalWidth = this.linkedState.end - this.linkedState.begin;
         // Clamp the width to a min of 10ms, and the largest possible size
         let targetWidth = Math.max(zoomFactor * originalWidth, 10);
         targetWidth = Math.min(targetWidth, this.linkedState.endLimit - this.linkedState.beginLimit);
         // Compute the new begin / end points, centered on where the user is mousing
+
+        /****** HACK AND FIX ALSO
+                I need to tie 1 width to an clear value which is realted to the size of our overflow ******/
+        const overflowAdjustedMousedScreenPont = d3.event.clientX - this._bounds.left - this.margin.left + this._bounds.width;
+        /******* HACK FIX ********/
+
         const mousedScreenPoint = d3.event.clientX - this._bounds.left - this.margin.left;
         const mousedPosition = this.xScale.invert(mousedScreenPoint);
         const begin = mousedPosition - (targetWidth / originalWidth) * (mousedPosition - this.linkedState.begin);
         const end = mousedPosition + (targetWidth / originalWidth) * (this.linkedState.end - mousedPosition);
         const actualBounds = clampWindow(begin, end);
 
-        // There isn't a begin / end wheel event, so trigger the update across
-        // views immediately
-        this.linkedState.setIntervalWindow(actualBounds);
+
 
         // For responsiveness, draw the axes immediately (waiting for the
         // events to propagate from setIntervalWindow may take a while)
@@ -409,13 +432,40 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
         // Patch a temporary scale transform to the bars / links layers (this
         // gets removed by full drawBars() / drawLinks() calls)
-        if (!this.content.select('.bars').attr('transform')) {
-          latentWidth = originalWidth;
-        }
-        const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
-        const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-        this.content.selectAll('.bars, .links')
-          .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
+
+        latentWidth = originalWidth;
+        const actualZoomFactor = latentWidth / ((actualBounds.end - actualBounds.begin));
+        const zoomCenter = (1 - actualZoomFactor) * overflowAdjustedMousedScreenPont;
+
+        // this.content.selectAll('.bars, .links')
+        // .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
+
+        // There isn't a begin / end wheel event, so trigger the update across
+        // views immediately
+        // window.clearTimeout(this._incrementalIntervalTimeout);
+        // this._incrementalIntervalTimeout = window.setTimeout(() => {
+
+        var canvas = this.content.select('.gantt-canvas');
+
+        var ctx = canvas.node().getContext("2d");
+
+        var buffer = document.createElement("CANVAS");
+        buffer.height = canvas.attr('height');
+        buffer.width = canvas.attr('width');
+
+        this.buff = buffer.getContext("2d");
+        this.buff.drawImage(ctx.canvas, 0, 0);
+
+
+        ctx.save();
+        ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
+        ctx.translate(zoomCenter, 0);
+        ctx.scale(actualZoomFactor, 1);
+        ctx.drawImage(this.buff.canvas, 0, 0);
+        ctx.restore();
+
+        this.linkedState.setIntervalWindow(actualBounds);
+
         // Show the small spinner to indicate that some of the stuff the user
         // sees may be inaccurate (will be hidden once the full draw() call
         // happens)
@@ -430,8 +480,43 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
               .domain(this.xScale.domain())
               .range(this.xScale.range())
           };
+
+          var canvas = this.content.select('.gantt-canvas');
+
+          var ctx = canvas.node().getContext("2d");
+
+          var buffer = document.createElement("CANVAS");
+          buffer.height = canvas.attr('height');
+          buffer.width = canvas.attr('width');
+
+          this.buff = buffer.getContext("2d");
+          this.buff.drawImage(ctx.canvas, 0, 0);
         })
         .on('drag', () => {
+          if(this.wasRerendered === true){
+            this.initialDragState = {
+              begin: this.linkedState.begin,
+              end: this.linkedState.end,
+              x: this.xScale.invert(d3.event.x),
+              scale: d3.scaleLinear()
+                .domain(this.xScale.domain())
+                .range(this.xScale.range())
+            };
+
+            var canvas = this.content.select('.gantt-canvas');
+
+            var ctx = canvas.node().getContext("2d");
+
+            var buffer = document.createElement("CANVAS");
+            buffer.height = canvas.attr('height');
+            buffer.width = canvas.attr('width');
+
+            this.buff = buffer.getContext("2d");
+            this.buff.drawImage(ctx.canvas, 0, 0);
+
+            this.wasRerendered = false;
+          }
+
           const mousedPosition = this.initialDragState.scale.invert(d3.event.x);
           const dx = this.initialDragState.x - mousedPosition;
           const begin = this.initialDragState.begin + dx;
@@ -443,13 +528,36 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
           this.drawAxes();
+          // this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
 
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
-            this.initialDragState.scale(actualBounds.begin);
-          this.content.selectAll('.bars, .links')
-            .attr('transform', `translate(${shift}, 0)`);
+          this.initialDragState.scale(actualBounds.begin);
+
+
+          var canvas = this.content.select('.gantt-canvas');
+
+          var ctx = canvas.node().getContext("2d");
+
+
+          ctx.save();
+          ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
+          ctx.translate(shift, 0);
+          ctx.drawImage(this.buff.canvas, 0, 0);
+          ctx.restore();
+
+          // ctx.globalCompositeOperation = "copy";
+          // ctx.drawImage(this.initialCanvas, shift, 0);
+          // // reset back to normal for subsequent operations.
+          // ctx.globalCompositeOperation = "source-over"
+
+
+
+          // console.log(ctx);
+          //
+          // this.content.selectAll('.bars, .links')
+          //   .attr('transform', `translate(${shift}, 0)`);
 
           // Show the small spinner to indicate that some of the stuff the user
           // sees may be inaccurate (will be hidden once the full draw() call
@@ -460,6 +568,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           // that manually
           this.linkedState.moveCursor(mousedPosition);
           this.updateCursor();
+          this.linkedState.setIntervalWindow(clampWindow(begin, end));
         })
         .on('end', () => {
           const dx = this.initialDragState.x - this.initialDragState.scale.invert(d3.event.x);
