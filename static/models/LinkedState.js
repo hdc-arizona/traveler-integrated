@@ -19,6 +19,7 @@ class LinkedState extends Model {
     this.selectedGUID = null;
     this.selectedIntervalId = null;
     this.caches = {};
+    this.newCaches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
     this.selectedProcMetric = 'meminfo:MemFree';
@@ -30,6 +31,7 @@ class LinkedState extends Model {
     this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
+    this.updateHistogramNew();
   }
   get begin () {
     return this.intervalWindow[0];
@@ -53,6 +55,7 @@ class LinkedState extends Model {
   setHistogramResolution (value) {
     this.histogramResolution = value;
     this.updateHistogram();
+    this.updateHistogramNew();
   }
   setIntervalWindow ({
     begin = this.begin,
@@ -68,6 +71,7 @@ class LinkedState extends Model {
     end = Math.min(this.endLimit, end);
     this.intervalWindow = [begin, end];
     this.updateHistogram();
+    this.updateHistogramNew();
     this.startIntervalStream();
     this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
@@ -78,6 +82,7 @@ class LinkedState extends Model {
     if (primitive !== this.selectedPrimitive) {
       this.selectedPrimitive = primitive;
       this.updateHistogram();
+      this.updateHistogramNew();
       this.trigger('primitiveSelected', { primitive });
     }
   }
@@ -122,8 +127,10 @@ class LinkedState extends Model {
       } else if (fileType === 'otf2') {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
-        views['LineChartView'] = false;
-        views['ProcMetricView'] = false;
+        views['LineChartView'] = true;
+        views['LineChartViewNew'] = false;
+        views['LineChartViewCanvas'] = true;
+        views['UtilizationViewNew'] = false;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -148,6 +155,9 @@ class LinkedState extends Model {
     return !!this.caches.intervalStream;
   }
   get isLoadingHistogram () {
+    return !this.caches.histogram;
+  }
+  get isLoadingHistogramNew () {
     return !this.caches.histogram;
   }
   getCurrentIntervals () {
@@ -369,6 +379,45 @@ class LinkedState extends Model {
       this.trigger('histogramUpdated');
     }, 100);
   }
+  getCurrentHistogramDataNew () {
+    return {
+      histogram: this.newCaches.histogram,
+      domain: this.newCaches.histogramDomain,
+      maxCount: this.newCaches.histogramMaxCount,
+      error: this.newCaches.histogramError
+    };
+  }
+  updateHistogramNew () {
+    // Debounce...
+    window.clearTimeout(this._histogramTimeoutNew);
+    this._histogramTimeoutNew = window.setTimeout(async () => {
+      delete this.newCaches.histogram;
+      delete this.newCaches.histogramDomain;
+      delete this.newCaches.histogramMaxCount;
+
+      const label = encodeURIComponent(this.label);
+      const urls = [`/datasets/${label}/drawValues?bins=${this.histogramResolution}`];
+      // const urls = [`/datasets/${label}/histogram?mode=utilization&bins=${this.histogramResolution}`];
+      try {
+        [this.newCaches.histogram] = await Promise.all(urls.map(url => d3.json(url)));
+      } catch (e) {
+        this.histogramError = e;
+        return;
+      }
+      delete this.histogramError;
+
+      let maxCount = 0;
+      const domain = [Infinity, -Infinity];
+      for (const [begin, end, count] of this.newCaches.histogram) {
+        maxCount = Math.max(maxCount, count);
+        domain[0] = Math.min(begin, domain[0]);
+        domain[1] = Math.max(end, domain[1]);
+      }
+      this.newCaches.histogramDomain = domain;
+      this.newCaches.histogramMaxCount = maxCount;
+      this.trigger('histogramsUpdated');
+    }, 100);
+  }
   getMaxMinOfMetric (metric) {
     const intervalList = Object.values(this.getCurrentIntervals());
     let maxY = Number.MIN_VALUE;
@@ -391,6 +440,7 @@ class LinkedState extends Model {
     var intervalData = this.getCurrentIntervals();
     var metricData = {};
     var dataOfLocation = {};
+    var printLocation = '1';
 
     var getPreviousKeyForLocation = function (i) {
       if(i in dataOfLocation && dataOfLocation[i] in metricData)return dataOfLocation[i];
@@ -399,8 +449,11 @@ class LinkedState extends Model {
 
     let maxY = Number.MIN_VALUE;
     let minY = Number.MAX_VALUE;
+    // console.log("start printing metric data - " + curMetric);
+
     for(const id in intervalData) {
       let k = id + '_' + intervalData[id]['enter']['Timestamp'];
+      if(intervalData[id]['Location'] !== '1')continue;
       let preKey = getPreviousKeyForLocation(intervalData[id]['Location']);
       let preX = 0;
       let preY = 0;
@@ -410,11 +463,15 @@ class LinkedState extends Model {
         preY = metricData[preKey].Value;
         rate = metricData[preKey].Rate;
       }
-      rate = Math.abs(intervalData[id]['enter']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['enter']['Timestamp'] - preX);
+      rate = Math.abs(intervalData[id]['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['enter']['Timestamp'] - preX);
+      if(intervalData[id]['Location'] === printLocation) {
+        // console.log("Time: " + intervalData[id]['enter']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
+      }
+
       metricData[k] = {
         Timestamp : intervalData[id]['enter']['Timestamp'],
         Location : intervalData[id]['Location'],
-        Value : intervalData[id]['enter']['metrics'][curMetric],
+        Value : intervalData[id]['metrics'][curMetric],
         Rate : rate
       };
       maxY = Math.max(maxY, rate);
@@ -424,17 +481,22 @@ class LinkedState extends Model {
       preX = metricData[k].Timestamp;
       preY = metricData[k].Value;
       k = id + '_' + intervalData[id]['leave']['Timestamp'];
-      rate = Math.abs(intervalData[id]['leave']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['leave']['Timestamp'] - preX);
+      rate = Math.abs(intervalData[id]['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['leave']['Timestamp'] - preX);
+      if(intervalData[id]['Location'] === printLocation) {
+        // console.log("Time: " + intervalData[id]['leave']['Timestamp'] + " Value: " + rate + " " + preY + " " + preX);
+      }
+
       metricData[k] = {
         Timestamp : intervalData[id]['leave']['Timestamp'],
         Location : intervalData[id]['Location'],
-        Value : intervalData[id]['leave']['metrics'][curMetric],
+        Value : intervalData[id]['metrics'][curMetric],
         Rate : rate
       };
       maxY = Math.max(maxY, rate);
       minY = Math.min(minY, rate);
       dataOfLocation[intervalData[id]['Location']] = k;
     }
+    // console.log("printing done");
     modifiedData.maxY = maxY;
     modifiedData.minY = minY;
     modifiedData.metricData = metricData;

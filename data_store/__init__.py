@@ -8,7 +8,7 @@ from .loggers import logToConsole, ClientLogger
 # Possible files / metadata structures that we create / open / update
 diskCacheIndices = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
 requiredDiskCacheIndices = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp']
+pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp', 'sparseUtilizationList']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
 

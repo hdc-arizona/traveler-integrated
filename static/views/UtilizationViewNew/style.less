@@ -1,0 +1,48 @@
+@import '../../style/colors.less';
+
+.UtilizationViewNew {
+  text {
+    font: 9px sans-serif;
+  }
+  .chart {
+    cursor: crosshair;
+  }
+  .background rect {
+    fill: transparent;
+  }
+  .cursor {
+    stroke-width: 1px;
+    stroke: @separatorColor;
+  }
+  .outline {
+    fill: none;
+    stroke-width: 1px;
+  }
+  .area {
+    stroke: none;
+    opacity: 0.25;
+  }
+  .overview {
+    .outline { stroke: @overviewColor; }
+    .area { fill: @overviewColor; }
+  }
+  .brush {
+    cursor: grab;
+    &:active {
+      cursor: grabbing;
+    }
+
+    .outline { stroke: @brushColor; }
+    .area { fill: @brushColor; }
+
+    .hoverTarget {
+      fill: transparent;
+    }
+    .leftHandle .hoverTarget {
+      cursor: w-resize;
+    }
+    .rightHandle .hoverTarget {
+      cursor: e-resize;
+    }
+  }
+}

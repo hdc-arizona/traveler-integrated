@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import asyncio
 from data_store import DataStore, logToConsole
+from data_store.sparseUtilizationList import loadSUL
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
 parser.add_argument('-l', '--label', dest='label', type=str, default='Latest',
@@ -130,6 +131,8 @@ async def main():
             # Handle otf2
             if 'otf2' in paths:
                 await db.processOtf2(label, FakeFile(paths['otf2']), args['events'])
+                await loadSUL(label, db)
+
 
             # Save all the data
             await db.save(label)

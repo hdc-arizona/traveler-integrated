@@ -39,7 +39,7 @@ RUN git clone https://github.com/stevenrbrandt/workenv.git
 WORKDIR /home/jovyan/workenv
 RUN python3 install.py
 WORKDIR /traveler-integrated/notebook
-ENV PATH /usr/local/cli/bin:/traveler-integrated/notebook/agave-cli/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+ENV PATH /usr/local/cli/bin:/traveler-integrated/notebook/agave-cli/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/otf2/bin/
 
 # Default container command is to launch jupyter
 CMD ["bash", "/traveler-integrated/jupyter.sh"]

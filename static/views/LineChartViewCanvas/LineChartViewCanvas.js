@@ -1,31 +1,45 @@
 /* globals d3 */
 import GoldenLayoutView from '../common/GoldenLayoutView.js';
 import LinkedMixin from '../common/LinkedMixin.js';
-import SvgViewMixin from '../common/SvgViewMixin.js';
 import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
+import CanvasViewMixin from "../common/CanvasViewMixin.js";
+import SvgViewMixin from "../common/SvgViewMixin.js";
 
-class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
+// d3 canvas source reference - https://github.com/xoor-io/d3-canvas-example
+class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(GoldenLayoutView))) {
   constructor (argObj) {
     argObj.resources = [
-      { type: 'less', url: 'views/LineChartView/style.less' },
-      { type: 'text', url: 'views/LineChartView/template.svg' }
+      { type: 'less', url: 'views/LineChartViewCanvas/style.less' },
+      { type: 'text', url: 'views/LineChartViewCanvas/template.svg' }
     ];
     super(argObj);
+    // d3 vars
     this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleLinear();
 
+    this.svgElement = null;
+    //canvas vars
+    this.canvasElement = null;
+    this.canvasContext = null;
+
+    this.stream = null;
+    this.cache = {};
+    this.newCache = null;
+    this.metricValueCount = 0;
+    this.isMetricLoading = false;
+    this.hoverIndex = -1;
     this.curMetric = 'PAPI_TOT_CYC';
     if(this.linkedState.selectedProcMetric.startsWith('PAPI')) {
       this.curMetric = this.linkedState.selectedProcMetric;
     }
-    this.selectedLocation = '-1';
+    this.selectedLocation = '1';
     this.baseOpacity = 0.3;
 
     // Some things like SVG clipPaths require ids instead of classes...
-    this.uniqueDomId = `LineChartView${LineChartView.DOM_COUNT}`;
-    LineChartView.DOM_COUNT++;
+    this.uniqueDomId = `LineChartViewCanvas${LineChartViewCanvas.DOM_COUNT}`;
+    LineChartViewCanvas.DOM_COUNT++;
   }
   get isLoading () {
     return super.isLoading || this.linkedState.isLoadingIntervals;
@@ -51,7 +65,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     var yOffset = (maxMin['max'] - maxMin['min']) / 10;
     this.yScale.domain([maxMin['max'] + yOffset, maxMin['min'] - yOffset]);
   }
-  
+
   setup () {
     super.setup();
 
@@ -66,70 +80,160 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this._bounds = this.getChartBounds();
     this.content.select('.chart')
         .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
+    console.log("setup called");
+    this.svgElement = this.content.select('.svg-plot');
+    this.canvasElement = this.content.select('.canvas-plot');
+    this.canvasContext = this.canvasElement.node().getContext('2d');
 
     // Create a view-specific clipPath id, as there can be more than one
-    // LineChartView in the app
+    // LineChartViewCanvas in the app
     const clipId = this.uniqueDomId + 'clip';
     this.content.select('clipPath')
         .attr('id', clipId);
     this.content.select('.clippedStuff')
         .attr('clip-path', `url(#${clipId})`);
-    this.drawClip();
-    this.content.select('.background')
+    // this.drawClip();
+    this.content.select('.canvas-plot')
         .on('click', () => {
-          this.selectedLocation = -1;
+          console.log("background clicked");
         });
-    this.xScale.domain(this.linkedState.intervalWindow);
-    // this.setYDomain(this.linkedState.getMaxMinOfMetric(this.curMetric));
 
     var __self = this;
     this.setupZoomAndPan();
-    // // Update scales whenever something changes the brush
+    // Update scales whenever something changes the brush
     this.linkedState.on('newIntervalWindow', () => {
-      this.xScale.domain(this.linkedState.intervalWindow);
-      this.drawAxes();
-      __self.render();
+      // console.log("new interval triggered");
+      __self.updateTheView();
     });
-    this.linkedState.on('intervalStreamFinished', () => { __self.render(); });
+    this.updateTheView();
+  }
+  updateTheView() {
+    this.getData();
+    this.xScale.domain(this.linkedState.intervalWindow);
+  }
+  getData () {
+    // Debounce the start of this expensive process...
+    // (but flag that we're loading)
+    window.clearTimeout(this._resizeTimeout);
+    this._resizeTimeout = window.setTimeout(async () => {
+      const label = encodeURIComponent(this.layoutState.label);
+      // const intervalWindow = this.linkedState.intervalWindow;
+      const self = this;
+      this.newCache = {};
+      this.waitingOnIncrementalRender = false;
+      var maxY = Number.MIN_VALUE;
+      var minY = Number.MAX_VALUE;
+      this.metricValueCount = 0;
+      var begin = Math.floor(this.linkedState.intervalWindow[0]);
+      var end = Math.ceil(this.linkedState.intervalWindow[1]);
+      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=1000&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
+          .fail(error => {
+            this.metricValueCount = 0;
+            this.error = error;
+            // console.log(error);
+          })
+          .node('!.*', function (metricList) {
+            if (currentStream !== self.stream) {
+              // A different stream has been started; abort this one
+              this.abort();
+            } else {
+              self.isMetricLoading = true;
+              var val = metricList[2];
+              if(self.newCache[metricList[1]] === undefined) {
+                self.newCache[metricList[1]] = {};
+              }
+              self.newCache[metricList[1]][metricList[3]] = val;
+              maxY = Math.max(maxY, val);
+              minY = Math.min(minY, val);
+              self.metricValueCount++;
+              if (!self.waitingOnIncrementalRender) {
+                // self.render() is debounced; this converts it to throttling,
+                // rate-limiting incremental refreshes by this.debounceWait
+                self.render();
+                self.waitingOnIncrementalRender = true;
+              }
+            }
+          })
+          .done(() => {
+            this.stream = null;
+            this.cache = this.newCache;
+            this.newCache = null;
+            this.isMetricLoading = false;
+            // console.log("cache for proc metric loaded: " + self.metricValueCount);
+            self.setYDomain({'max':maxY, 'min':minY});
+            this.render();
+          });
+    }, 100);
   }
   draw () {
     super.draw();
+    console.log("draw called");
 
+    // this.canvasContext.fillStyle = 'green';
+    // this.canvasContext.fillRect(0, 0, 80, 80);
     if (this.isHidden) {
       return;
     } else if (this.isEmpty) {
       if (this.error) {
         this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
-      } else if (this.linkedState.tooManyIntervals) {
-        this.emptyStateDiv.html('<p>No data in the current view</p>');
-      } else {
-        this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
+        return;
       }
+      // else if (this.linkedState.tooManyIntervals) {
+      //   this.emptyStateDiv.html('<p>No data in the current view</p>');
+      // } else {
+      //   this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
+      // }
     }
     // Update the dimensions of the plot in case we were resized (NOT updated by
     // immediately-drawn things like drawAxes that get executed repeatedly by
     // scrolling / panning)
     this._bounds = this.getChartBounds();
+    this.canvasElement.attr('width', this._bounds.width)
+        .attr('height', this._bounds.height)
+        .style('margin-left', this.margin.left + 'px')
+        .style('margin-top', this.margin.top + 'px');
     // Update whether we're showing the spinner
     this.drawSpinner();
     // Update the clip rect
     this.drawClip();
+    // Hide the small spinner
 
-
-    // Combine old data with any new data that's streaming in
-    const intervalData = this.linkedState.getCurrentMetricData(this.curMetric);
-    if(intervalData.maxY === Number.MIN_VALUE)return; // presumed no data
-
-    this.setYDomain({max: intervalData.maxY, min: intervalData.minY});
     // Update the axes (also updates scales)
     this.drawAxes();
+    this.drawWrapper(0);
+    // this.drawLines(data);
+  }
+  drawWrapper(shift) {
 
-    const data = d3.entries(intervalData.metricData);
-    // Update the bars
-    this.drawLines(data);
+    this._bounds = this.getChartBounds();
+    // Combine old data with any new data that's streaming in
+    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
+    console.log("clearing the data: " + data.length);
+    // Update the lines
+    this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
+    data.forEach((d, i) => {
+      var preD = d;
+      if(i>0) {
+        preD = data[i-1];
+      }
+      var k = Object.keys(d.value);
+      for(const loc of k) {
+        this.drawLines(d, preD, shift, loc);
+      }
+      // d.value.forEach(location => {
+      //   this.drawLines(d, preD, shift, location);
+      // });
+    });
+  }
+  drawLines (d, preD, shift, location) {
+    this.canvasContext.beginPath();
+    this.canvasContext.strokeStyle = 'black';
+    this.canvasContext.moveTo(this.xScale(parseInt(preD.key))+parseInt(shift), this.yScale(preD.value[location]));
+    this.canvasContext.lineTo(this.xScale(parseInt(d.key))+parseInt(shift), this.yScale(d.value[location]));
+    this.canvasContext.stroke();
   }
   drawSpinner () {
-    this.content.select('.small.spinner').style('display', this.isLoading ? null : 'none');
+    this.content.select('.small.spinner').style('display', 'none');
   }
   drawClip () {
     this.content.select('clipPath rect')
@@ -139,123 +243,23 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
   drawAxes () {
     const bounds = this.getChartBounds();
     // Update the x axis
-    const xAxisGroup = this.content.select('.xAxis')
-      .attr('transform', `translate(0, ${this._bounds.height})`)
-      .call(d3.axisBottom(this.xScale));
+    const xAxisGroup = this.svgElement.select('.xAxis')
+        .attr('transform', `translate(0, ${this._bounds.height})`)
+        .call(d3.axisBottom(this.xScale));
     cleanupAxis(xAxisGroup);
 
     // Position the x label
-    this.content.select('.xAxisLabel')
-      .attr('x', this._bounds.width / 2)
-      .attr('y', this._bounds.height + this.margin.bottom - this.emSize / 2);
+    this.svgElement.select('.xAxisLabel')
+        .attr('x', this._bounds.width / 2)
+        .attr('y', this._bounds.height + this.margin.bottom - this.emSize / 2);
 
     // Update the y axis
-    this.content.select('.yAxis')
-      .call(d3.axisLeft(this.yScale));
+    this.svgElement.select('.yAxis')
+        .call(d3.axisLeft(this.yScale));
 
     // Position the y label
-    this.content.select('.yAxisLabel')
-      .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
-  }
-  drawLines (data) {
-    // console.log('drawing again');
-    var _self = this;
-    if (!this.initialDragState) {
-      // Remove temporarily patched transformations
-      this.content.select('.dots').attr('transform', null);
-      this.content.select('.lines').attr('transform', null);
-    }
-
-    let cirlces = this.content.select('.dots')
-      .selectAll('.dot').data(data, d => d.key);
-    cirlces.exit().remove();
-    const cirlcesEnter = cirlces.enter().append('circle')
-      .classed('dot', true);
-    cirlces = cirlces.merge(cirlcesEnter);
-
-    cirlces.attr('class', 'dot')
-      .attr('cx', d => this.xScale(d.value['Timestamp']))
-      .attr('cy', d => this.yScale(d.value['Rate']))
-      .attr('r', d => {
-        if (d.value['Location'] === _self.selectedLocation) {
-          return 5.0;
-        }
-        return 1.0;
-      })
-      .style('opacity', d => {
-        if (d.value['Location'] === _self.selectedLocation) {
-          return 1.0;
-        }
-        return _self.baseOpacity;
-      })
-      .style('fill', d => {
-        if (d.value['Location'] === _self.selectedLocation) {
-          return 'blue';
-        }
-        return 'black';
-      });
-
-    var prevDataKey = {};
-
-    let lines = this.content.select('.lines')
-        .selectAll('.line').data(data, d => d.key);
-    lines.exit().remove();
-    const linesEnter = lines.enter().append('line')
-        .classed('line', true);
-    lines = lines.merge(linesEnter);
-
-    lines.attr('class', 'line')
-        .attr('x1', function (d, i) {
-          var retScale = _self.xScale(0);
-          if (d.value['Location'] in prevDataKey) {
-            var prevData = lines.data()[prevDataKey[d.value['Location']]];
-            retScale = _self.xScale(prevData.value['Timestamp']);
-          }
-          prevDataKey[d.value['Location']] = i;
-          return retScale;
-        })
-        .attr('y1', function (d, i) {
-          var retScale = _self.yScale(0);
-          if (d.value['Location'] in prevDataKey) {
-            var prevData = lines.data()[prevDataKey[d.value['Location']]];
-            retScale = _self.yScale(prevData.value['Rate']);
-          }
-          prevDataKey[d.value['Location']] = i;
-          return retScale;
-        })
-        .attr('x2', function (d, i) {
-          return _self.xScale(d.value['Timestamp']);
-        })
-        .attr('y2', function (d, i) {
-          return _self.yScale(d.value['Rate']);
-        })
-        .style('stroke', d => {
-          if (d.value['Location'] === _self.selectedLocation) {
-            return 'blue';
-          }
-          return 'black';
-        })
-        .style('stroke-width', 3)
-        .style('opacity', d => {
-          if (d.value['Location'] === _self.selectedLocation) {
-            return 1.0;
-          }
-          return _self.baseOpacity;
-        })
-        .on('mouseenter', function (d) {
-          window.controller.tooltip.show({
-            content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-            targetBounds: this.getBoundingClientRect(),
-            hideAfterMs: null
-          });
-        })
-        .on('mouseout', () => {
-          window.controller.tooltip.hide();
-        })
-        .on('click', (d) => {
-          this.selectedLocation = d.value['Location'];
-          this.render();
-        });
+    this.svgElement.select('.yAxisLabel')
+        .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
   setupZoomAndPan () {
     this.initialDragState = null;
@@ -274,7 +278,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       }
       return { begin, end };
     };
-    this.content
+    this.canvasElement
       .on('wheel', () => {
         const zoomFactor = 1.05 ** (normalizeWheel(d3.event).pixelY / 100);
         const originalWidth = this.linkedState.end - this.linkedState.begin;
@@ -303,12 +307,10 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         }
         const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
         const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-        this.content.selectAll('.dots, .lines')
-          .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
-        // Show the small spinner to indicate that some of the stuff the user
-        // sees may be inaccurate (will be hidden once the full draw() call
-        // happens)
-        this.content.select('.small.spinner').style('display', null);
+        // this.content.selectAll('.dots, .lines')
+        //   .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
+        this.drawWrapper(zoomCenter);
+        // this.updateTheView();
       }).call(d3.drag()
         .on('start', () => {
           this.initialDragState = {
@@ -331,19 +333,14 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
 
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
-          this.drawAxes();
+          // this.drawAxes();
 
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
             this.initialDragState.scale(actualBounds.begin);
-          this.content.selectAll('.dots, .lines')
-            .attr('transform', `translate(${shift}, 0)`);
-
-          // Show the small spinner to indicate that some of the stuff the user
-          // sees may be inaccurate (will be hidden once the full draw() call
-          // happens)
-          this.content.select('.small.spinner').style('display', null);
+          this.drawWrapper(shift);
+          // this.updateTheView();
 
           // d3's drag behavior captures + prevents updating the cursor, so do
           // that manually
@@ -360,5 +357,5 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         }));
   }
 }
-LineChartView.DOM_COUNT = 1;
-export default LineChartView;
+LineChartViewCanvas.DOM_COUNT = 1;
+export default LineChartViewCanvas;
