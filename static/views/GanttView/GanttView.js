@@ -547,17 +547,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           ctx.drawImage(this.buff.canvas, 0, 0);
           ctx.restore();
 
-          // ctx.globalCompositeOperation = "copy";
-          // ctx.drawImage(this.initialCanvas, shift, 0);
-          // // reset back to normal for subsequent operations.
-          // ctx.globalCompositeOperation = "source-over"
-
-
-
-          // console.log(ctx);
-          //
-          // this.content.selectAll('.bars, .links')
-          //   .attr('transform', `translate(${shift}, 0)`);
 
           // Show the small spinner to indicate that some of the stuff the user
           // sees may be inaccurate (will be hidden once the full draw() call
