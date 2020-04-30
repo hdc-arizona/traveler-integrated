@@ -28,7 +28,8 @@ class LinkedState extends Model {
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
     })();
-    this.startIntervalStream();
+    this.fetchGanttAggBins();
+    // this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
     this.updateHistogramNew();
@@ -52,6 +53,10 @@ class LinkedState extends Model {
     this._mode = newMode;
     this.trigger('changeMode');
   }
+  setGanttXResolution(value){
+    this.ganttXResolution = value;
+    this.fetchGanttAggBins();
+  }
   setHistogramResolution (value) {
     this.histogramResolution = value;
     this.updateHistogram();
@@ -72,7 +77,8 @@ class LinkedState extends Model {
     this.intervalWindow = [begin, end];
     this.updateHistogram();
     this.updateHistogramNew();
-    this.startIntervalStream();
+    this.fetchGanttAggBins();
+    // this.startIntervalStream();
     this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalWindow', { begin, end });
@@ -160,12 +166,27 @@ class LinkedState extends Model {
   get isLoadingHistogramNew () {
     return !this.caches.histogram;
   }
+  get isAggBinsLoaded(){
+    return !(this.caches.ganttAggBins == {});
+  }
+  getTimeStampFromBin(bin){
+    var offset = (this.caches.ganttAggBins.metadata.end - this.caches.ganttAggBins.metadata.begin)/ this.caches.ganttAggBins.metadata.bins
+
+    return this.caches.ganttAggBins.metadata.begin + (bin*offset)
+
+  }
   getCurrentIntervals () {
     // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
     const oldIntervals = this.caches.intervals || {};
     const newIntervals = this.caches.newIntervals || {};
     return Object.assign({}, oldIntervals, newIntervals);
+  }
+  getCurrentGanttAggregrateBins () {
+    // Combine old data with any new data that's streaming in for more
+    // seamless zooming / panning
+    const ganttAggBins = this.caches.ganttAggBins || {};
+    return Object.assign({}, ganttAggBins);
   }
   getCurrentTraceback () {
     // Returns a right-to-left list of intervals
@@ -227,6 +248,49 @@ class LinkedState extends Model {
       }
     }
     return linkData;
+  }
+  //we query intervals as a set of pre-aggregrated pixel-wide bins
+  // the drawing process is significantly simplified and sped up from this
+  fetchGanttAggBins(){
+    var bins = this.ganttXResolution;
+    var queryRange = this.intervalWindow[1] - this.intervalWindow[0];
+    // console.log(this.getCurrentHistogramData().domain)
+    if(typeof this.caches.histogramDomain !== 'undefined'){
+      // console.log(this.caches.histogramDomain[0],this.caches.histogramDomain[1])
+      var begin = (this.intervalWindow[0] - queryRange > this.caches.histogramDomain[0]) ? this.intervalWindow[0] - queryRange : this.intervalWindow[0];
+      var end = (this.intervalWindow[1] + queryRange < this.caches.histogramDomain[1]) ? this.intervalWindow[1] + queryRange : this.intervalWindow[1];
+    }
+    else{
+      var begin = this.intervalWindow[0];
+      var end = this.intervalWindow[1];
+    }
+
+    // console.log(bins, begin, end);
+
+    // console.log(begin, end);
+    //this function will replace the fetching of intervals
+    window.clearTimeout(this._ganttAggTimeout);
+    this._ganttAggTimeout = window.setTimeout(async () => {
+      //*****NetworkError on reload is here somewhere******//
+      if (bins){
+        const label = encodeURIComponent(this.label);
+        var endpt = `/datasets/${label}/ganttChartValues?bins=${bins}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`
+        fetch(endpt)
+          .then((response) => {
+            return response.json();
+          })
+          .then((data) => {
+            this.caches.ganttAggBins = JSON.parse(data);
+            this.trigger('intervalsUpdated');
+          })
+          .catch(err => {
+            err.text.then( errorMessage => {
+              console.warn(errorMessage)
+            });
+          });
+      }
+    }, 50);
+
   }
   startIntervalStream () {
     // Debounce the start of this expensive process...
@@ -350,7 +414,7 @@ class LinkedState extends Model {
     this._histogramTimeout = window.setTimeout(async () => {
       delete this.caches.histogram;
       delete this.caches.primitiveHistogram;
-      delete this.caches.histogramDomain;
+      // delete this.caches.histogramDomain; //**************** bad hack fix later *****************//
       delete this.caches.histogramMaxCount;
 
       const label = encodeURIComponent(this.label);

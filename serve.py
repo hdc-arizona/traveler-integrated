@@ -11,10 +11,13 @@ from fastapi import FastAPI, File, UploadFile, HTTPException  # pylint: disable=
 from pydantic import BaseModel  # pylint: disable=import-error
 from starlette.staticfiles import StaticFiles  # pylint: disable=import-error
 from starlette.requests import Request  # pylint: disable=import-error
-from starlette.responses import RedirectResponse, StreamingResponse  # pylint: disable=import-error
+from starlette.responses import RedirectResponse, StreamingResponse, JSONResponse #pylint: disable=import-error
+from starlette.middleware.cors import CORSMiddleware
 from data_store import DataStore, ClientLogger
 from profiling_tools.profilier import Profilier
 import cProfile, pstats, io
+
+
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
@@ -32,6 +35,23 @@ app = FastAPI(
     version='0.1.0'
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
+
+# origins = [
+#     "http://localhost.tiangolo.com",
+#     "https://localhost.tiangolo.com",
+#     "http://localhost",
+#     "http://localhost:8080",
+#     "*"
+# ]
+#
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
 
 prf = Profilier()
 profile = False
@@ -489,8 +509,29 @@ def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = Non
     else:
         ret = db[label]['sparseUtilizationList']['metrics'][metric_type].calcUtilizationForLocation(bins, begin, end, location, False)
 
-    return ret
+    ret = {"location":location, "begin":begin, "end":end, "return":ret}
 
+    # print(type(ret), type(json.dumps(ret)), json.dumps(ret))
+
+    return json.dumps(ret)
+
+
+@app.get('/datasets/{label}/ganttChartValues')
+def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    ret = {}
+    ret['locationList'] = db[label]['sparseUtilizationList'].calcGanttHistogram(bins, begin, end)
+
+    ret['metadata'] = {}
+    ret['metadata']['begin'] = begin
+    ret['metadata']['end'] = end
+    ret['metadata']['bins'] = bins
+
+    return json.dumps(ret)
 
 #####################
 # Profilier Wrappers#

@@ -45,6 +45,16 @@ class SparseUtilizationList():
         return
 
     # Calculates utilization histogram for all intervals regardless of location
+    def calcGanttHistogram(self, bins=100, begin=None, end=None):
+        listOfLocations = []
+
+        for location in self.locationDict:
+            temp = self.calcUtilizationForLocation(bins, begin, end, location)
+            listOfLocations.append({"location":location, "histogram":temp})
+
+        return listOfLocations
+
+    # Calculates utilization histogram for all intervals regardless of location
     def calcUtilizationHistogram(self, bins=100, begin=None, end=None, isInterval=True):
 
         array = []
@@ -55,7 +65,7 @@ class SparseUtilizationList():
                 isFirst = False
                 array = temp
             for i in range(bins):
-                array[i][2] = array[i][2] + temp[i][2]
+                array[i] = array[i] + temp[i]
 
         return array
 
@@ -120,10 +130,8 @@ class SparseUtilizationList():
                 val = (current['util'] - prev['util']) / (current['index'] - prev['index'])
             current['integral'] = val
             prev = current
-            prettyHistogram.append([histogram[i-1]['index'], histogram[i]['index'], histogram[i]['integral'], Location])
+            prettyHistogram.append(histogram[i]['integral'])
         return prettyHistogram
-
-
 # In charge of loading interval data into our integral list
 # I have no idea how we want to load interval data :/
 async def loadSUL(label, db, log=logToConsole):
