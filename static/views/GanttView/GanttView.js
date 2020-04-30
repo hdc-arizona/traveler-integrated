@@ -239,12 +239,12 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
 
 
-        for (var location in aggBins.locationList){
-          var loc_offset = this.yScale(parseInt(aggBins.locationList[location].location));
-          for (var bucket in aggBins.locationList[location].histogram){
+        for (var location in aggBins.data){
+          var loc_offset = this.yScale(parseInt(aggBins.data[location].location));
+          for (var bucket in aggBins.data[location].histogram){
 
-            var bucket_pix_offset = localXScale(this.linkedState.getTimeStampFromBin(bucket));
-            var pixel = aggBins.locationList[location].histogram[bucket];
+            var bucket_pix_offset = localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
+            var pixel = aggBins.data[location].histogram[bucket];
             if (pixel === 1){
               ctx.fillStyle = borderColor;
               ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);

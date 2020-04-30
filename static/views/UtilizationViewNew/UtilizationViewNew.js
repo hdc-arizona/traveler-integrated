@@ -77,6 +77,7 @@ class UtilizationViewNew extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gold
     } else if (data.error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
+      console.log(data)
       // Set / update the scales
       this.xScale.domain(data.domain);
       this.yScale.domain([0, data.maxCount]);

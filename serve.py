@@ -489,10 +489,17 @@ def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = Non
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
 
+    ret = {}
+
     if location is None:
-        ret = db[label]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
+        ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
     else:
-        ret = db[label]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
+        ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
+
+    ret['metadata'] = {}
+    ret['metadata']['begin'] = begin
+    ret['metadata']['end'] = end
+    ret['metadata']['bins'] = bins
 
     return ret
 
@@ -524,7 +531,7 @@ def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
         end = db[label]['meta']['intervalDomain'][1]
 
     ret = {}
-    ret['locationList'] = db[label]['sparseUtilizationList'].calcGanttHistogram(bins, begin, end)
+    ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcGanttHistogram(bins, begin, end)
 
     ret['metadata'] = {}
     ret['metadata']['begin'] = begin

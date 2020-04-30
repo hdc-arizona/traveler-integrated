@@ -132,11 +132,11 @@ class LinkedState extends Model {
         views['TreeView'] = true;
       } else if (fileType === 'otf2') {
         views['GanttView'] = true;
-        views['UtilizationView'] = true;
-        views['LineChartView'] = true;
+        views['UtilizationView'] = false;
+        views['LineChartView'] = false;
         views['LineChartViewNew'] = false;
-        views['LineChartViewCanvas'] = true;
-        views['UtilizationViewNew'] = false;
+        views['LineChartViewCanvas'] = false;
+        views['UtilizationViewNew'] = true;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -169,10 +169,10 @@ class LinkedState extends Model {
   get isAggBinsLoaded(){
     return !(this.caches.ganttAggBins == {});
   }
-  getTimeStampFromBin(bin){
-    var offset = (this.caches.ganttAggBins.metadata.end - this.caches.ganttAggBins.metadata.begin)/ this.caches.ganttAggBins.metadata.bins
+  getTimeStampFromBin(bin, metadata){
+    var offset = (metadata.end - metadata.begin)/ metadata.bins;
 
-    return this.caches.ganttAggBins.metadata.begin + (bin*offset)
+    return metadata.begin + (bin*offset);
 
   }
   getCurrentIntervals () {
@@ -470,12 +470,16 @@ class LinkedState extends Model {
       }
       delete this.histogramError;
 
+      console.log(this.newCaches.histogram);
+
       let maxCount = 0;
       const domain = [Infinity, -Infinity];
-      for (const [begin, end, count] of this.newCaches.histogram) {
-        maxCount = Math.max(maxCount, count);
-        domain[0] = Math.min(begin, domain[0]);
-        domain[1] = Math.max(end, domain[1]);
+      let data = this.newCaches.histogram.data;
+      let metadata = this.newCaches.histogram.metadata;
+      for (let bin in data) {
+        maxCount = Math.max(maxCount, data[bin]);
+        domain[0] = Math.min(this.getTimeStampFromBin(bin, metadata), domain[0]);
+        domain[1] = Math.max(this.getTimeStampFromBin(bin+1, metadata), domain[1]);
       }
       this.newCaches.histogramDomain = domain;
       this.newCaches.histogramMaxCount = maxCount;

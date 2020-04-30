@@ -192,21 +192,23 @@ class Controller {
           componentState: { label: linkedState.label }
         }, {
           type: 'component',
-          componentName: 'UtilizationView',
+          componentName: 'UtilizationViewNew',
           componentState: { label: linkedState.label }
+        }
         // }, {
         //   type: 'component',
         //   componentName: 'UtilizationViewNew',
         //   componentState: { label: linkedState.label }
-        }, {
-          type: 'component',
-          componentName: 'LineChartView',
-          componentState: { label: linkedState.label }
-        }, {
-          type: 'component',
-          componentName: 'LineChartViewCanvas',
-          componentState: { label: linkedState.label }
-        }]
+        // }, {
+        //   type: 'component',
+        //   componentName: 'LineChartView',
+        //   componentState: { label: linkedState.label }
+        // }, {
+        //   type: 'component',
+        //   componentName: 'LineChartViewCanvas',
+        //   componentState: { label: linkedState.label }
+        // }
+      ]
       });
     }
     // Put all code views into a stack, and share a column with a tree
