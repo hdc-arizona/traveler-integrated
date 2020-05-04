@@ -77,16 +77,25 @@ class UtilizationViewNew extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gold
     } else if (data.error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
-      console.log(data)
       // Set / update the scales
-      this.xScale.domain(data.domain);
+
+      this.xScale.domain([data.histogram.metadata.begin, data.histogram.metadata.end]);
+
+
       this.yScale.domain([0, data.maxCount]);
 
       // Update the axis
       this.drawAxes();
 
+      let boundedData = []
+      for (const [i,datum] of data.histogram.data.entries()){
+        boundedData.push([this.linkedState.getTimeStampFromBin(i, data.histogram.metadata), this.linkedState.getTimeStampFromBin(i+1, data.histogram.metadata), datum])
+      }
+
+
+
       // Update the overview paths
-      this.drawPaths(this.content.select('.overview'), data.histogram);
+      this.drawPaths(this.content.select('.overview'), boundedData);
 
       // // Update the currently selected primitive paths
       // const selectedPrimitive = this.content.select('.selectedPrimitive');
@@ -126,6 +135,7 @@ class UtilizationViewNew extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gold
       .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
   drawPaths (container, histogram) {
+
     const outlinePathGenerator = d3.line()
       .x(d => this.xScale((d[0] + d[1]) / 2))
       .y(d => this.yScale(d[2]));

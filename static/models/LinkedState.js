@@ -470,8 +470,6 @@ class LinkedState extends Model {
       }
       delete this.histogramError;
 
-      console.log(this.newCaches.histogram);
-
       let maxCount = 0;
       const domain = [Infinity, -Infinity];
       let data = this.newCaches.histogram.data;
