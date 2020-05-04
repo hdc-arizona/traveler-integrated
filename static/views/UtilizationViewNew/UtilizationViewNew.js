@@ -92,21 +92,19 @@ class UtilizationViewNew extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gold
         boundedData.push([this.linkedState.getTimeStampFromBin(i, data.histogram.metadata), this.linkedState.getTimeStampFromBin(i+1, data.histogram.metadata), datum])
       }
 
-
-
       // Update the overview paths
       this.drawPaths(this.content.select('.overview'), boundedData);
 
       // // Update the currently selected primitive paths
-      // const selectedPrimitive = this.content.select('.selectedPrimitive');
-      // selectedPrimitive.style('display', data.primitiveHistogram ? null : 'none');
-      // if (data.primitiveHistogram) {
-      //   selectedPrimitive.select('.area')
-      //     .style('fill', this.linkedState.selectionColor);
-      //   selectedPrimitive.select('.outline')
-      //     .style('stroke', this.linkedState.selectionColor);
-      //   this.drawPaths(selectedPrimitive, data.primitiveHistogram);
-      // }
+      const selectedPrimitive = this.content.select('.selectedPrimitive');
+      selectedPrimitive.style('display', data.primitiveHistogram ? null : 'none');
+      if (data.primitiveHistogram) {
+        selectedPrimitive.select('.area')
+          .style('fill', this.linkedState.selectionColor);
+        selectedPrimitive.select('.outline')
+          .style('stroke', this.linkedState.selectionColor);
+        this.drawPaths(selectedPrimitive, data.primitiveHistogram);
+      }
 
       // Update the brush
       this.drawBrush();
