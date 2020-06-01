@@ -11,7 +11,6 @@ import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 import LineChartView from './views/LineChartView/LineChartView.js';
-import LineChartViewCanvas from './views/LineChartViewCanvas/LineChartViewCanvas.js';
 import ProcMetricView from './views/ProcMetricView/ProcMetricView.js';
 
 const viewClassLookup = {
@@ -23,7 +22,6 @@ const viewClassLookup = {
   GanttView,
   UtilizationView,
   LineChartView,
-  LineChartViewCanvas,
   ProcMetricView
 };
 
@@ -176,7 +174,6 @@ class Controller {
       delete views.GanttView;
       delete views.UtilizationView;
       delete views.LineChartView;
-      delete views.LineChartViewCanvas;
       delete views.ProcMetricView;
       newLayout.content.push({
         type: 'column',
@@ -188,13 +185,9 @@ class Controller {
           type: 'component',
           componentName: 'UtilizationView',
           componentState: { label: linkedState.label }
-        // }, {
-        //   type: 'component',
-        //   componentName: 'LineChartView',
-        //   componentState: { label: linkedState.label }
         }, {
           type: 'component',
-          componentName: 'LineChartViewCanvas',
+          componentName: 'LineChartView',
           componentState: { label: linkedState.label }
         }
       ]

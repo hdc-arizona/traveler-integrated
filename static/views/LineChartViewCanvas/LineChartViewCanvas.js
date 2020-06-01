@@ -86,7 +86,6 @@ class LineChartViewCanvas extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gol
     this.yScale.domain([10,0]);//remove this later
 
     // Create a view-specific clipPath id, as there can be more than one
-    // LineChartViewCanvas in the app
     const clipId = this.uniqueDomId + 'clip';
     this.content.select('clipPath')
         .attr('id', clipId);
