@@ -4,11 +4,10 @@ import LinkedMixin from '../common/LinkedMixin.js';
 import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
-import CanvasViewMixin from "../common/CanvasViewMixin.js";
 import SvgViewMixin from "../common/SvgViewMixin.js";
 
 // d3 canvas source reference - https://github.com/xoor-io/d3-canvas-example
-class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(GoldenLayoutView))) {
+class LineChartViewCanvas extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/LineChartViewCanvas/style.less' },
@@ -24,18 +23,14 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this.canvasElement = null;
     this.canvasContext = null;
 
-    this.stream = null;
-    this.cache = {};
-    this.newCache = null;
-    this.metricValueCount = 0;
-    this.isMetricLoading = false;
-    this.hoverIndex = -1;
     this.curMetric = 'PAPI_TOT_CYC';
     if(this.linkedState.selectedProcMetric.startsWith('PAPI')) {
       this.curMetric = this.linkedState.selectedProcMetric;
     }
     this.selectedLocation = '1';
     this.baseOpacity = 0.3;
+    this.wasRendered = false;
+    this.initialDragState = null;
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `LineChartViewCanvas${LineChartViewCanvas.DOM_COUNT}`;
@@ -45,7 +40,7 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     return super.isLoading || this.linkedState.isLoadingIntervals;
   }
   get isEmpty () {
-    return this.error || this.linkedState.loadedIntervalCount === 0;
+    return this.error || !this.linkedState.isMetricBinsLoaded(this.curMetric);
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
@@ -65,7 +60,9 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     var yOffset = (maxMin['max'] - maxMin['min']) / 10;
     this.yScale.domain([maxMin['max'] + yOffset, maxMin['min'] - yOffset]);
   }
-
+  getSpilloverWidth(width){
+    return width*3;
+  }
   setup () {
     super.setup();
 
@@ -80,10 +77,13 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     this._bounds = this.getChartBounds();
     this.content.select('.chart')
         .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
-    console.log("setup called");
+    this.linkedState.setMetricXResolution(this.getSpilloverWidth(this._bounds.width));
+
     this.svgElement = this.content.select('.svg-plot');
     this.canvasElement = this.content.select('.canvas-plot');
     this.canvasContext = this.canvasElement.node().getContext('2d');
+
+    this.yScale.domain([10,0]);//remove this later
 
     // Create a view-specific clipPath id, as there can be more than one
     // LineChartViewCanvas in the app
@@ -99,78 +99,26 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
         });
 
     var __self = this;
+    this.xScale.domain(this.linkedState.intervalWindow);
+    this.drawAxes();
     this.setupZoomAndPan();
     // Update scales whenever something changes the brush
-    this.linkedState.on('newIntervalWindow', () => {
-      // console.log("new interval triggered");
-      __self.updateTheView();
-    });
-    this.updateTheView();
+    const justFullRender = () => { __self.updateTheView(); };
+    this.linkedState.on('newIntervalWindow', justFullRender);
+    // this.linkedState.on('metricsUpdated', justFullRender);
+    this.linkedState.on('primitiveSelected', justFullRender);
+    this.linkedState.on('intervalStreamFinished', justFullRender);
+    this.linkedState.on('tracebackStreamFinished', justFullRender);
   }
   updateTheView() {
-    this.getData();
+    // this.getData();
     this.xScale.domain(this.linkedState.intervalWindow);
-  }
-  getData () {
-    // Debounce the start of this expensive process...
-    // (but flag that we're loading)
-    window.clearTimeout(this._resizeTimeout);
-    this._resizeTimeout = window.setTimeout(async () => {
-      const label = encodeURIComponent(this.layoutState.label);
-      // const intervalWindow = this.linkedState.intervalWindow;
-      const self = this;
-      this.newCache = {};
-      this.waitingOnIncrementalRender = false;
-      var maxY = Number.MIN_VALUE;
-      var minY = Number.MAX_VALUE;
-      this.metricValueCount = 0;
-      var begin = Math.floor(this.linkedState.intervalWindow[0]);
-      var end = Math.ceil(this.linkedState.intervalWindow[1]);
-      const currentStream = this.stream = oboe(`/datasets/${label}/newMetricData?bins=1000&metric_type=${this.curMetric}&begin=${begin}&end=${end}`)
-          .fail(error => {
-            this.metricValueCount = 0;
-            this.error = error;
-            // console.log(error);
-          })
-          .node('!.*', function (metricList) {
-            if (currentStream !== self.stream) {
-              // A different stream has been started; abort this one
-              this.abort();
-            } else {
-              self.isMetricLoading = true;
-              var val = metricList[2];
-              if(self.newCache[metricList[1]] === undefined) {
-                self.newCache[metricList[1]] = {};
-              }
-              self.newCache[metricList[1]][metricList[3]] = val;
-              maxY = Math.max(maxY, val);
-              minY = Math.min(minY, val);
-              self.metricValueCount++;
-              if (!self.waitingOnIncrementalRender) {
-                // self.render() is debounced; this converts it to throttling,
-                // rate-limiting incremental refreshes by this.debounceWait
-                self.render();
-                self.waitingOnIncrementalRender = true;
-              }
-            }
-          })
-          .done(() => {
-            this.stream = null;
-            this.cache = this.newCache;
-            this.newCache = null;
-            this.isMetricLoading = false;
-            // console.log("cache for proc metric loaded: " + self.metricValueCount);
-            self.setYDomain({'max':maxY, 'min':minY});
-            this.render();
-          });
-    }, 100);
+    this.drawAxes();
+    this.render();
   }
   draw () {
     super.draw();
-    console.log("draw called");
-
-    // this.canvasContext.fillStyle = 'green';
-    // this.canvasContext.fillRect(0, 0, 80, 80);
+    console.log('draw called ' + this.curMetric);
     if (this.isHidden) {
       return;
     } else if (this.isEmpty) {
@@ -188,10 +136,15 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
     // immediately-drawn things like drawAxes that get executed repeatedly by
     // scrolling / panning)
     this._bounds = this.getChartBounds();
-    this.canvasElement.attr('width', this._bounds.width)
+    this.linkedState.setMetricXResolution(this.getSpilloverWidth(this._bounds.width));
+
+    this.content.select('.canvas-container')
+        .attr('width', this.getSpilloverWidth(this._bounds.width))
         .attr('height', this._bounds.height)
-        .style('margin-left', this.margin.left + 'px')
-        .style('margin-top', this.margin.top + 'px');
+        .attr('transform', `translate(${-this._bounds.width}, 0)`);
+    this.canvasElement.attr('width', this.getSpilloverWidth(this._bounds.width))
+        .attr('height', this._bounds.height);
+
     // Update whether we're showing the spinner
     this.drawSpinner();
     // Update the clip rect
@@ -200,36 +153,49 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
 
     // Update the axes (also updates scales)
     this.drawAxes();
-    this.drawWrapper(0);
-    // this.drawLines(data);
+    this.drawWrapper();
   }
-  drawWrapper(shift) {
+  drawWrapper() {
+    if(this.initialDragState)return;
+    var localXScale = d3.scaleLinear();
+    localXScale.domain(this.xScale.domain());
+    localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
     this._bounds = this.getChartBounds();
-    // Combine old data with any new data that's streaming in
-    const data = d3.entries(Object.assign({}, this.cache, this.newCache || {}));
-    console.log("clearing the data: " + data.length);
+    const data = this.linkedState.getCurrentMetricBins(this.curMetric);
+
+    var maxY = Number.MIN_VALUE;
+    var minY = Number.MAX_VALUE;
+
+    for (var i = 0; i < data.data.length; i++) {
+      var t = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
+      if(t < this._bounds.width) continue;
+      if(t > (2*this._bounds.width)) break;
+      var d = data.data[i];
+      maxY = Math.max(maxY, d);
+      minY = Math.min(minY, d);
+    }
+    this.setYDomain({'max':maxY, 'min':minY});
+
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
-    data.forEach((d, i) => {
-      var preD = d;
+    data.data.forEach((d, i) => {
+      var x = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
+      var dd = {'x': x, 'y': d};
+      var preD = dd;
       if(i>0) {
-        preD = data[i-1];
+        var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
+        preD = {'x': xx, 'y':data.data[i-1]};
       }
-      var k = Object.keys(d.value);
-      for(const loc of k) {
-        this.drawLines(d, preD, shift, loc);
-      }
-      // d.value.forEach(location => {
-      //   this.drawLines(d, preD, shift, location);
-      // });
+      this.drawLines(dd, preD);
     });
+    this.wasRendered = true;
   }
-  drawLines (d, preD, shift, location) {
+  drawLines (d, preD) {
     this.canvasContext.beginPath();
     this.canvasContext.strokeStyle = 'black';
-    this.canvasContext.moveTo(this.xScale(parseInt(preD.key))+parseInt(shift), this.yScale(preD.value[location]));
-    this.canvasContext.lineTo(this.xScale(parseInt(d.key))+parseInt(shift), this.yScale(d.value[location]));
+    this.canvasContext.moveTo(preD.x, this.yScale(preD.y));
+    this.canvasContext.lineTo(d.x, this.yScale(d.y));
     this.canvasContext.stroke();
   }
   drawSpinner () {
@@ -278,13 +244,18 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
       }
       return { begin, end };
     };
+
     this.canvasElement
       .on('wheel', () => {
+
         const zoomFactor = 1.05 ** (normalizeWheel(d3.event).pixelY / 100);
         const originalWidth = this.linkedState.end - this.linkedState.begin;
         // Clamp the width to a min of 10ms, and the largest possible size
         let targetWidth = Math.max(zoomFactor * originalWidth, 10);
         targetWidth = Math.min(targetWidth, this.linkedState.endLimit - this.linkedState.beginLimit);
+
+        const overflowAdjustedMousedScreenPoint = d3.event.clientX - this._bounds.left - this.margin.left + this._bounds.width; //connors hack fix
+
         // Compute the new begin / end points, centered on where the user is mousing
         const mousedScreenPoint = d3.event.clientX - this._bounds.left - this.margin.left;
         const mousedPosition = this.xScale.invert(mousedScreenPoint);
@@ -299,18 +270,26 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
         // For responsiveness, draw the axes immediately (the debounced, full
         // render() triggered by changing linkedState may take a while)
         this.drawAxes();
-
         // Patch a temporary scale transform to the bars / links layers (this
         // gets removed by full drawBars() / drawLinks() calls)
-        if (!this.content.select('.dots').attr('transform')) {
-          latentWidth = originalWidth;
-        }
+        latentWidth = originalWidth;
         const actualZoomFactor = latentWidth / (actualBounds.end - actualBounds.begin);
-        const zoomCenter = (1 - actualZoomFactor) * mousedScreenPoint;
-        // this.content.selectAll('.dots, .lines')
-        //   .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
-        this.drawWrapper(zoomCenter);
-        // this.updateTheView();
+        const zoomCenter = (1 - actualZoomFactor) * overflowAdjustedMousedScreenPoint;
+
+        var buffer = document.createElement("CANVAS");
+        buffer.height = this.canvasElement.attr('height');
+        buffer.width = this.canvasElement.attr('width');
+
+        this.buff = buffer.getContext("2d");
+        this.buff.drawImage(this.canvasContext.canvas, 0, 0);
+
+        this.canvasContext.save();
+        this.canvasContext.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
+        this.canvasContext.translate(zoomCenter, 0);
+        this.canvasContext.scale(actualZoomFactor, 1);
+        this.canvasContext.drawImage(this.buff.canvas, 0, 0);
+        this.canvasContext.restore();
+
       }).call(d3.drag()
         .on('start', () => {
           this.initialDragState = {
@@ -321,8 +300,32 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
               .domain(this.xScale.domain())
               .range(this.xScale.range())
           };
+          var buffer = document.createElement("CANVAS");
+          buffer.height = this.canvasElement.attr('height');
+          buffer.width = this.canvasElement.attr('width');
+
+          this.buff = buffer.getContext("2d");
+          this.buff.drawImage(this.canvasContext.canvas, 0, 0);
         })
         .on('drag', () => {
+          if(this.wasRendered === true) {
+            this.initialDragState = {
+              begin: this.linkedState.begin,
+              end: this.linkedState.end,
+              x: this.xScale.invert(d3.event.x),
+              scale: d3.scaleLinear()
+                  .domain(this.xScale.domain())
+                  .range(this.xScale.range())
+            };
+            var buffer = document.createElement("CANVAS");
+            buffer.height = this.canvasElement.attr('height');
+            buffer.width = this.canvasElement.attr('width');
+
+            this.buff = buffer.getContext("2d");
+            this.buff.drawImage(this.canvasContext.canvas, 0, 0);
+            this.wasRendered = false;
+          }
+
           const mousedPosition = this.initialDragState.scale.invert(d3.event.x);
           const dx = this.initialDragState.x - mousedPosition;
           const begin = this.initialDragState.begin + dx;
@@ -333,25 +336,31 @@ class LineChartViewCanvas extends CursoredViewMixin(CanvasViewMixin(LinkedMixin(
 
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
-          // this.drawAxes();
+          this.drawAxes();
 
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)
           const shift = this.initialDragState.scale(this.initialDragState.begin) -
             this.initialDragState.scale(actualBounds.begin);
-          this.drawWrapper(shift);
-          // this.updateTheView();
+
+          this.canvasContext.save();
+          this.canvasContext.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
+          this.canvasContext.translate(shift, 0);
+          this.canvasContext.drawImage(this.buff.canvas, 0, 0);
+          this.canvasContext.restore();
 
           // d3's drag behavior captures + prevents updating the cursor, so do
           // that manually
           this.linkedState.moveCursor(mousedPosition);
           this.updateCursor();
+          this.linkedState.setIntervalWindow(clampWindow(begin, end));
         })
         .on('end', () => {
           const dx = this.initialDragState.x - this.initialDragState.scale.invert(d3.event.x);
           const begin = this.initialDragState.begin + dx;
           const end = this.initialDragState.end + dx;
           this.initialDragState = null;
+          this.buff = null;
 
           this.linkedState.setIntervalWindow(clampWindow(begin, end));
         }));

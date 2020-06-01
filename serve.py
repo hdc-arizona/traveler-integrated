@@ -490,17 +490,11 @@ def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = Non
         end = db[label]['meta']['intervalDomain'][1]
 
     ret = {}
-
     if location is None:
         ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
     else:
         ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
-
-    ret['metadata'] = {}
-    ret['metadata']['begin'] = begin
-    ret['metadata']['end'] = end
-    ret['metadata']['bins'] = bins
-
+    ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 
 
@@ -511,16 +505,13 @@ def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = Non
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
 
+    ret = {}
     if location is None:
-        ret = db[label]['sparseUtilizationList']['metrics'][metric_type].calcMetricUtilization(bins, begin, end)
+        ret['data'] = db[label]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end)
     else:
-        ret = db[label]['sparseUtilizationList']['metrics'][metric_type].calcUtilizationForLocation(bins, begin, end, location, False)
-
-    ret = {"location":location, "begin":begin, "end":end, "return":ret}
-
-    # print(type(ret), type(json.dumps(ret)), json.dumps(ret))
-
-    return json.dumps(ret)
+        ret['data'] = db[label]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end, location)
+    ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
+    return ret
 
 
 @app.get('/datasets/{label}/ganttChartValues')

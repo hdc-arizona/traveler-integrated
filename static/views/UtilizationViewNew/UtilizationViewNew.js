@@ -16,7 +16,7 @@ class UtilizationViewNew extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gold
     this.yScale = d3.scaleLinear();
   }
   get isLoading () {
-    return super.isLoading || this.linkedState.isLoadingHistogramNew;
+    return super.isLoading || this.linkedState.isLoadingHistogram;
   }
   get isEmpty () {
     return !!this.linkedState.histogramError;
@@ -70,14 +70,14 @@ class UtilizationViewNew extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gold
   draw () {
     super.draw();
 
-    const data = this.linkedState.getCurrentHistogramDataNew();
+    const data = this.linkedState.getCurrentHistogramData();
 
     if (this.isHidden || this.isLoading) {
       return; // eslint-disable-line no-useless-return
     } else if (data.error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
-      console.log(data)
+      // console.log(data);
       // Set / update the scales
       this.xScale.domain(data.domain);
       this.yScale.domain([0, data.maxCount]);
@@ -127,18 +127,18 @@ class UtilizationViewNew extends CursoredViewMixin(SvgViewMixin(LinkedMixin(Gold
   }
   drawPaths (container, histogram) {
     const outlinePathGenerator = d3.line()
-      .x(d => this.xScale((d[0] + d[1]) / 2))
-      .y(d => this.yScale(d[2]));
+      .x((d, i) => this.xScale(this.linkedState.getTimeStampFromBin(i, histogram.metadata)))
+      .y(d => this.yScale(d));
     container.select('.outline')
-      .datum(histogram)
+      .datum(histogram.data)
       .attr('d', outlinePathGenerator);
 
     const areaPathGenerator = d3.area()
-      .x(d => this.xScale((d[0] + d[1]) / 2))
-      .y1(d => this.yScale(d[2]))
+      .x((d, i) => this.xScale(this.linkedState.getTimeStampFromBin(i, histogram.metadata)))
+      .y1(d => this.yScale(d))
       .y0(this.yScale(0));
     container.select('.area')
-      .datum(histogram)
+      .datum(histogram.data)
       .attr('d', areaPathGenerator);
   }
   setupBrush () {

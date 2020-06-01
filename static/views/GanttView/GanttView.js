@@ -29,7 +29,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
   }
   get isEmpty () {
     return this.error || !this.linkedState.isAggBinsLoaded;
-    // return this.error || this.linkedState.loadedIntervalCount === 0;
   }
   getChartBounds () {
     const bounds = this.getAvailableSpace();
@@ -218,7 +217,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       var localXScale = d3.scaleLinear();
 
       localXScale.domain(this.xScale.domain());
-      localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width])
+      localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
       /***** DONT FORGET TO ADD FLAG FOR IF USING NATIVE OR OVERLOADED VIEW SCALE****/
 
@@ -564,6 +563,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           const begin = this.initialDragState.begin + dx;
           const end = this.initialDragState.end + dx;
           this.initialDragState = null;
+          this.buff = null;
 
           this.linkedState.setIntervalWindow(clampWindow(begin, end));
         }));

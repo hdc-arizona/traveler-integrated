@@ -11,12 +11,6 @@ class SparseUtilizationList():
         self.locationDict = dict()
         self.cLocationDict = dict()
 
-    # def __getitem__(self, loc):
-    #     return self.locationDict[loc]
-    #
-    # def __setitem__(self, loc, val):
-    #     self.locationDict[loc] = val
-
     def getCLocation(self, loc):
         return self.cLocationDict[loc]
 
@@ -56,7 +50,6 @@ class SparseUtilizationList():
 
     # Calculates utilization histogram for all intervals regardless of location
     def calcUtilizationHistogram(self, bins=100, begin=None, end=None, isInterval=True):
-
         array = []
         isFirst = True
         for location in self.locationDict:
@@ -69,16 +62,18 @@ class SparseUtilizationList():
 
         return array
 
-    # Calculates utilization histogram for all intervals regardless of location
-    def calcMetricUtilization(self, bins=100, begin=None, end=None):
+    # Calculates metric histogram
+    def calcMetricHistogram(self, bins=100, begin=None, end=None, location=None):
         array = []
         isFirst = True
+        if location is not None:
+            return self.calcUtilizationForLocation(bins, begin, end, location, False)
         for location in self.locationDict:
             temp = self.calcUtilizationForLocation(bins, begin, end, location, False)
             if isFirst is True:
                 isFirst = False
                 array = temp
-            else:
+            for i in range(bins):
                 array = array + temp
 
         return array
@@ -109,10 +104,6 @@ class SparseUtilizationList():
         histogram_counter = ffi.new("long long[]", histogram_length)
         histogram_util = ffi.new("double[]", histogram_length)
 
-        # critical_points = ffi.new("int[]", critical_length)
-        # for i in range(critical_length):
-        #     critical_points[i] = criticalPts[i]
-
         cLocationStruct = self.getCLocation(Location)
         location_index = ffi.cast("long long*", cLocationStruct['index'].ctypes.data)
         location_counter = ffi.cast("long long*", cLocationStruct['counter'].ctypes.data)
@@ -132,6 +123,8 @@ class SparseUtilizationList():
             prev = current
             prettyHistogram.append(histogram[i]['integral'])
         return prettyHistogram
+
+
 # In charge of loading interval data into our integral list
 # I have no idea how we want to load interval data :/
 async def loadSUL(label, db, log=logToConsole):

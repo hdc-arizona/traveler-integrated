@@ -9,7 +9,6 @@ import PythonView from './views/CodeView/PythonView.js';
 import PhyslView from './views/CodeView/PhyslView.js';
 import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
-import UtilizationViewNew from './views/UtilizationViewNew/UtilizationViewNew.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 import LineChartView from './views/LineChartView/LineChartView.js';
 import LineChartViewNew from './views/LineChartViewNew/LineChartViewNew.js';
@@ -24,7 +23,6 @@ const viewClassLookup = {
   PhyslView,
   GanttView,
   UtilizationView,
-  UtilizationViewNew,
   LineChartView,
   LineChartViewNew,
   LineChartViewCanvas,
@@ -179,7 +177,6 @@ class Controller {
     if (views.GanttView && views.UtilizationView) {
       delete views.GanttView;
       delete views.UtilizationView;
-      delete views.UtilizationViewNew;
       delete views.LineChartView;
       delete views.LineChartViewNew;
       delete views.LineChartViewCanvas;
@@ -192,22 +189,17 @@ class Controller {
           componentState: { label: linkedState.label }
         }, {
           type: 'component',
-          componentName: 'UtilizationViewNew',
+          componentName: 'UtilizationView',
           componentState: { label: linkedState.label }
-        }
-        // }, {
-        //   type: 'component',
-        //   componentName: 'UtilizationViewNew',
-        //   componentState: { label: linkedState.label }
         // }, {
         //   type: 'component',
         //   componentName: 'LineChartView',
         //   componentState: { label: linkedState.label }
-        // }, {
-        //   type: 'component',
-        //   componentName: 'LineChartViewCanvas',
-        //   componentState: { label: linkedState.label }
-        // }
+        }, {
+          type: 'component',
+          componentName: 'LineChartViewCanvas',
+          componentState: { label: linkedState.label }
+        }
       ]
       });
     }
