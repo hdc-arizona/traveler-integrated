@@ -11,7 +11,6 @@ import GanttView from './views/GanttView/GanttView.js';
 import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 import LineChartView from './views/LineChartView/LineChartView.js';
-import LineChartViewNew from './views/LineChartViewNew/LineChartViewNew.js';
 import LineChartViewCanvas from './views/LineChartViewCanvas/LineChartViewCanvas.js';
 import ProcMetricView from './views/ProcMetricView/ProcMetricView.js';
 
@@ -24,7 +23,6 @@ const viewClassLookup = {
   GanttView,
   UtilizationView,
   LineChartView,
-  LineChartViewNew,
   LineChartViewCanvas,
   ProcMetricView
 };
@@ -178,7 +176,6 @@ class Controller {
       delete views.GanttView;
       delete views.UtilizationView;
       delete views.LineChartView;
-      delete views.LineChartViewNew;
       delete views.LineChartViewCanvas;
       delete views.ProcMetricView;
       newLayout.content.push({
