@@ -92,10 +92,10 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.content.select('.clippedStuff')
         .attr('clip-path', `url(#${clipId})`);
     // this.drawClip();
-    this.content.select('.canvas-plot')
-        .on('click', () => {
-          console.log("background clicked");
-        });
+    // this.content.select('.canvas-plot')
+    //     .on('click', () => {
+    //       console.log("background clicked");
+    //     });
 
     var __self = this;
     this.xScale.domain(this.linkedState.intervalWindow);
@@ -117,7 +117,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
   }
   draw () {
     super.draw();
-    console.log('draw called ' + this.curMetric);
+    // console.log('draw called ' + this.curMetric);
     if (this.isHidden) {
       return;
     } else if (this.isEmpty) {

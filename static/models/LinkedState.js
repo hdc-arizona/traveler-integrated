@@ -297,7 +297,7 @@ class LinkedState extends Model {
 
   }
   fetchMetricBins(){
-    console.log("fetch metric bins called");
+    // console.log("fetch metric bins called");
     if(!(this.selectedProcMetric in this.caches.metricAggBins)) {
       this.caches.metricAggBins[this.selectedProcMetric] = {}
     }
