@@ -185,7 +185,12 @@ class Controller {
           type: 'component',
           componentName: 'UtilizationView',
           componentState: { label: linkedState.label }
-        }]
+        // }, {
+        //   type: 'component',
+        //   componentName: 'LineChartView',
+        //   componentState: { label: linkedState.label }
+        }
+      ]
       });
     }
     // Put all code views into a stack, and share a column with a tree
