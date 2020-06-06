@@ -103,11 +103,11 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.setupZoomAndPan();
     // Update scales whenever something changes the brush
     const justFullRender = () => { __self.updateTheView(); };
-    this.linkedState.on('newIntervalWindow', justFullRender);
-    // this.linkedState.on('metricsUpdated', justFullRender);
-    this.linkedState.on('primitiveSelected', justFullRender);
-    this.linkedState.on('intervalStreamFinished', justFullRender);
-    this.linkedState.on('tracebackStreamFinished', justFullRender);
+    // this.linkedState.on('newIntervalWindow', justFullRender);
+    this.linkedState.on('metricsUpdated', justFullRender);
+    // this.linkedState.on('primitiveSelected', justFullRender);
+    // this.linkedState.on('intervalStreamFinished', justFullRender);
+    // this.linkedState.on('tracebackStreamFinished', justFullRender);
   }
   updateTheView() {
     // this.getData();
@@ -135,7 +135,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     // immediately-drawn things like drawAxes that get executed repeatedly by
     // scrolling / panning)
     this._bounds = this.getChartBounds();
-    this.linkedState.setMetricXResolution(this.getSpilloverWidth(this._bounds.width));
+    // this.linkedState.setMetricXResolution(this.getSpilloverWidth(this._bounds.width));
 
     this.content.select('.canvas-container')
         .attr('width', this.getSpilloverWidth(this._bounds.width))
@@ -262,10 +262,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           const end = mousedPosition + (targetWidth / originalWidth) * (this.linkedState.end - mousedPosition);
           const actualBounds = clampWindow(begin, end);
 
-          // There isn't a begin / end wheel event, so trigger the update across
-          // views immediately
-          this.linkedState.setIntervalWindow(actualBounds);
-
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
           this.drawAxes();
@@ -288,6 +284,8 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           this.canvasContext.scale(actualZoomFactor, 1);
           this.canvasContext.drawImage(this.buff.canvas, 0, 0);
           this.canvasContext.restore();
+
+          this.linkedState.setIntervalWindow(actualBounds);
 
         }).call(d3.drag()
         .on('start', () => {
@@ -330,9 +328,8 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
           const begin = this.initialDragState.begin + dx;
           const end = this.initialDragState.end + dx;
           const actualBounds = clampWindow(begin, end);
-          // Don't bother triggering a full update mid-drag...
-          // this.linkedState.setIntervalWindow(actualBounds)
 
+          // Don't bother triggering a full update mid-drag...
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
           this.drawAxes();

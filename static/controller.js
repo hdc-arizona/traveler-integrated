@@ -185,10 +185,10 @@ class Controller {
           type: 'component',
           componentName: 'UtilizationView',
           componentState: { label: linkedState.label }
-        // }, {
-        //   type: 'component',
-        //   componentName: 'LineChartView',
-        //   componentState: { label: linkedState.label }
+        }, {
+          type: 'component',
+          componentName: 'LineChartView',
+          componentState: { label: linkedState.label }
         }
       ]
       });

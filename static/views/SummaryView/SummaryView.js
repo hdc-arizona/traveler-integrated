@@ -17,20 +17,6 @@ class SummaryView extends View {
   get isLoading () {
     return window.controller.datasets === undefined;
   }
-  animateLeft(obj, from, to){
-    var _self = this;
-    if(from >= to){
-      obj.style.visibility = 'hidden';
-      return;
-    }
-    else {
-      var box = obj;
-      box.style.marginLeft = from + "px";
-      setTimeout(function(){
-        _self.animateLeft(obj, from + 1, to);
-      }, 25)
-    }
-  }
   setup () {
     this.d3el.html(this.resources[1]);
     this.d3el.select('.new.button').on('click', () => {
