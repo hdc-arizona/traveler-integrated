@@ -12,15 +12,46 @@ class SummaryView extends View {
     ]);
 
     this.helperViews = {};
+    this.isCollapsed = false;
   }
   get isLoading () {
     return window.controller.datasets === undefined;
+  }
+  animateLeft(obj, from, to){
+    var _self = this;
+    if(from >= to){
+      obj.style.visibility = 'hidden';
+      return;
+    }
+    else {
+      var box = obj;
+      box.style.marginLeft = from + "px";
+      setTimeout(function(){
+        _self.animateLeft(obj, from + 1, to);
+      }, 25)
+    }
   }
   setup () {
     this.d3el.html(this.resources[1]);
     this.d3el.select('.new.button').on('click', () => {
       window.controller.showModal(UploadView);
     });
+    var _self = this;
+    this.d3el.style('left', "0em");
+    this.d3el.select('.collapses')
+        .on('click', () => {
+          _self.d3el.transition()
+              .duration(1000)
+              .style('left', _self.isCollapsed ? "0em" : "-20em");
+          _self.isCollapsed = !_self.isCollapsed;
+          if(_self.isCollapsed) {
+            _self.d3el.select('.c_right')
+                .attr('src', '/static/img/collapse_right.png');
+          } else {
+            _self.d3el.select('.c_right')
+                .attr('src', '/static/img/collapse_left.png');
+          }
+  });
   }
   draw () {
     this.d3el.select('.spinner')
