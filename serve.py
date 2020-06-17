@@ -216,10 +216,17 @@ class FakeOtf2File:  # pylint: disable=R0903
         self.request = request
 
     async def __aiter__(self):
+        line = ''
         async for chunk in self.request.stream():
-            for line in chunk.decode().split('\n'):
-                if line != '':
-                    yield line
+            line += chunk.decode()
+            done = False
+            while not done:
+                done = True
+                i = line.find('\n')
+                if i >= 0:
+                    yield line[0:i]
+                    line = line[i+1:]
+                    done = False
 
 
 @app.post('/datasets/{label}/otf2')
