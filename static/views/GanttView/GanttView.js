@@ -13,10 +13,18 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       { type: 'text', url: 'views/GanttView/template.svg' }
     ];
     super(argObj);
+    this.canvasLeftPadding = 105; // dont know how got this value, 40 is in left margin
+    this.localXScale = d3.scaleLinear();
     this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleBand()
       .paddingInner(0.2)
       .paddingOuter(0.1);
+    this.yScale.invert = function(x) { // think about the padding later
+      var domain = this.domain();
+      var range = this.range();
+      var scale = d3.scaleQuantize().domain(range).range(domain);
+      return scale(x);
+    };
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
@@ -212,20 +220,19 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
   }
   drawBarsCanvas(aggBins){
       var border = 1;
-      var fillColor = "#D9D9D9"//temp hack for now
-      var borderColor = "#737373"
-      var localXScale = d3.scaleLinear();
+      var fillColor = "#D9D9D9";//temp hack for now
+      var borderColor = "#737373";
 
-      localXScale.domain(this.xScale.domain());
-      localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
+      this.localXScale.domain(this.xScale.domain());
+      this.localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
       /***** DONT FORGET TO ADD FLAG FOR IF USING NATIVE OR OVERLOADED VIEW SCALE****/
 
       // we need a canvas already
       // first we focus on moving canvas to the correct place
-    console.log("g1");
+
       if (!this.initialDragState) {
-        console.log("g2");
+
         this.content.select('.canvas-container')
           .attr('width', this.getSpilloverWidth(this._bounds.width))
           .attr('height', this._bounds.height)
@@ -244,7 +251,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           var loc_offset = this.yScale(parseInt(aggBins.data[location].location));
           for (var bucket in aggBins.data[location].histogram){
 
-            var bucket_pix_offset = localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
+            var bucket_pix_offset = this.localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
             var pixel = aggBins.data[location].histogram[bucket];
             if (pixel === 1){
               ctx.fillStyle = borderColor;

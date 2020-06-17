@@ -136,7 +136,7 @@ class LinkedState extends Model {
       } else if (fileType === 'otf2') {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
-        views['LineChartView'] = true;
+        views['LineChartView'] = false;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
