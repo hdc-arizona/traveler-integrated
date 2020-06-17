@@ -13,10 +13,18 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       { type: 'text', url: 'views/GanttView/template.svg' }
     ];
     super(argObj);
+    this.canvasLeftPadding = 105; // dont know how got this value, 40 is in left margin
+    this.localXScale = d3.scaleLinear();
     this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleBand()
       .paddingInner(0.2)
       .paddingOuter(0.1);
+    this.yScale.invert = function(x) { // think about the padding later
+      var domain = this.domain();
+      var range = this.range();
+      var scale = d3.scaleQuantize().domain(range).range(domain);
+      return scale(x);
+    };
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
@@ -92,9 +100,21 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // Set up zoom / pan interactions
     this.setupZoomAndPan();
 
-    // Set up listeners on the model
-    this.linkedState.on('newIntervalWindow', () => {
-      // Update scales whenever something changes the brush
+    // // Set up listeners on the model
+    // this.linkedState.on('newIntervalWindow', () => {
+    //   // Update scales whenever something changes the brush
+    //   this.xScale.domain(this.linkedState.intervalWindow);
+    //   this.yScale.domain(this.linkedState.metadata.locationNames);
+    //   // Update the axes immediately for smooth dragging responsiveness
+    //   this.drawAxes();
+    //   // Make sure we render eventually
+    //   this.render();
+    // });
+    // const showSpinner = () => { this.drawSpinner(); };
+    // this.linkedState.on('intervalStreamStarted', showSpinner);
+    // this.linkedState.on('tracebackStreamStarted', showSpinner);
+    this.linkedState.on('intervalsUpdated', () => {
+      // console.log("interval update triggered");
       this.xScale.domain(this.linkedState.intervalWindow);
       this.yScale.domain(this.linkedState.metadata.locationNames);
       // Update the axes immediately for smooth dragging responsiveness
@@ -102,31 +122,19 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Make sure we render eventually
       this.render();
     });
-    const showSpinner = () => { this.drawSpinner(); };
-    this.linkedState.on('intervalStreamStarted', showSpinner);
-    this.linkedState.on('tracebackStreamStarted', showSpinner);
-    this.linkedState.on('intervalsUpdated', () => {
-      // This is an incremental update; we don't need to do a full render()...
-      // (but still debounce this, as we don't want to call drawBars() for every
-      // new interval)
-      // window.clearTimeout(this._incrementalIntervalTimeout);
-      // this._incrementalIntervalTimeout = window.setTimeout(() => {
-      //     this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
-      // });
-    });
-    this.linkedState.on('tracebackUpdated', () => {
-      // This is an incremental update; we don't need to do a full render()...
-      // (but still debounce this, as we don't want to call drawLinks() for
-      // every new interval)
-      window.clearTimeout(this._incrementalTracebackTimeout);
-      this._incrementalTracebackTimeout = window.setTimeout(() => {
-        this.drawLinks(this.linkedState.getCurrentTraceback());
-      });
-    });
-    const justFullRender = () => { this.render(); };
-    this.linkedState.on('primitiveSelected', justFullRender);
-    this.linkedState.on('intervalStreamFinished', justFullRender);
-    this.linkedState.on('tracebackStreamFinished', justFullRender);
+    // this.linkedState.on('tracebackUpdated', () => {
+    //   // This is an incremental update; we don't need to do a full render()...
+    //   // (but still debounce this, as we don't want to call drawLinks() for
+    //   // every new interval)
+    //   window.clearTimeout(this._incrementalTracebackTimeout);
+    //   this._incrementalTracebackTimeout = window.setTimeout(() => {
+    //     this.drawLinks(this.linkedState.getCurrentTraceback());
+    //   });
+    // });
+    // const justFullRender = () => { this.render(); };
+    // this.linkedState.on('primitiveSelected', justFullRender);
+    // this.linkedState.on('intervalStreamFinished', justFullRender);
+    // this.linkedState.on('tracebackStreamFinished', justFullRender);
   }
   draw () {
     super.draw();
@@ -147,7 +155,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     // this during incremental / immediate draw calls in setup()'s listeners or
     // zooming / panning that need more responsiveness)
     this._bounds = this.getChartBounds();
-    this.linkedState.setGanttXResolution(this.getSpilloverWidth(this._bounds.width));
+    // this.linkedState.setGanttXResolution(this.getSpilloverWidth(this._bounds.width));
 
     // Update whether we're showing the spinner
     this.drawSpinner();
@@ -212,18 +220,19 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
   }
   drawBarsCanvas(aggBins){
       var border = 1;
-      var fillColor = "#D9D9D9"//temp hack for now
-      var borderColor = "#737373"
-      var localXScale = d3.scaleLinear();
+      var fillColor = "#D9D9D9";//temp hack for now
+      var borderColor = "#737373";
 
-      localXScale.domain(this.xScale.domain());
-      localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
+      this.localXScale.domain(this.xScale.domain());
+      this.localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
       /***** DONT FORGET TO ADD FLAG FOR IF USING NATIVE OR OVERLOADED VIEW SCALE****/
 
       // we need a canvas already
       // first we focus on moving canvas to the correct place
+
       if (!this.initialDragState) {
+
         this.content.select('.canvas-container')
           .attr('width', this.getSpilloverWidth(this._bounds.width))
           .attr('height', this._bounds.height)
@@ -242,7 +251,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           var loc_offset = this.yScale(parseInt(aggBins.data[location].location));
           for (var bucket in aggBins.data[location].histogram){
 
-            var bucket_pix_offset = localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
+            var bucket_pix_offset = this.localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
             var pixel = aggBins.data[location].histogram[bucket];
             if (pixel === 1){
               ctx.fillStyle = borderColor;
@@ -425,8 +434,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
 
 
-        // For responsiveness, draw the axes immediately (waiting for the
-        // events to propagate from setIntervalWindow may take a while)
+        // For responsiveness, draw the axes immediately
         this.drawAxes();
 
         // Patch a temporary scale transform to the bars / links layers (this
@@ -521,9 +529,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           const begin = this.initialDragState.begin + dx;
           const end = this.initialDragState.end + dx;
           const actualBounds = clampWindow(begin, end);
-          // Don't bother triggering a full update mid-drag...
-          // this.linkedState.setIntervalWindow(actualBounds)
 
+          // Don't bother triggering a full update mid-drag...
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
           this.drawAxes();

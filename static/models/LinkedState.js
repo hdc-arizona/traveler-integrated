@@ -258,9 +258,8 @@ class LinkedState extends Model {
   fetchGanttAggBins(){
     var bins = this.ganttXResolution;
     var queryRange = this.intervalWindow[1] - this.intervalWindow[0];
-    // console.log(this.getCurrentHistogramData().domain)
+
     if(typeof this.caches.histogramDomain !== 'undefined'){
-      // console.log(this.caches.histogramDomain[0],this.caches.histogramDomain[1])
       var begin = (this.intervalWindow[0] - queryRange > this.caches.histogramDomain[0]) ? this.intervalWindow[0] - queryRange : this.intervalWindow[0];
       var end = (this.intervalWindow[1] + queryRange < this.caches.histogramDomain[1]) ? this.intervalWindow[1] + queryRange : this.intervalWindow[1];
     }
@@ -269,9 +268,6 @@ class LinkedState extends Model {
       var end = this.intervalWindow[1];
     }
 
-    // console.log(bins, begin, end);
-
-    // console.log(begin, end);
     //this function will replace the fetching of intervals
     window.clearTimeout(this._ganttAggTimeout);
     this._ganttAggTimeout = window.setTimeout(async () => {
@@ -289,7 +285,7 @@ class LinkedState extends Model {
           })
           .catch(err => {
             err.text.then( errorMessage => {
-              console.warn(errorMessage)
+              console.warn(errorMessage);
             });
           });
       }
@@ -297,7 +293,6 @@ class LinkedState extends Model {
 
   }
   fetchMetricBins(){
-    // console.log("fetch metric bins called");
     if(!(this.selectedProcMetric in this.caches.metricAggBins)) {
       this.caches.metricAggBins[this.selectedProcMetric] = {}
     }
@@ -324,7 +319,7 @@ class LinkedState extends Model {
               })
               .then((data) => {
                 this.caches.metricAggBins[curMetric] = data;
-                this.trigger('intervalsUpdated');
+                this.trigger('metricsUpdated');
               })
               .catch(err => {
                 err.text.then( errorMessage => {
@@ -471,8 +466,6 @@ class LinkedState extends Model {
         return;
       }
       delete this.histogramError;
-
-      // console.log(this.newCaches.histogram);
 
       let maxCount = 0;
 
