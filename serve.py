@@ -14,6 +14,7 @@ from starlette.requests import Request  # pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse, JSONResponse #pylint: disable=import-error
 from starlette.middleware.cors import CORSMiddleware
 from data_store import DataStore, ClientLogger
+from data_store.sparseUtilizationList import loadSUL
 from profiling_tools.profilier import Profilier
 import cProfile, pstats, io
 
@@ -229,6 +230,7 @@ async def add_otf2_trace(label: str, request: Request, storeEvents: bool = False
     async def startProcess():
         db.addSourceFile(label, 'APEX.otf2', 'otf2')
         await db.processOtf2(label, FakeOtf2File(request), storeEvents, logger.log)
+        await loadSUL(label, db)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
