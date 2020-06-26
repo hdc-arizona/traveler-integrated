@@ -9,7 +9,9 @@ class LinkedState extends Model {
     this.metadata = metadata;
     // Sometimes the locations aren't sorted (todo: enable interactive sorting?)
     if (this.metadata.locationNames) {
-      this.metadata.locationNames.sort();
+      this.metadata.locationNames.sort(function(a, b) {
+        return d3.ascending(parseInt(a), parseInt(b));
+      });
     }
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
@@ -55,11 +57,11 @@ class LinkedState extends Model {
     this.trigger('changeMode');
   }
   setGanttXResolution(value){
-    this.ganttXResolution = value;
+    this.ganttXResolution = value|0;//round down
     this.fetchGanttAggBins();
   }
   setMetricXResolution(value){
-    this.metricXResolution = value;
+    this.metricXResolution = value|0;//round down
     this.fetchMetricBins();
   }
   setHistogramResolution (value) {
@@ -483,7 +485,7 @@ class LinkedState extends Model {
 }
 LinkedState.COLOR_SCHEMES = {
   Inclusive: {
-    mouseHoverSelectionColor: '#a30012', // red
+    mouseHoverSelectionColor: '#ff0500', // red
     selectionColor: '#e6ab02', // yellow
     traceBackColor: '#000000', // black
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple

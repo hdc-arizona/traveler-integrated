@@ -482,6 +482,112 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
     return StreamingResponse(intervalIdGenerator(), media_type='application/json')
 
 
+@app.get('/datasets/{label}/getIntervalInfo')
+def guidIntervalIds(label: str, timestamp: int = None, location: str = '1'):
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+
+    begin = timestamp
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    end = begin + 1
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    def intervalInfoGenerator():
+        yield '['
+        firstItem = True
+        for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(begin, end):
+            if not firstItem:
+                yield ','
+            yield json.dumps(db[label]['intervals'][i.data])
+            json.dumps(db[label]['intervals'][i.data])
+            firstItem = False
+        yield ']'
+
+    def profIntervalInfoGenerator():
+        firstItem = True
+        for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(begin, end):
+            if not firstItem:
+                pass
+            json.dumps(db[label]['intervals'][i.data])
+            firstItem = False
+
+    if profile is True:
+        return profIntervalInfoGenerator()
+    else:
+        return StreamingResponse(intervalInfoGenerator(), media_type='application/json')
+
+
+@app.get('/datasets/{label}/getPrimitiveList')
+def guidIntervalIds(label: str, begin: int = None, end: int = None, timestamp: int = None, location: str = '1', isPrimitive: bool = True):
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+
+    locList = {}
+    if timestamp is None:
+        return locList
+
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    prim = None
+    for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(timestamp, timestamp + 1):
+        prim = db[label]['intervals'][i.data]
+
+    if prim is None:
+        return locList
+
+    for loc in db[label]['intervalIndexes']['locations']:
+        locList[loc] = []
+        for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
+            cur = db[label]['intervals'][i.data]
+            if isPrimitive and cur['Primitive'] == prim['Primitive']:
+                locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
+            elif cur['GUID'] == prim['GUID']:
+                locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
+    return locList
+
+
+@app.get('/datasets/{label}/getGUIDList')
+def guidIntervalIds(label: str, timestamp: float = None, location: str = '1'):
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+
+    begin = timestamp
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    end = begin + 1
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    def intervalInfoGenerator():
+        yield '['
+        firstItem = True
+        for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(begin, end):
+            if not firstItem:
+                yield ','
+            yield json.dumps(db[label]['intervals'][i.data])
+            json.dumps(db[label]['intervals'][i.data])
+            firstItem = False
+        yield ']'
+
+    def profIntervalInfoGenerator():
+        firstItem = True
+        for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(begin, end):
+            if not firstItem:
+                pass
+            json.dumps(db[label]['intervals'][i.data])
+            firstItem = False
+
+    if profile is True:
+        return profIntervalInfoGenerator()
+    else:
+        return StreamingResponse(intervalInfoGenerator(), media_type='application/json')
+
+
 @app.get('/datasets/{label}/guids/{guid}/intervalIds')
 def guidIntervalIds(label: str, guid: str):
     checkDatasetExistence(label)
