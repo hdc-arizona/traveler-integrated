@@ -160,7 +160,6 @@ async def loadSUL(label, db, log=logToConsole):
             sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0}, loc)
             updateSULForInterval(db[label]['intervals'][i.data], loc)
 
-        # print('sul metric size: ' + str(len(sul['metrics'].items())))
         sul['intervals'].sortAtLoc(loc)
         sul['intervals'].locationDict[loc] = np.array(sul['intervals'].locationDict[loc])
         for key in sul['metrics']:
@@ -183,7 +182,6 @@ async def loadSUL(label, db, log=logToConsole):
             locStruct['util'][i] = sul['intervals'].locationDict[loc][i]['util']
 
         sul['intervals'].setCLocation(loc, locStruct)
-        # print("interval loc struct initiated")
 
         for key in sul['metrics']:
             length = len(sul['metrics'][key].locationDict[loc])
@@ -194,7 +192,6 @@ async def loadSUL(label, db, log=logToConsole):
                 mlocStruct['util'][i] = sul['metrics'][key].locationDict[loc][i]['util']
 
             sul['metrics'][key].setCLocation(loc, mlocStruct)
-        # print("metric loc struct initiated")
     db[label]['sparseUtilizationList'] = sul
 
     return

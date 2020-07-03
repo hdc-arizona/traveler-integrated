@@ -135,10 +135,6 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                 currentEvent[attrMatch.group(1)] = attrMatch.group(2)
         else:
             # This line contains additional event attributes
-            if currentEvent is None or addAttrLineMatch is None:
-                print(currentEvent)
-                print(addAttrLineMatch)
-                print(line)
             assert currentEvent is not None and addAttrLineMatch is not None
             attrList = addAttrSplitter.split(addAttrLineMatch.group(1))
             for attrStr in attrList:
