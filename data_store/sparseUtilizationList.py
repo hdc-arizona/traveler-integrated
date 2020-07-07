@@ -142,14 +142,9 @@ async def loadSUL(label, db, log=logToConsole):
                 if k not in sul['metrics']:
                     sul['metrics'][k] = SparseUtilizationList()
                     preMetricValue[k] = {'Timestamp': 0, 'Value': 0}
-                current_rate = (value - preMetricValue[k]['Value']) / (event['enter']['Timestamp'] - preMetricValue[k]['Timestamp'])
-                sul['metrics'][k].setIntervalAtLocation({'index': int(event['enter']['Timestamp']), 'counter': 0, 'util': current_rate}, cur_location)
-                preMetricValue[k]['Timestamp'] = event['enter']['Timestamp']
-                preMetricValue[k]['Value'] = value
-
-                current_rate = (value - preMetricValue[k]['Value']) / (event['leave']['Timestamp'] - preMetricValue[k]['Timestamp'])
-                sul['metrics'][k].setIntervalAtLocation({'index': int(event['leave']['Timestamp']), 'counter': 0, 'util': current_rate}, cur_location)
-                preMetricValue[k]['Timestamp'] = event['leave']['Timestamp']
+                current_rate = (value - preMetricValue[k]['Value']) / (event['Timestamp'] - preMetricValue[k]['Timestamp'])
+                sul['metrics'][k].setIntervalAtLocation({'index': int(event['Timestamp']), 'counter': 0, 'util': current_rate}, cur_location)
+                preMetricValue[k]['Timestamp'] = event['Timestamp']
                 preMetricValue[k]['Value'] = value
 
     # we extract relevant data from database
@@ -158,7 +153,8 @@ async def loadSUL(label, db, log=logToConsole):
         for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
             sul['intervals'].setIntervalAtLocation({'index': int(i.begin), 'counter': 1, 'util': 0}, loc)
             sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0}, loc)
-            updateSULForInterval(db[label]['intervals'][i.data], loc)
+            updateSULForInterval(db[label]['intervals'][i.data]['enter'], loc)
+            updateSULForInterval(db[label]['intervals'][i.data]['leave'], loc)
 
         sul['intervals'].sortAtLoc(loc)
         sul['intervals'].locationDict[loc] = np.array(sul['intervals'].locationDict[loc])

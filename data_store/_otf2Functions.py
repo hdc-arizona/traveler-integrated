@@ -164,7 +164,7 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                 newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
             elif attr not in lastEvent:  # pylint: disable=E1135
                 newInterval['leave'][attr] = event[attr]
-            elif attr != 'Timestamp' and event[attr] == lastEvent[attr]:  # pylint: disable=unsubscriptable-object
+            elif attr != 'Timestamp' and attr != 'metrics' and event[attr] == lastEvent[attr]:  # pylint: disable=unsubscriptable-object
                 newInterval[attr] = event[attr]
             else:
                 newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
@@ -186,7 +186,8 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                     dummyEvent = copy.deepcopy(lastEventStack[-1])
                     dummyEvent['Event'] = 'LEAVE'
                     dummyEvent['Timestamp'] = event['Timestamp'] - 1  # add a new dummy leave event in 1 time unit ago
-                    dummyEvent['metrics'] = copy.deepcopy(event['metrics'])
+                    if 'metrics' in event:
+                        dummyEvent['metrics'] = copy.deepcopy(event['metrics'])
                     currentInterval = createNewInterval(dummyEvent, lastEventStack[-1], intervalId)
                 lastEventStack.append(event)
             elif event['Event'] == 'LEAVE':
