@@ -12,6 +12,7 @@ import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 import LineChartView from './views/LineChartView/LineChartView.js';
 import ProcMetricView from './views/ProcMetricView/ProcMetricView.js';
+import IntervalHistogramView from "./views/IntervalHistogramView/IntervalHistogramView.js";
 
 const viewClassLookup = {
   TreeView,
@@ -22,7 +23,8 @@ const viewClassLookup = {
   GanttView,
   UtilizationView,
   LineChartView,
-  ProcMetricView
+  ProcMetricView,
+  IntervalHistogramView
 };
 
 class Controller {
@@ -173,6 +175,7 @@ class Controller {
     if (views.GanttView && views.UtilizationView) {
       delete views.GanttView;
       delete views.UtilizationView;
+      delete views.IntervalHistogramView;
       delete views.LineChartView;
       delete views.ProcMetricView;
       newLayout.content.push({
@@ -185,10 +188,10 @@ class Controller {
           type: 'component',
           componentName: 'UtilizationView',
           componentState: { label: linkedState.label }
-        // }, {
-        //   type: 'component',
-        //   componentName: 'LineChartView',
-        //   componentState: { label: linkedState.label }
+        }, {
+          type: 'component',
+          componentName: 'IntervalHistogramView',
+          componentState: { label: linkedState.label }
         }
       ]
       });

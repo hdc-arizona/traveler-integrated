@@ -646,6 +646,20 @@ def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
 
     return json.dumps(ret)
 
+
+@app.get('/datasets/{label}/getIntervalDuration')
+def getIntervalDuration(label: str, bins: int = 100, begin: int = None, end: int = None):
+    if begin is None:
+        begin = int(db[label]['meta']['intervalDurationDomain'][0])
+    if end is None:
+        end = db[label]['meta']['intervalDurationDomain'][1]
+
+    ret = {}
+    ret['data'] = db[label]['sparseUtilizationList']['intervalDuration'].calcIntervalHistogram(bins, begin, end)
+    ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
+    return ret
+
+
 #####################
 # Profilier Wrappers#
 #####################
