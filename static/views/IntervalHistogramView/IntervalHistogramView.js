@@ -210,30 +210,14 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         ss = data.data[i-1];
       }
       var dd = {'x': x, 'y': d - ss};
-      var preD = dd;
-      if(i>0) {
-        var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
-        var sub = 0;
-        if(i>1) {
-          sub = data.data[i-2];
-        }
-        preD = {'x': xx, 'y':data.data[i-1] - sub};
-      }
-      this.drawLines(dd, preD);
+      this.drawLines(dd);
     });
     this.wasRendered = true;
   }
-  drawLines (d, preD) {
+  drawLines (d) {
     var barWidth = 10;
     this.canvasContext.fillStyle = "#D9D9D9";// this.linkedState.selectionColor;
     this.canvasContext.fillRect(d.x - (barWidth / 2), this.yScale(d.y), barWidth, this._bounds.height - this.yScale(d.y));
-
-
-    this.canvasContext.beginPath();
-    this.canvasContext.strokeStyle = 'black';
-    this.canvasContext.moveTo(preD.x, this.yScale(preD.y));
-    this.canvasContext.lineTo(d.x, this.yScale(d.y));
-    this.canvasContext.stroke();
   }
   drawSpinner () {
     this.content.select('.small.spinner').style('display', 'none');
