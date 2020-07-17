@@ -23,7 +23,7 @@ class LinkedState extends Model {
     this.caches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
-    this.selectedProcMetric = 'PAPI_TOT_CYC';//'meminfo:MemFree';
+    this.selectedProcMetric = '';//'meminfo:MemFree';
 
     // Start processes for collecting data
     (async () => {
@@ -295,7 +295,7 @@ class LinkedState extends Model {
 
   }
   fetchMetricBins(){
-    if(!(this.selectedProcMetric in this.caches.metricAggBins)) {
+    if(this.selectedProcMetric.startsWith('PAPI') === true && !(this.selectedProcMetric in this.caches.metricAggBins)) {
       this.caches.metricAggBins[this.selectedProcMetric] = {}
     }
 
