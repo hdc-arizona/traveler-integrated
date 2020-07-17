@@ -15,7 +15,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     ];
     super(argObj);
     // d3 vars
-    this.xScale = d3.scaleLinear();
+    this.xScale = d3.scaleLog();// d3.scaleLinear();
     this.yScale = d3.scaleLinear();
 
     this.svgElement = null;
@@ -59,7 +59,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
   }
   setYDomain(maxMin) {
     var yOffset = (maxMin['max'] - maxMin['min']) / 10;
-    this.yScale.domain([maxMin['max'] + yOffset, maxMin['min'] - yOffset]);
+    this.yScale.domain([maxMin['max'] + yOffset, maxMin['min']]);
   }
   getSpilloverWidth(width){
     return width*1;
@@ -111,7 +111,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
   }
   updateTheView() {
     var xWindow = [this.intervalDomains.metadata.begin, this.intervalDomains.metadata.end];
-    this.xScale.domain(xWindow);
+    this.xScale.domain(xWindow).nice();
     // this.drawAxes();
     this.render();
   }
@@ -177,15 +177,11 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     // Hide the small spinner
 
     // Update the axes (also updates scales)
-    this.drawAxes();
     this.drawWrapper();
   }
   drawWrapper() {
     if(this.initialDragState)return;
     var localXScale = this.xScale;
-    // var localXScale = d3.scaleLinear();
-    // localXScale.domain(this.xScale.domain());
-    // localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
     this._bounds = this.getChartBounds();
     if(this.intervalDomains === null)return;
@@ -203,12 +199,17 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
       minY = Math.min(minY, d);
     }
     this.setYDomain({'max':maxY, 'min':minY});
+    this.drawAxes();
 
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
     data.data.forEach((d, i) => {
       var x = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
-      var dd = {'x': x, 'y': d - data.data[i-1]};
+      var ss = 0;
+      if(i>0) {
+        ss = data.data[i-1];
+      }
+      var dd = {'x': x, 'y': d - ss};
       var preD = dd;
       if(i>0) {
         var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
@@ -223,6 +224,11 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     this.wasRendered = true;
   }
   drawLines (d, preD) {
+    var barWidth = 10;
+    this.canvasContext.fillStyle = "#D9D9D9";// this.linkedState.selectionColor;
+    this.canvasContext.fillRect(d.x - (barWidth / 2), this.yScale(d.y), barWidth, this._bounds.height - this.yScale(d.y));
+
+
     this.canvasContext.beginPath();
     this.canvasContext.strokeStyle = 'black';
     this.canvasContext.moveTo(preD.x, this.yScale(preD.y));
