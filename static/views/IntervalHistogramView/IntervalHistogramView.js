@@ -218,6 +218,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     var barWidth = 10;
     this.canvasContext.fillStyle = "#D9D9D9";// this.linkedState.selectionColor;
     this.canvasContext.fillRect(d.x - (barWidth / 2), this.yScale(d.y), barWidth, this._bounds.height - this.yScale(d.y));
+    this.canvasContext.strokeRect(d.x - (barWidth / 2), this.yScale(d.y), barWidth, this._bounds.height - this.yScale(d.y));
   }
   drawSpinner () {
     this.content.select('.small.spinner').style('display', 'none');
