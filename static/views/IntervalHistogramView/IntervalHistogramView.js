@@ -32,6 +32,8 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     this.wasRendered = false;
     this.initialDragState = null;
     this.intervalDomains = null;
+    this.ClickState = {"background":0, "hover":1, "singleClick":2, "doubleClick":3};
+    this.isMouseInside = false;
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `IntervalHistogramView${IntervalHistogramView.DOM_COUNT}`;
@@ -80,9 +82,6 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
     this.svgElement = this.content.select('.svg-plot');
-    this.canvasElement = this.content.select('.canvas-plot');
-    this.canvasContext = this.canvasElement.node().getContext('2d');
-
     this.yScale.domain([10,0]).nice();//remove this later
 
     // Create a view-specific clipPath id, as there can be more than one
@@ -91,23 +90,78 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         .attr('id', clipId);
     this.content.select('.clippedStuff')
         .attr('clip-path', `url(#${clipId})`);
-    // this.drawClip();
-    // this.content.select('.canvas-plot')
-    //     .on('click', () => {
-    //       console.log("background clicked");
-    //     });
 
-    // var __self = this;
-    // this.drawAxes();
-    // this.setupZoomAndPan();
+    this.currentClickState = this.ClickState.background;
+    var __self = this;
+    // mouse events
+    this.canvasElement = this.content.select('.histogram-plot')
+        .on('click', function() {
+          console.log("clicked");
+        })
+        .on('mouseleave', function () {
+          __self.isMouseInside = false;
+          __self.clearAllTimer();
+        })
+        .on('mouseenter',function () {
+          __self.isMouseInside = true;
+        })
+        .on('mousemove', function() {
+          __self.clearAllTimer();
+          if(__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
+            var dm = d3.mouse(__self.content.select('.histogram-container').node());
+            this._mouseHoverTimeout = window.setTimeout(async () => {
+              if(__self.isMouseInside === true) {
+                __self.showDetailsTooltip(dm[0], dm[1]);
+              }
+            }, 100);
+          }
+        })
+        .on('dblclick', function() {
+          __self.clearAllTimer();
+          console.log("dbl clicked");
+        });
+    this.canvasContext = this.canvasElement.node().getContext('2d');
     this.fetchIntervalDomainBins();
-    // Update scales whenever something changes the brush
-    // const justFullRender = () => { __self.updateTheView(); };
-    // this.linkedState.on('newIntervalWindow', justFullRender);
-    // this.linkedState.on('metricsUpdated', justFullRender);
-    // this.linkedState.on('primitiveSelected', justFullRender);
-    // this.linkedState.on('intervalStreamFinished', justFullRender);
-    // this.linkedState.on('tracebackStreamFinished', justFullRender);
+  }
+  clearAllTimer() {
+    if(this._mouseHoverTimeout) {
+      window.clearTimeout(this._mouseHoverTimeout);
+      this._mouseHoverTimeout = null;
+    }
+    if(this._mouseClickTimeout) {
+      window.clearTimeout(this._mouseClickTimeout);
+      this._mouseClickTimeout = null;
+    }
+  }
+  showDetailsTooltip(xx, yy){
+    var __self = this;
+    var tm = __self.xScale.invert(xx);
+    var loc = __self.yScale.invert(yy);
+    var dr = __self.canvasElement.node().getBoundingClientRect();
+    dr.x = xx + dr.left;
+    dr.y = yy + dr.top;
+
+    var offset = (__self.intervalDomains.metadata.end - __self.intervalDomains.metadata.begin)/ __self.intervalDomains.metadata.bins;
+    var ll = (tm - __self.intervalDomains.metadata.begin) / offset;
+    var bin = Math.trunc(ll);
+    var rightBoundary = __self.xScale(this.linkedState.getTimeStampFromBin(bin, __self.intervalDomains.metadata)) + (this.barWidth/2);
+    var leftBoundary = __self.xScale(this.linkedState.getTimeStampFromBin(bin, __self.intervalDomains.metadata)) - (this.barWidth/2);
+    var val = __self.intervalDomains.data[bin];
+    if(bin>0){
+      val = val - __self.intervalDomains.data[bin-1];
+    }
+    if(xx < rightBoundary && xx > leftBoundary && val>0){
+      var dd = {'Duration': Math.trunc(tm), 'Count': val};
+      window.controller.tooltip.show({
+        content: `<pre>${JSON.stringify(dd, null, 2)}</pre>`,
+        targetBounds: dr,
+        hideAfterMs: null
+      });
+      __self.currentClickState = __self.ClickState.hover
+    } else {
+      window.controller.tooltip.hide();
+      __self.currentClickState = __self.ClickState.background;
+    }
   }
   updateTheView() {
     var xWindow = [this.intervalDomains.metadata.begin, this.intervalDomains.metadata.end];
@@ -163,7 +217,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     // scrolling / panning)
     this._bounds = this.getChartBounds();
 
-    this.content.select('.canvas-container')
+    this.content.select('.histogram-container')
         .attr('width', this.getSpilloverWidth(this._bounds.width))
         .attr('height', this._bounds.height);
         // .attr('transform', `translate(${-this._bounds.width}, 0)`);
@@ -215,10 +269,10 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     this.wasRendered = true;
   }
   drawLines (d) {
-    var barWidth = 10;
+    this.barWidth = 10;
     this.canvasContext.fillStyle = "#D9D9D9";// this.linkedState.selectionColor;
-    this.canvasContext.fillRect(d.x - (barWidth / 2), this.yScale(d.y), barWidth, this._bounds.height - this.yScale(d.y));
-    this.canvasContext.strokeRect(d.x - (barWidth / 2), this.yScale(d.y), barWidth, this._bounds.height - this.yScale(d.y));
+    this.canvasContext.fillRect(d.x - (this.barWidth / 2), this.yScale(d.y), this.barWidth, this._bounds.height - this.yScale(d.y));
+    this.canvasContext.strokeRect(d.x - (this.barWidth / 2), this.yScale(d.y), this.barWidth, this._bounds.height - this.yScale(d.y));
   }
   drawSpinner () {
     this.content.select('.small.spinner').style('display', 'none');

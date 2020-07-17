@@ -15,8 +15,8 @@
       <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
     </g>
     <g class="clippedStuff">
-      <foreignObject class="canvas-container">
-        <canvas class="canvas-plot"></canvas>
+      <foreignObject class="histogram-container">
+        <canvas class="histogram-plot"></canvas>
       </foreignObject>
       <g class="dots"></g>
       <g class="lines"></g>
