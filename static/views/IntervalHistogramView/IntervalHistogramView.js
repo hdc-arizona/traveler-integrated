@@ -16,7 +16,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     super(argObj);
     // d3 vars
     this.xScale = d3.scaleLog();// d3.scaleLinear();
-    this.yScale = d3.scaleLinear();
+    this.yScale = d3.scaleLog();//d3.scaleLinear();
 
     this.svgElement = null;
     //canvas vars
@@ -59,7 +59,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
   }
   setYDomain(maxMin) {
     var yOffset = (maxMin['max'] - maxMin['min']) / 10;
-    this.yScale.domain([maxMin['max'] + yOffset, maxMin['min']]);
+    this.yScale.domain([maxMin['max'], maxMin['min']+1]).nice();
   }
   getSpilloverWidth(width){
     return width*1;
@@ -83,7 +83,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     this.canvasElement = this.content.select('.canvas-plot');
     this.canvasContext = this.canvasElement.node().getContext('2d');
 
-    this.yScale.domain([10,0]);//remove this later
+    this.yScale.domain([10,0]).nice();//remove this later
 
     // Create a view-specific clipPath id, as there can be more than one
     const clipId = this.uniqueDomId + 'clip';
@@ -209,7 +209,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
       if(i>0) {
         ss = data.data[i-1];
       }
-      var dd = {'x': x, 'y': d - ss};
+      var dd = {'x': x, 'y': ((d - ss) + 1)};
       this.drawLines(dd);
     });
     this.wasRendered = true;
