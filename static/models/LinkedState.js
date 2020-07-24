@@ -16,6 +16,8 @@ class LinkedState extends Model {
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
+    this.intervalHistogram = null;
+    this.intervalHistogramWindow = null;
     this.cursorPosition = null;
     this.selectedPrimitive = null;
     this.selectedGUID = null;
@@ -36,6 +38,7 @@ class LinkedState extends Model {
     // this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
+    this.fetchIntervalHistogram();
   }
   get begin () {
     return this.intervalWindow[0];
@@ -55,6 +58,18 @@ class LinkedState extends Model {
   set mode (newMode) {
     this._mode = newMode;
     this.trigger('changeMode');
+  }
+  get intervalHistogramBegin () {
+    return this.intervalHistogramWindow[0];
+  }
+  get intervalHistogramEnd () {
+    return this.intervalHistogramWindow[1];
+  }
+  get intervalHistogramBeginLimit () {
+    return this.intervalHistogram.metadata.begin;
+  }
+  get intervalHistogramEndLimit () {
+    return this.intervalHistogram.metadata.end;
   }
   setGanttXResolution(value){
     this.ganttXResolution = value|0;//round down
@@ -88,6 +103,23 @@ class LinkedState extends Model {
     this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalWindow', { begin, end });
+    }
+  }
+  setIntervalHistogramWindow ({
+                       begin = this.intervalHistogramBegin,
+                       end = this.intervalHistogramEnd
+                     } = {}) {
+    if (this.intervalHistogram === null) {
+      throw new Error("Can't set interval window; no interval histogram data");
+    }
+    const oldBegin = this.intervalHistogramBegin;
+    const oldEnd = this.intervalHistogramEnd;
+    // Clamp to where there's actually data
+    begin = Math.max(this.intervalHistogramBeginLimit, begin);
+    end = Math.min(this.intervalHistogramEndLimit, end);
+    this.intervalHistogramWindow = [begin, end];
+    if (oldBegin !== begin || oldEnd !== end) {
+      this.stickyTrigger('newIntervalHistogramWindow', { begin, end });
     }
   }
   selectPrimitive (primitive) {
@@ -481,6 +513,33 @@ class LinkedState extends Model {
       this.caches.histogramMaxCount = maxCount;
       this.trigger('histogramsUpdated');
     }, 100);
+  }
+  fetchIntervalHistogram(){
+    var bins = 1000;
+
+    //this function will replace the fetching of intervals
+    window.clearTimeout(this._intervalDomainTimeout);
+    this._intervalDomainTimeout = window.setTimeout(async () => {
+      //*****NetworkError on reload is here somewhere******//
+      if (bins){
+        const label = encodeURIComponent(this.label);
+        var endpt = `/datasets/${label}/getIntervalDuration?bins=${bins}`;
+        fetch(endpt)
+            .then((response) => {
+              return response.json();
+            })
+            .then((data) => {
+              this.intervalHistogram = data;
+              this.intervalHistogramWindow = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
+              this.trigger('intervalHistogramUpdated');
+            })
+            .catch(err => {
+              err.text.then( errorMessage => {
+                console.warn(errorMessage);
+              });
+            });
+      }
+    }, 50);
   }
 }
 LinkedState.COLOR_SCHEMES = {

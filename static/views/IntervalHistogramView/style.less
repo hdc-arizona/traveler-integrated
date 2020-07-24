@@ -54,4 +54,28 @@
       vector-effect: non-scaling-stroke;
     }
   }
+
+  .histogram_brush {
+    cursor: grab;
+    opacity: 0.5;
+    stroke: black;
+    &:active {
+      cursor: grabbing;
+    }
+
+    .outline { stroke: @brushColor; }
+    .area { fill: @brushColor; }
+
+    .hoverTarget {
+      fill: transparent;
+    }
+    .leftHandle .hoverTarget {
+      cursor: w-resize;
+      stroke: none;
+    }
+    .rightHandle .hoverTarget {
+      cursor: e-resize;
+      stroke: none;
+    }
+  }
 }

@@ -21,5 +21,18 @@
       <g class="dots"></g>
       <g class="lines"></g>
     </g>
+    <g class="histogram_brush">
+      <rect class="area"></rect>
+      <line class="top outline"></line>
+      <line class="bottom outline"></line>
+      <g class="leftHandle">
+        <line class="outline"></line>
+        <rect class="hoverTarget"></rect>
+      </g>
+      <g class="rightHandle">
+        <line class="outline"></line>
+        <rect class="hoverTarget"></rect>
+      </g>
+    </g>
   </g>
 </svg>

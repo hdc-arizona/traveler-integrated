@@ -31,6 +31,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.wasRerendered = false;
     this.highlightedData = null;
     this.ClickState = {"background":0, "hover":1, "singleClick":2, "doubleClick":3};
+    this.IntervalListMode = {all: "all", primitive: "primitive", guid: "guid", duration: "duration"};
     this.isMouseInside = false;
   }
 
@@ -121,6 +122,12 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Make sure we render eventually
       this.render();
     });
+    this.linkedState.on('newIntervalHistogramWindow', () => {
+        this.drawHighlightedBars(this.IntervalListMode.all);
+        this.fetchIntervalList(this.linkedState.intervalHistogramBegin,
+            this.linkedState.intervalHistogramEnd,
+            this.IntervalListMode.duration);
+    });
     // this.linkedState.on('tracebackUpdated', () => {
     //   // This is an incremental update; we don't need to do a full render()...
     //   // (but still debounce this, as we don't want to call drawLinks() for
@@ -144,8 +151,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
             __self.clearAllTimer();
             var dm = d3.mouse(__self.content.select('.canvas-container').node());
             __self._mouseClickTimeout = window.setTimeout(async () => {
-                __self.drawHighlightedBars(0);
-                __self.fetchPrimitiveList(dm[0], dm[1], true);
+                __self.drawHighlightedBars(__self.IntervalListMode.all);
+                __self.fetchIntervalList(dm[0], dm[1], __self.IntervalListMode.primitive);
             }, 300);
         })
         .on('mouseleave', function () {
@@ -161,8 +168,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
                 var dm = d3.mouse(__self.content.select('.canvas-container').node());
                 this._mouseHoverTimeout = window.setTimeout(async () => {
                     if(__self.isMouseInside === true) {
-                        __self.drawHighlightedBars(0);
-                        __self.fetchPrimitiveList(dm[0], dm[1], false);
+                        __self.drawHighlightedBars(__self.IntervalListMode.all);
+                        __self.fetchIntervalList(dm[0], dm[1], __self.IntervalListMode.guid);
                     }
                 }, 100);
             }
@@ -229,26 +236,42 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
               });
       }, 100);
   }
-  fetchPrimitiveList(xx, yy, isPrim){
+  fetchIntervalList(xx, yy, mode){
       var __self = this;
-      var tm = __self.localXScale.invert(xx);
-      var loc = __self.yScale.invert(yy);
+      var tm = 0;
+      var loc = 0;
+      if(mode === this.IntervalListMode.guid || mode === this.IntervalListMode.primitive) {
+          tm = __self.localXScale.invert(xx);
+          loc = __self.yScale.invert(yy);
+      } else if(mode === this.IntervalListMode.duration) {
+          tm = xx;
+          loc = yy;
+      }
       //this function will replace the fetching of intervals
       window.clearTimeout(this.primitiveFetchTimeout);
       this.primitiveFetchTimeout = window.setTimeout(async () => {
-          //*****NetworkError on reload is here somewhere******//
           const label = encodeURIComponent(this.linkedState.label);
           var begin = this.linkedState.intervalWindow[0];
           var end = this.linkedState.intervalWindow[1];
-          var endpt = `/datasets/${label}/getPrimitiveList?timestamp=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&isPrimitive=${isPrim}`;
+          var endpt = `/datasets/${label}/getIntervalList?`;
+          endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&mode=${mode}`;
+          if(mode === this.IntervalListMode.duration) {
+              endpt += `&leave=${Math.ceil(loc)}`;// loc in location isnt used if mode is duration
+          }
           fetch(endpt)
               .then((response) => {
                   return response.json();
               })
               .then((data) => {
                   __self.highlightedData = data;
-                  __self.currentClickState = isPrim?__self.ClickState.singleClick:__self.ClickState.hover;
-                  __self.drawHighlightedBars(__self.currentClickState);
+                  if(mode === __self.IntervalListMode.primitive) {
+                      __self.currentClickState = __self.ClickState.singleClick;
+                  } else if(mode === __self.IntervalListMode.guid) {
+                      __self.currentClickState = __self.ClickState.hover;
+                  } else {
+                      __self.currentClickState = __self.ClickState.background;
+                  }
+                  __self.drawHighlightedBars(mode);
               })
               .catch(err => {
                   err.text.then( errorMessage => {
@@ -397,14 +420,16 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       this.wasRerendered = true;
 
   }
-  drawHighlightedBars(isClear) {
+  drawHighlightedBars(mode) {
       if(this.highlightedData == null)return;
       var border = 1;
       var fillColor = "#D9D9D9";
       var borderColor = "#737373";
-      if(isClear === this.ClickState.hover) {
+      if(mode === this.IntervalListMode.guid) {
           fillColor = this.linkedState.mouseHoverSelectionColor;
-      } else if(isClear === this.ClickState.singleClick) {
+      } else if(mode === this.IntervalListMode.primitive) {
+          fillColor = this.linkedState.selectionColor;
+      } else if(mode === this.IntervalListMode.duration) {
           fillColor = this.linkedState.selectionColor;
       }
       var ctx = this.canvasElement.node().getContext("2d");
