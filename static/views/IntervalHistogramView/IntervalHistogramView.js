@@ -260,10 +260,12 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
   }
   drawAxes () {
     const bounds = this.getChartBounds();
+
+    var xaxes = d3.axisBottom(this.xScale).ticks(50,",.1s");//number of ticks, tick format
     // Update the x axis
     const xAxisGroup = this.svgElement.select('.xAxis')
         .attr('transform', `translate(0, ${this._bounds.height})`)
-        .call(d3.axisBottom(this.xScale));
+        .call(xaxes);
     cleanupAxis(xAxisGroup);
 
     // Position the x label
@@ -271,9 +273,13 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         .attr('x', this._bounds.width / 2)
         .attr('y', this._bounds.height + this.margin.bottom - this.emSize / 2);
 
+    var yaxes = d3.axisLeft(this.yScale)
+        .ticks(10,",.1s");
+        // .tickFormat(d3.format(",.0f"))
+        // .tickArguments([d3.every(15)]);
     // Update the y axis
     this.svgElement.select('.yAxis')
-        .call(d3.axisLeft(this.yScale));
+        .call(yaxes);
 
     // Position the y label
     this.svgElement.select('.yAxisLabel')
