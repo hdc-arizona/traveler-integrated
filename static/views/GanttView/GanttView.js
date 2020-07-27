@@ -365,8 +365,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
   }
   drawBarsCanvas(aggBins){
       var border = 1;
-      var fillColor = "#D9D9D9";
-      var borderColor = "#737373";
 
       this.localXScale.domain(this.xScale.domain());
       this.localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
@@ -398,23 +396,22 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
             var bucket_pix_offset = this.localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
             var pixel = aggBins.data[location].histogram[bucket];
             if (pixel === 1){
-              ctx.fillStyle = borderColor;
+              ctx.fillStyle = this.linkedState.contentBorderColor;
               ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
               ctx.fillRect(bucket_pix_offset, (loc_offset-border)+this.yScale.bandwidth(), 1, border);
-              ctx.fillStyle = fillColor;
+              ctx.fillStyle = this.linkedState.contentFillColor;
               ctx.rect(bucket_pix_offset, loc_offset+border, 1, this.yScale.bandwidth()-(2*border));
             }
             if (pixel < 1 && pixel > 0){
-              ctx.fillStyle = borderColor;
+              ctx.fillStyle = this.linkedState.contentBorderColor;
               ctx.fillRect(bucket_pix_offset, loc_offset, border, this.yScale.bandwidth());
             }
           }
         }
 
-        ctx.fillStyle = fillColor;
+        ctx.fillStyle = this.linkedState.contentFillColor;
         ctx.fill();
         this.visibleAggBinsMetadata = aggBins.metadata;
-
       }
       this.ctx = ctx;
       this.wasRerendered = true;
@@ -423,8 +420,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
   drawHighlightedBars(mode) {
       if(this.highlightedData == null)return;
       var border = 1;
-      var fillColor = "#D9D9D9";
-      var borderColor = "#737373";
+      var fillColor = this.linkedState.contentFillColor;
+      var borderColor = this.linkedState.contentBorderColor;
       if(mode === this.IntervalListMode.guid) {
           fillColor = this.linkedState.mouseHoverSelectionColor;
       } else if(mode === this.IntervalListMode.primitive) {

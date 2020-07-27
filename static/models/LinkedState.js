@@ -153,6 +153,12 @@ class LinkedState extends Model {
     // TODO: identify the color map based on the data, across views...
     return LinkedState.COLOR_SCHEMES[this.mode].timeScale;
   }
+  get contentFillColor () {
+    return LinkedState.COLOR_SCHEMES[this.mode].contentFillColor;
+  }
+  get contentBorderColor () {
+    return LinkedState.COLOR_SCHEMES[this.mode].contentBorderColor;
+  }
   get selectionColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].selectionColor;
   }
@@ -544,18 +550,24 @@ class LinkedState extends Model {
 }
 LinkedState.COLOR_SCHEMES = {
   Inclusive: {
+    contentFillColor: "#d9d9d9",
+    contentBorderColor: "#737373",
     mouseHoverSelectionColor: '#ff0500', // red
     selectionColor: '#e6ab02', // yellow
     traceBackColor: '#000000', // black
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple
   },
   Exclusive: {
+    contentFillColor: "#d9d9d9",
+    contentBorderColor: "#737373",
     mouseHoverSelectionColor: '#a30012', // red
     selectionColor: '#7570b3', // purple
     traceBackColor: '#000000', // black
     timeScale: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'] // green
   },
   Difference: {
+    contentFillColor: "#d9d9d9",
+    contentBorderColor: "#737373",
     mouseHoverSelectionColor: '#a30012', // red
     selectionColor: '#4daf4a', // green
     traceBackColor: '#000000', // black
