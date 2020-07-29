@@ -47,7 +47,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
       left: 40
     };
     this.content.select('.chart')
-      .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
+        .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
     // Prep interactive callbacks for the brush
     this.setupBrush();
 
@@ -57,7 +57,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
       // GanttView is zoomed)
       this.drawBrush();
     });
-    this.linkedState.on('histogramUpdated', () => {
+    this.linkedState.on('histogramsUpdated', () => {
       // Full render whenever we have new histograms
       this.render();
     });
@@ -77,6 +77,7 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
     } else if (data.error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
+      // console.log(data);
       // Set / update the scales
       this.xScale.domain(data.domain);
       this.yScale.domain([0, data.maxCount]);
@@ -87,16 +88,16 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
       // Update the overview paths
       this.drawPaths(this.content.select('.overview'), data.histogram);
 
-      // Update the currently selected primitive paths
-      const selectedPrimitive = this.content.select('.selectedPrimitive');
-      selectedPrimitive.style('display', data.primitiveHistogram ? null : 'none');
-      if (data.primitiveHistogram) {
-        selectedPrimitive.select('.area')
-          .style('fill', this.linkedState.selectionColor);
-        selectedPrimitive.select('.outline')
-          .style('stroke', this.linkedState.selectionColor);
-        this.drawPaths(selectedPrimitive, data.primitiveHistogram);
-      }
+      // // Update the currently selected primitive paths
+      // const selectedPrimitive = this.content.select('.selectedPrimitive');
+      // selectedPrimitive.style('display', data.primitiveHistogram ? null : 'none');
+      // if (data.primitiveHistogram) {
+      //   selectedPrimitive.select('.area')
+      //     .style('fill', this.linkedState.selectionColor);
+      //   selectedPrimitive.select('.outline')
+      //     .style('stroke', this.linkedState.selectionColor);
+      //   this.drawPaths(selectedPrimitive, data.primitiveHistogram);
+      // }
 
       // Update the brush
       this.drawBrush();
@@ -106,72 +107,72 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
     const bounds = this.getChartBounds();
     // Update the x axis
     const xAxis = this.content.select('.xAxis')
-      .attr('transform', `translate(0, ${bounds.height})`)
-      .call(d3.axisBottom(this.xScale));
+        .attr('transform', `translate(0, ${bounds.height})`)
+        .call(d3.axisBottom(this.xScale));
 
     cleanupAxis(xAxis);
 
     // Position the x label
     this.content.select('.xAxisLabel')
-      .attr('x', bounds.width / 2)
-      .attr('y', bounds.height + this.margin.bottom - this.emSize / 2);
+        .attr('x', bounds.width / 2)
+        .attr('y', bounds.height + this.margin.bottom - this.emSize / 2);
 
     // Update the y axis
     this.content.select('.yAxis')
-      .call(d3.axisLeft(this.yScale));
+        .call(d3.axisLeft(this.yScale));
 
     // Position the y label
     this.content.select('.yAxisLabel')
-      .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
+        .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
   drawPaths (container, histogram) {
     const outlinePathGenerator = d3.line()
-      .x(d => this.xScale((d[0] + d[1]) / 2))
-      .y(d => this.yScale(d[2]));
+        .x((d, i) => this.xScale(this.linkedState.getTimeStampFromBin(i, histogram.metadata)))
+        .y(d => this.yScale(d));
     container.select('.outline')
-      .datum(histogram)
-      .attr('d', outlinePathGenerator);
+        .datum(histogram.data)
+        .attr('d', outlinePathGenerator);
 
     const areaPathGenerator = d3.area()
-      .x(d => this.xScale((d[0] + d[1]) / 2))
-      .y1(d => this.yScale(d[2]))
-      .y0(this.yScale(0));
+        .x((d, i) => this.xScale(this.linkedState.getTimeStampFromBin(i, histogram.metadata)))
+        .y1(d => this.yScale(d))
+        .y0(this.yScale(0));
     container.select('.area')
-      .datum(histogram)
-      .attr('d', areaPathGenerator);
+        .datum(histogram.data)
+        .attr('d', areaPathGenerator);
   }
   setupBrush () {
     let initialState;
     const brush = this.content.select('.brush');
     const brushDrag = d3.drag()
-      .on('start', () => {
-        d3.event.sourceEvent.stopPropagation();
-        initialState = {
-          begin: this.linkedState.begin,
-          end: this.linkedState.end,
-          x: this.xScale.invert(d3.event.x)
-        };
-      })
-      .on('drag', () => {
-        let dx = this.xScale.invert(d3.event.x) - initialState.x;
-        let begin = initialState.begin + dx;
-        let end = initialState.end + dx;
-        // clamp to the lowest / highest possible values
-        if (begin <= this.linkedState.beginLimit) {
-          const offset = this.linkedState.beginLimit - begin;
-          begin += offset;
-          end += offset;
-        }
-        if (end >= this.linkedState.endLimit) {
-          const offset = end - this.linkedState.endLimit;
-          begin -= offset;
-          end -= offset;
-        }
-        this.linkedState.setIntervalWindow({ begin, end });
-        // For responsiveness, draw the brush immediately
-        // (instead of waiting around for debounced events / server calls)
-        this.drawBrush({ begin, end });
-      });
+        .on('start', () => {
+          d3.event.sourceEvent.stopPropagation();
+          initialState = {
+            begin: this.linkedState.begin,
+            end: this.linkedState.end,
+            x: this.xScale.invert(d3.event.x)
+          };
+        })
+        .on('drag', () => {
+          let dx = this.xScale.invert(d3.event.x) - initialState.x;
+          let begin = initialState.begin + dx;
+          let end = initialState.end + dx;
+          // clamp to the lowest / highest possible values
+          if (begin <= this.linkedState.beginLimit) {
+            const offset = this.linkedState.beginLimit - begin;
+            begin += offset;
+            end += offset;
+          }
+          if (end >= this.linkedState.endLimit) {
+            const offset = end - this.linkedState.endLimit;
+            begin -= offset;
+            end -= offset;
+          }
+          this.linkedState.setIntervalWindow({ begin, end });
+          // For responsiveness, draw the brush immediately
+          // (instead of waiting around for debounced events / server calls)
+          this.drawBrush({ begin, end });
+        });
     const leftDrag = d3.drag().on('drag', () => {
       d3.event.sourceEvent.stopPropagation();
       let begin = this.xScale.invert(d3.event.x);
@@ -201,35 +202,35 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
     brush.select('.rightHandle .hoverTarget').call(rightDrag);
 
     const directDrag = d3.drag()
-      .on('start', () => {
-        d3.event.sourceEvent.stopPropagation();
-        initialState = {
-          x0: this.xScale.invert(d3.event.x - this.margin.left)
-        };
-      })
-      .on('drag', () => {
-        let begin = initialState.x0;
-        let end = this.xScale.invert(d3.event.x - this.margin.left);
-        // In case we're dragging to the left...
-        if (end < begin) {
-          const temp = begin;
-          begin = end;
-          end = temp;
-        }
-        // clamp to the lowest / highest possible values
-        begin = Math.max(begin, this.linkedState.beginLimit);
-        end = Math.min(end, this.linkedState.endLimit);
-        this.linkedState.setIntervalWindow({ begin, end });
-        // For responsiveness, draw the brush immediately
-        // (instead of waiting around for debounced events / server calls)
-        this.drawBrush({ begin, end });
-      });
+        .on('start', () => {
+          d3.event.sourceEvent.stopPropagation();
+          initialState = {
+            x0: this.xScale.invert(d3.event.x - this.margin.left)
+          };
+        })
+        .on('drag', () => {
+          let begin = initialState.x0;
+          let end = this.xScale.invert(d3.event.x - this.margin.left);
+          // In case we're dragging to the left...
+          if (end < begin) {
+            const temp = begin;
+            begin = end;
+            end = temp;
+          }
+          // clamp to the lowest / highest possible values
+          begin = Math.max(begin, this.linkedState.beginLimit);
+          end = Math.min(end, this.linkedState.endLimit);
+          this.linkedState.setIntervalWindow({ begin, end });
+          // For responsiveness, draw the brush immediately
+          // (instead of waiting around for debounced events / server calls)
+          this.drawBrush({ begin, end });
+        });
     this.content.select('.chart').call(directDrag);
   }
   drawBrush ({
-    begin = this.linkedState.begin,
-    end = this.linkedState.end
-  } = {}) {
+               begin = this.linkedState.begin,
+               end = this.linkedState.end
+             } = {}) {
     const bounds = this.getChartBounds();
     let x1 = this.xScale(begin);
     const showLeftHandle = x1 >= 0 && x1 <= bounds.width;
@@ -250,48 +251,48 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
 
     const brush = this.content.select('.brush');
     brush.select('.area')
-      .attr('x', x1)
-      .attr('y', 0)
-      .attr('width', x2 - x1)
-      .attr('height', bounds.height);
+        .attr('x', x1)
+        .attr('y', 0)
+        .attr('width', x2 - x1)
+        .attr('height', bounds.height);
     brush.select('.top.outline')
-      .attr('y1', 0)
-      .attr('y2', 0);
+        .attr('y1', 0)
+        .attr('y2', 0);
     brush.select('.bottom.outline')
-      .attr('y1', bounds.height)
-      .attr('y2', bounds.height);
+        .attr('y1', bounds.height)
+        .attr('y2', bounds.height);
     brush.selectAll('.top.outline, .bottom.outline')
-      .attr('x1', x1)
-      .attr('x2', x2);
+        .attr('x1', x1)
+        .attr('x2', x2);
     brush.select('.leftHandle')
-      .style('display', showLeftHandle);
+        .style('display', showLeftHandle);
     brush.select('.rightHandle')
-      .style('display', showRightHandle);
+        .style('display', showRightHandle);
 
     if (showLeftHandle) {
       brush.select('.leftHandle .outline')
-        .attr('x1', x1)
-        .attr('x2', x1)
-        .attr('y1', 0)
-        .attr('y2', bounds.height);
+          .attr('x1', x1)
+          .attr('x2', x1)
+          .attr('y1', 0)
+          .attr('y2', bounds.height);
       brush.select('.leftHandle .hoverTarget')
-        .attr('x', x1 - handleWidth / 2 + x1Offset)
-        .attr('width', handleWidth)
-        .attr('y', 0)
-        .attr('height', bounds.height);
+          .attr('x', x1 - handleWidth / 2 + x1Offset)
+          .attr('width', handleWidth)
+          .attr('y', 0)
+          .attr('height', bounds.height);
     }
 
     if (showRightHandle) {
       brush.select('.rightHandle .outline')
-        .attr('x1', x2)
-        .attr('x2', x2)
-        .attr('y1', 0)
-        .attr('y2', bounds.height);
+          .attr('x1', x2)
+          .attr('x2', x2)
+          .attr('y1', 0)
+          .attr('y2', bounds.height);
       brush.select('.rightHandle .hoverTarget')
-        .attr('x', x2 - handleWidth / 2 + x2Offset)
-        .attr('width', handleWidth)
-        .attr('y', 0)
-        .attr('height', bounds.height);
+          .attr('x', x2 - handleWidth / 2 + x2Offset)
+          .attr('width', handleWidth)
+          .attr('y', 0)
+          .attr('height', bounds.height);
     }
   }
 }

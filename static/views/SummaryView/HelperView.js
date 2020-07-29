@@ -101,7 +101,7 @@ class HelperView extends LinkedMixin(View) {
           var newProcMetricView = {
             type: 'component',
             componentName: 'LineChartView',
-            componentState: { label: self.linkedState.label, metricType: metricType }
+            componentState: {label: self.linkedState.label, metricType: metricType}
           };
           if (param.startsWith('PAPI') === false) {
             metricType = param;

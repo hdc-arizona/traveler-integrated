@@ -9,7 +9,9 @@ class LinkedState extends Model {
     this.metadata = metadata;
     // Sometimes the locations aren't sorted (todo: enable interactive sorting?)
     if (this.metadata.locationNames) {
-      this.metadata.locationNames.sort();
+      this.metadata.locationNames.sort(function(a, b) {
+        return d3.ascending(parseInt(a), parseInt(b));
+      });
     }
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
@@ -21,13 +23,17 @@ class LinkedState extends Model {
     this.caches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
-    this.selectedProcMetric = 'meminfo:MemFree';
+    this.selectedProcMetric = '';//'meminfo:MemFree';
 
     // Start processes for collecting data
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
     })();
-    this.startIntervalStream();
+    this.fetchGanttAggBins();
+    this.caches.metricAggBins = {};
+    this._metricAggTimeout = {};
+    this.fetchMetricBins();
+    // this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
   }
@@ -50,6 +56,14 @@ class LinkedState extends Model {
     this._mode = newMode;
     this.trigger('changeMode');
   }
+  setGanttXResolution(value){
+    this.ganttXResolution = value|0;//round down
+    this.fetchGanttAggBins();
+  }
+  setMetricXResolution(value){
+    this.metricXResolution = value|0;//round down
+    this.fetchMetricBins();
+  }
   setHistogramResolution (value) {
     this.histogramResolution = value;
     this.updateHistogram();
@@ -68,7 +82,9 @@ class LinkedState extends Model {
     end = Math.min(this.endLimit, end);
     this.intervalWindow = [begin, end];
     this.updateHistogram();
-    this.startIntervalStream();
+    this.fetchGanttAggBins();
+    this.fetchMetricBins();
+    // this.startIntervalStream();
     this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalWindow', { begin, end });
@@ -123,7 +139,6 @@ class LinkedState extends Model {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
         views['LineChartView'] = false;
-        views['ProcMetricView'] = false;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -150,12 +165,34 @@ class LinkedState extends Model {
   get isLoadingHistogram () {
     return !this.caches.histogram;
   }
+  get isAggBinsLoaded(){
+    return !(this.caches.ganttAggBins === {});
+  }
+  isMetricBinsLoaded(metric){
+    return !(this.caches.metricAggBins[metric] === {});
+  }
+  getTimeStampFromBin(bin, metadata){
+    var offset = (metadata.end - metadata.begin)/ metadata.bins;
+    return metadata.begin + (bin*offset);
+  }
   getCurrentIntervals () {
     // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
     const oldIntervals = this.caches.intervals || {};
     const newIntervals = this.caches.newIntervals || {};
     return Object.assign({}, oldIntervals, newIntervals);
+  }
+  getCurrentGanttAggregrateBins () {
+    // Combine old data with any new data that's streaming in for more
+    // seamless zooming / panning
+    const ganttAggBins = this.caches.ganttAggBins || {};
+    return Object.assign({}, ganttAggBins);
+  }
+  getCurrentMetricBins (metric) {
+    // Combine old data with any new data that's streaming in for more
+    // seamless zooming / panning
+    const metricAggBins = this.caches.metricAggBins[metric] || {};
+    return Object.assign({}, metricAggBins);
   }
   getCurrentTraceback () {
     // Returns a right-to-left list of intervals
@@ -217,6 +254,86 @@ class LinkedState extends Model {
       }
     }
     return linkData;
+  }
+  //we query intervals as a set of pre-aggregrated pixel-wide bins
+  // the drawing process is significantly simplified and sped up from this
+  fetchGanttAggBins(){
+    var bins = this.ganttXResolution;
+    var queryRange = this.intervalWindow[1] - this.intervalWindow[0];
+
+    if(typeof this.caches.histogramDomain !== 'undefined'){
+      var begin = (this.intervalWindow[0] - queryRange > this.caches.histogramDomain[0]) ? this.intervalWindow[0] - queryRange : this.intervalWindow[0];
+      var end = (this.intervalWindow[1] + queryRange < this.caches.histogramDomain[1]) ? this.intervalWindow[1] + queryRange : this.intervalWindow[1];
+    }
+    else{
+      var begin = this.intervalWindow[0];
+      var end = this.intervalWindow[1];
+    }
+
+    //this function will replace the fetching of intervals
+    window.clearTimeout(this._ganttAggTimeout);
+    this._ganttAggTimeout = window.setTimeout(async () => {
+      //*****NetworkError on reload is here somewhere******//
+      if (bins){
+        const label = encodeURIComponent(this.label);
+        var endpt = `/datasets/${label}/ganttChartValues?bins=${bins}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
+        fetch(endpt)
+          .then((response) => {
+            return response.json();
+          })
+          .then((data) => {
+            this.caches.ganttAggBins = JSON.parse(data);
+            this.trigger('intervalsUpdated');
+          })
+          .catch(err => {
+            err.text.then( errorMessage => {
+              console.warn(errorMessage);
+            });
+          });
+      }
+    }, 50);
+
+  }
+  fetchMetricBins(){
+    if(this.selectedProcMetric.startsWith('PAPI') === true && !(this.selectedProcMetric in this.caches.metricAggBins)) {
+      this.caches.metricAggBins[this.selectedProcMetric] = {}
+    }
+
+    for( const curMetric in this.caches.metricAggBins) {
+      var bins = this.metricXResolution;
+      var queryRange = this.intervalWindow[1] - this.intervalWindow[0];
+      var begin = this.intervalWindow[0];
+      var end = this.intervalWindow[1];
+      if(typeof this.caches.histogramDomain !== 'undefined'){
+        begin = (this.intervalWindow[0] - queryRange > this.caches.histogramDomain[0]) ? this.intervalWindow[0] - queryRange : this.intervalWindow[0];
+        end = (this.intervalWindow[1] + queryRange < this.caches.histogramDomain[1]) ? this.intervalWindow[1] + queryRange : this.intervalWindow[1];
+      }
+      //this function will replace the fetching of intervals
+      window.clearTimeout(this._metricAggTimeout[curMetric]);
+      this._metricAggTimeout[curMetric] = window.setTimeout(async () => {
+        //*****NetworkError on reload is here somewhere******//
+        if (bins){
+          const label = encodeURIComponent(this.label);
+          var endpt = `/datasets/${label}/newMetricData?bins=${bins}&metric_type=${curMetric}&location=1&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
+          fetch(endpt)
+              .then((response) => {
+                return response.json();
+              })
+              .then((data) => {
+                this.caches.metricAggBins[curMetric] = data;
+                this.trigger('metricsUpdated');
+              })
+              .catch(err => {
+                err.text.then( errorMessage => {
+                  console.warn(errorMessage)
+                });
+              });
+        }
+      }, 50);
+    }
+
+
+
   }
   startIntervalStream () {
     // Debounce the start of this expensive process...
@@ -336,21 +453,16 @@ class LinkedState extends Model {
   }
   updateHistogram () {
     // Debounce...
-    window.clearTimeout(this._histogramTimeout);
-    this._histogramTimeout = window.setTimeout(async () => {
+    window.clearTimeout(this._histogramTimeoutNew);
+    this._histogramTimeoutNew = window.setTimeout(async () => {
       delete this.caches.histogram;
-      delete this.caches.primitiveHistogram;
       delete this.caches.histogramDomain;
       delete this.caches.histogramMaxCount;
 
       const label = encodeURIComponent(this.label);
-      const urls = [`/datasets/${label}/histogram?mode=utilization&bins=${this.histogramResolution}`];
-      if (this.selectedPrimitive) {
-        const primitive = encodeURIComponent(this.selectedPrimitive);
-        urls.push(`/datasets/${label}/histogram?mode=utilization&bins=${this.histogramResolution}&primitive=${primitive}`);
-      }
+      const urls = [`/datasets/${label}/drawValues?bins=${this.histogramResolution}`];
       try {
-        [this.caches.histogram, this.caches.primitiveHistogram] = await Promise.all(urls.map(url => d3.json(url)));
+        [this.caches.histogram] = await Promise.all(urls.map(url => d3.json(url)));
       } catch (e) {
         this.histogramError = e;
         return;
@@ -358,92 +470,22 @@ class LinkedState extends Model {
       delete this.histogramError;
 
       let maxCount = 0;
-      const domain = [Infinity, -Infinity];
-      for (const [begin, end, count] of this.caches.histogram) {
-        maxCount = Math.max(maxCount, count);
-        domain[0] = Math.min(begin, domain[0]);
-        domain[1] = Math.max(end, domain[1]);
+
+      let data = this.caches.histogram.data;
+      let metadata = this.caches.histogram.metadata;
+      const domain = [metadata.begin, metadata.end];
+      for (let bin in data) {
+        maxCount = Math.max(maxCount, data[bin]);
       }
       this.caches.histogramDomain = domain;
       this.caches.histogramMaxCount = maxCount;
-      this.trigger('histogramUpdated');
+      this.trigger('histogramsUpdated');
     }, 100);
-  }
-  getMaxMinOfMetric (metric) {
-    const intervalList = Object.values(this.getCurrentIntervals());
-    let maxY = Number.MIN_VALUE;
-    let minY = Number.MAX_VALUE;
-    const locationPosition = {};
-    for (const interval of intervalList) {
-      if ('metrics' in interval['enter'] && metric in interval['enter']['metrics']) {
-        maxY = Math.max(maxY, interval['enter']['metrics'][metric]);
-        minY = Math.min(minY, interval['enter']['metrics'][metric]);
-      }
-      if ('metrics' in interval['leave'] && metric in interval['leave']['metrics']) {
-        maxY = Math.max(maxY, interval['leave']['metrics'][metric]);
-        minY = Math.min(minY, interval['leave']['metrics'][metric]);
-      }
-    }
-    return {max: maxY, min: minY};
-  }
-  getCurrentMetricData (curMetric) {
-    var modifiedData = {maxY: Number.MIN_VALUE, minY: Number.MAX_VALUE, metricData: {}};
-    var intervalData = this.getCurrentIntervals();
-    var metricData = {};
-    var dataOfLocation = {};
-
-    var getPreviousKeyForLocation = function (i) {
-      if(i in dataOfLocation && dataOfLocation[i] in metricData)return dataOfLocation[i];
-      return null;
-    };
-
-    let maxY = Number.MIN_VALUE;
-    let minY = Number.MAX_VALUE;
-    for(const id in intervalData) {
-      let k = id + '_' + intervalData[id]['enter']['Timestamp'];
-      let preKey = getPreviousKeyForLocation(intervalData[id]['Location']);
-      let preX = 0;
-      let preY = 0;
-      let rate = 0;
-      if(preKey) {
-        preX = metricData[preKey].Timestamp;
-        preY = metricData[preKey].Value;
-        rate = metricData[preKey].Rate;
-      }
-      rate = Math.abs(intervalData[id]['enter']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['enter']['Timestamp'] - preX);
-      metricData[k] = {
-        Timestamp : intervalData[id]['enter']['Timestamp'],
-        Location : intervalData[id]['Location'],
-        Value : intervalData[id]['enter']['metrics'][curMetric],
-        Rate : rate
-      };
-      maxY = Math.max(maxY, rate);
-      minY = Math.min(minY, rate);
-
-      preKey = k;
-      preX = metricData[k].Timestamp;
-      preY = metricData[k].Value;
-      k = id + '_' + intervalData[id]['leave']['Timestamp'];
-      rate = Math.abs(intervalData[id]['leave']['metrics'][curMetric] - preY) / Math.abs(intervalData[id]['leave']['Timestamp'] - preX);
-      metricData[k] = {
-        Timestamp : intervalData[id]['leave']['Timestamp'],
-        Location : intervalData[id]['Location'],
-        Value : intervalData[id]['leave']['metrics'][curMetric],
-        Rate : rate
-      };
-      maxY = Math.max(maxY, rate);
-      minY = Math.min(minY, rate);
-      dataOfLocation[intervalData[id]['Location']] = k;
-    }
-    modifiedData.maxY = maxY;
-    modifiedData.minY = minY;
-    modifiedData.metricData = metricData;
-    return modifiedData;
   }
 }
 LinkedState.COLOR_SCHEMES = {
   Inclusive: {
-    mouseHoverSelectionColor: '#a30012', // red
+    mouseHoverSelectionColor: '#ff0500', // red
     selectionColor: '#e6ab02', // yellow
     traceBackColor: '#000000', // black
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple

@@ -1,3 +1,4 @@
+import copy
 import os
 import re
 import diskcache #pylint: disable=import-error
@@ -134,10 +135,6 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                 currentEvent[attrMatch.group(1)] = attrMatch.group(2)
         else:
             # This line contains additional event attributes
-            if currentEvent is None or addAttrLineMatch is None:
-                print(currentEvent)
-                print(addAttrLineMatch)
-                print(line)
             assert currentEvent is not None and addAttrLineMatch is not None
             attrList = addAttrSplitter.split(addAttrLineMatch.group(1))
             for attrStr in attrList:
@@ -157,54 +154,66 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
     # Now that we've seen all the locations, store that list in our metadata
     locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
 
+    def createNewInterval(event, lastEvent, intervalId):
+        newInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId}
+        # Copy all of the attributes from the OTF2 events into the interval object. If the values
+        # differ (or it's the timestamp), put them in nested enter / leave objects. Otherwise, put
+        # them directly in the interval object
+        for attr in set(event.keys()).union(lastEvent.keys()):
+            if attr not in event:
+                newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
+            elif attr not in lastEvent:  # pylint: disable=E1135
+                newInterval['leave'][attr] = event[attr]
+            elif attr != 'Timestamp' and attr != 'metrics' and event[attr] == lastEvent[attr]:  # pylint: disable=unsubscriptable-object
+                newInterval[attr] = event[attr]
+            else:
+                newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
+                newInterval['leave'][attr] = event[attr]
+        return newInterval
+
     # Combine the sorted enter / leave events into intervals
     await log('Combining enter / leave events into intervals (.=2500 intervals)')
     numIntervals = mismatchedIntervals = 0
     for location, eventList in self.sortedEventsByLocation.items():
-        lastEvent = None
+        lastEventStack = []
+        currentInterval = None
         for _, event in eventList:
             assert event is not None
+            intervalId = str(numIntervals)
             if event['Event'] == 'ENTER':
-                # Start an interval (don't output anything)
-                if lastEvent is not None:
-                    # TODO: factorial data used to trigger this... why?
-                    await log('WARNING: omitting ENTER event without a following LEAVE event (%s)' % lastEvent['name']) #pylint: disable=unsubscriptable-object
-                lastEvent = event
+                # check if there is an enter event in the stack, push a dummy leave event
+                if len(lastEventStack) > 0:
+                    dummyEvent = copy.deepcopy(lastEventStack[-1])
+                    dummyEvent['Event'] = 'LEAVE'
+                    dummyEvent['Timestamp'] = event['Timestamp'] - 1  # add a new dummy leave event in 1 time unit ago
+                    if 'metrics' in event:
+                        dummyEvent['metrics'] = copy.deepcopy(event['metrics'])
+                    currentInterval = createNewInterval(dummyEvent, lastEventStack[-1], intervalId)
+                lastEventStack.append(event)
             elif event['Event'] == 'LEAVE':
                 # Finish a interval
-                if lastEvent is None:
+                if len(lastEventStack) == 0:
                     # TODO: factorial data used to trigger this... why?
-                    await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['name'])
+                    await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['Primitive'])
                     continue
-                intervalId = str(numIntervals)
-                currentInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId}
-                # Copy all of the attributes from the OTF2 events into the interval object. If the values
-                # differ (or it's the timestamp), put them in nested enter / leave objects. Otherwise, put
-                # them directly in the interval object
-                for attr in set(event.keys()).union(lastEvent.keys()):
-                    if attr not in event:
-                        currentInterval['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
-                    elif attr not in lastEvent: #pylint: disable=E1135
-                        currentInterval['leave'][attr] = event[attr]
-                    elif attr != 'Timestamp' and event[attr] == lastEvent[attr]: #pylint: disable=unsubscriptable-object
-                        currentInterval[attr] = event[attr]
-                    else:
-                        currentInterval['enter'][attr] = lastEvent[attr] #pylint: disable=unsubscriptable-object
-                        currentInterval['leave'][attr] = event[attr]
+                lastEvent = lastEventStack.pop()
+                currentInterval = createNewInterval(event, lastEvent, intervalId)
+                if len(lastEventStack) > 0:
+                    lastEventStack[-1]['Timestamp'] = event['Timestamp'] + 1  # move the enter event to after 1 time unit
+            if currentInterval is not None:
                 # Count whether the primitive attribute differed between enter / leave
                 if 'Primitive' not in currentInterval:
                     mismatchedIntervals += 1
                 intervals[intervalId] = currentInterval
-
                 # Log that we've finished the finished interval
                 numIntervals += 1
                 if numIntervals % 2500 == 0:
                     await log('.', end='')
                 if numIntervals % 100000 == 0:
                     await log('processed %i intervals' % numIntervals)
-                lastEvent = None
+            currentInterval = None
         # Make sure there are no trailing ENTER events
-        if lastEvent is not None:
+        if len(lastEventStack) > 0:
             # TODO: fibonacci data triggers this... why?
             await log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
     del self.sortedEventsByLocation

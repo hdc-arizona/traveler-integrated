@@ -5,4 +5,6 @@ fastapi==0.31.0
 uvicorn==0.8.3
 python-multipart==0.0.5
 diskcache==4.1.0
+numpy==1.18.1
+cffi
 git+https://github.com/alex-r-bigelow/intervaltree.git@master#egg=intervaltree
