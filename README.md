@@ -22,6 +22,17 @@ source env/bin/activate
 pip3 install -r requirements.txt
 ```
 
+### Building C dependencies
+You will most likely need to build a C dependency for your specific
+architecture:
+
+```bash
+cd profiling_tools/clibs
+python3 rp_extension_build.py
+mv _cCalcBin.*.so ../
+rm _cCalcBin.* calcBin.o
+```
+
 ## Workflow
 Running traveler-integrated usually comes in two phases:
 [bundling](#bundling-data), and [serving](#serving)
