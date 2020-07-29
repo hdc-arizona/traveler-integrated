@@ -16,12 +16,13 @@
   },
   "homepage": "https://github.com/alex-r-bigelow/traveler-integrated#readme",
   "dependencies": {
-    "codemirror": "^5.53.2",
-    "d3": "^5.16.0",
+    "codemirror": "^5.48.0",
+    "d3": "^5.9.7",
     "golden-layout": "^1.5.9",
-    "jquery": "^3.5.1",
-    "less": "^3.11.1",
-    "oboe": "^2.1.5",
-    "uki": "0.5.6"
+    "jquery": "^3.4.1",
+    "less": "^3.9.0",
+    "oboe": "^2.1.4",
+    "serve": "^11.0.2",
+    "uki": "^0.3.0"
   }
 }
