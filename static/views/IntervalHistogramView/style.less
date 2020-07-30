@@ -1,0 +1,81 @@
+@import '../../style/colors.less';
+
+.IntervalHistogramView {
+  cursor: grab;
+  touch-action: none; /* Don't zoom the browser when the user pinches */
+  &:active {
+    cursor: grabbing;
+  }
+  text {
+    font: 9px sans-serif;
+  }
+  .background rect {
+    fill: transparent;
+  }
+  .svg-plot {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+  }
+  .cursor {
+    stroke-width: 1px;
+    stroke: @separatorColor;
+  }
+  .yAxis line {
+    stroke-weight: 1px;
+    stroke: @separatorColor;
+  }
+
+  .bar {
+    cursor: pointer;
+    .outline {
+      fill: none;
+      stroke-width: 1px;
+      stroke: @overviewColor;
+      vector-effect: non-scaling-stroke;
+    }
+    .area {
+      stroke: none;
+      opacity: 0.25;
+      fill: @overviewColor;
+    }
+    &:hover {
+      .area { opacity: 0.5; }
+    }
+    .traceback {
+      stroke: black;
+    }
+  }
+
+  .lines {
+    .line {
+      stroke-width: 1px;
+      stroke: black; /* TODO: Unify me */
+      vector-effect: non-scaling-stroke;
+    }
+  }
+
+  .histogram_brush {
+    cursor: grab;
+    opacity: 0.5;
+    stroke: black;
+    &:active {
+      cursor: grabbing;
+    }
+
+    .outline { stroke: @selectionColor; }
+    .area { fill: @selectionColor; }
+
+    .hoverTarget {
+      fill: transparent;
+    }
+    .leftHandle .hoverTarget {
+      cursor: w-resize;
+      stroke: none;
+    }
+    .rightHandle .hoverTarget {
+      cursor: e-resize;
+      stroke: none;
+    }
+  }
+}

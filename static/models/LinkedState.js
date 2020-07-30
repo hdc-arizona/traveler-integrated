@@ -16,10 +16,13 @@ class LinkedState extends Model {
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
+    this.intervalHistogram = {};
+    this.intervalHistogramWindow = {};
     this.cursorPosition = null;
     this.selectedPrimitive = null;
     this.selectedGUID = null;
     this.selectedIntervalId = null;
+    this.selectedPrimitiveHistogram = null;
     this.caches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
@@ -56,6 +59,18 @@ class LinkedState extends Model {
     this._mode = newMode;
     this.trigger('changeMode');
   }
+  get intervalHistogramBegin () {
+    return this.intervalHistogramWindow[this.selectedPrimitiveHistogram][0];
+  }
+  get intervalHistogramEnd () {
+    return this.intervalHistogramWindow[this.selectedPrimitiveHistogram][1];
+  }
+  get intervalHistogramBeginLimit () {
+    return this.intervalHistogram[this.selectedPrimitiveHistogram].metadata.begin;
+  }
+  get intervalHistogramEndLimit () {
+    return this.intervalHistogram[this.selectedPrimitiveHistogram].metadata.end;
+  }
   setGanttXResolution(value){
     this.ganttXResolution = value|0;//round down
     this.fetchGanttAggBins();
@@ -90,6 +105,23 @@ class LinkedState extends Model {
       this.stickyTrigger('newIntervalWindow', { begin, end });
     }
   }
+  setIntervalHistogramWindow ({
+                       begin = this.intervalHistogramBegin,
+                       end = this.intervalHistogramEnd
+                     } = {}) {
+    if (this.intervalHistogram === null) {
+      throw new Error("Can't set interval window; no interval histogram data");
+    }
+    const oldBegin = this.intervalHistogramBegin;
+    const oldEnd = this.intervalHistogramEnd;
+    // Clamp to where there's actually data
+    begin = Math.max(this.intervalHistogramBeginLimit, begin);
+    end = Math.min(this.intervalHistogramEndLimit, end);
+    this.intervalHistogramWindow[this.selectedPrimitiveHistogram] = [begin, end];
+    if (oldBegin !== begin || oldEnd !== end) {
+      this.stickyTrigger('newIntervalHistogramWindow', { begin, end });
+    }
+  }
   selectPrimitive (primitive) {
     if (primitive !== this.selectedPrimitive) {
       this.selectedPrimitive = primitive;
@@ -121,6 +153,12 @@ class LinkedState extends Model {
     // TODO: identify the color map based on the data, across views...
     return LinkedState.COLOR_SCHEMES[this.mode].timeScale;
   }
+  get contentFillColor () {
+    return LinkedState.COLOR_SCHEMES[this.mode].contentFillColor;
+  }
+  get contentBorderColor () {
+    return LinkedState.COLOR_SCHEMES[this.mode].contentBorderColor;
+  }
   get selectionColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].selectionColor;
   }
@@ -138,7 +176,7 @@ class LinkedState extends Model {
       } else if (fileType === 'otf2') {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
-        views['LineChartView'] = false;
+        views['IntervalHistogramView'] = false;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -164,6 +202,9 @@ class LinkedState extends Model {
   }
   get isLoadingHistogram () {
     return !this.caches.histogram;
+  }
+  get isLoadingPrimitiveHistogram () {
+    return !(this.selectedPrimitiveHistogram in this.intervalHistogram);
   }
   get isAggBinsLoaded(){
     return !(this.caches.ganttAggBins === {});
@@ -292,8 +333,8 @@ class LinkedState extends Model {
           });
       }
     }, 50);
-
   }
+
   fetchMetricBins(){
     if(this.selectedProcMetric.startsWith('PAPI') === true && !(this.selectedProcMetric in this.caches.metricAggBins)) {
       this.caches.metricAggBins[this.selectedProcMetric] = {}
@@ -482,21 +523,55 @@ class LinkedState extends Model {
       this.trigger('histogramsUpdated');
     }, 100);
   }
+  fetchIntervalHistogram(primitive){
+    var bins = 1000;
+
+    //this function will replace the fetching of intervals
+    window.clearTimeout(this._intervalDomainTimeout);
+    this._intervalDomainTimeout = window.setTimeout(async () => {
+      //*****NetworkError on reload is here somewhere******//
+      if (bins){
+        const label = encodeURIComponent(this.label);
+        var endpt = `/datasets/${label}/getIntervalDuration?bins=${bins}&primitive=${primitive}`;
+        fetch(endpt)
+            .then((response) => {
+              return response.json();
+            })
+            .then((data) => {
+              this.selectedPrimitiveHistogram = primitive;
+              this.intervalHistogram[primitive] = data;
+              this.intervalHistogramWindow[primitive] = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
+              this.trigger('intervalHistogramUpdated');
+            })
+            .catch(err => {
+              err.text.then( errorMessage => {
+                console.warn(errorMessage);
+              });
+            });
+      }
+    }, 50);
+  }
 }
 LinkedState.COLOR_SCHEMES = {
   Inclusive: {
+    contentFillColor: "#d9d9d9",
+    contentBorderColor: "#737373",
     mouseHoverSelectionColor: '#ff0500', // red
     selectionColor: '#e6ab02', // yellow
     traceBackColor: '#000000', // black
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple
   },
   Exclusive: {
+    contentFillColor: "#d9d9d9",
+    contentBorderColor: "#737373",
     mouseHoverSelectionColor: '#a30012', // red
     selectionColor: '#7570b3', // purple
     traceBackColor: '#000000', // black
     timeScale: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'] // green
   },
   Difference: {
+    contentFillColor: "#d9d9d9",
+    contentBorderColor: "#737373",
     mouseHoverSelectionColor: '#a30012', // red
     selectionColor: '#4daf4a', // green
     traceBackColor: '#000000', // black

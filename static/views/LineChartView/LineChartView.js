@@ -187,6 +187,10 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         preD = {'x': xx, 'y':data.data[i-1]};
       }
       this.drawLines(dd, preD);
+      if(dd.y != preD.y) {
+        this.drawCircle(dd);
+        this.drawCircle(preD);
+      }
     });
     this.wasRendered = true;
   }
@@ -196,6 +200,13 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.canvasContext.moveTo(preD.x, this.yScale(preD.y));
     this.canvasContext.lineTo(d.x, this.yScale(d.y));
     this.canvasContext.stroke();
+  }
+  drawCircle(d) {
+    var radius = 2;
+    this.canvasContext.beginPath();
+    this.canvasContext.arc(d.x, this.yScale(d.y), radius, 0, 2 * Math.PI, false);
+    this.canvasContext.fillStyle = 'black';
+    this.canvasContext.fill();
   }
   drawSpinner () {
     this.content.select('.small.spinner').style('display', 'none');

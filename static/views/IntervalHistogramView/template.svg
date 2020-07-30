@@ -1,0 +1,38 @@
+<svg class="svg-plot">
+  <defs>
+    <clipPath id="dummy">
+      <rect></rect>
+    </clipPath>
+  </defs>
+  <g class="chart">
+    <g class="background">
+      <rect></rect>
+      <image class="small spinner" style="display:none" x="-30" y="-10" width="20" height="20" xlink:href="img/spinner.gif"></image>
+      <line class="cursor" style="display:none"></line>
+      <g class="yAxis"></g>
+      <text class="yAxisLabel" text-anchor="middle">Rate</text>
+      <g class="xAxis"></g>
+      <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
+    </g>
+    <g class="clippedStuff">
+      <foreignObject class="histogram-container">
+        <canvas class="histogram-plot"></canvas>
+      </foreignObject>
+      <g class="dots"></g>
+      <g class="lines"></g>
+    </g>
+    <g class="histogram_brush">
+      <rect class="area"></rect>
+      <line class="top outline"></line>
+      <line class="bottom outline"></line>
+      <g class="leftHandle">
+        <line class="outline"></line>
+        <rect class="hoverTarget"></rect>
+      </g>
+      <g class="rightHandle">
+        <line class="outline"></line>
+        <rect class="hoverTarget"></rect>
+      </g>
+    </g>
+  </g>
+</svg>

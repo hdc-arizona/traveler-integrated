@@ -299,6 +299,12 @@ class HistogramMode(str, Enum):
     count = 'count'
 
 
+class IntervalFetchMode(str, Enum):
+    primitive = 'primitive'
+    guid = 'guid'
+    duration = 'duration'
+
+
 @app.get('/datasets/{label}/histogram')
 def histogram(label: str, \
               mode: HistogramMode = HistogramMode.utilization, \
@@ -483,7 +489,7 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
 
 
 @app.get('/datasets/{label}/getIntervalInfo')
-def guidIntervalIds(label: str, timestamp: int = None, location: str = '1'):
+def getIntervalInfo(label: str, timestamp: int = None, location: str = '1'):
     checkDatasetExistence(label)
     checkDatasetHasIntervals(label)
 
@@ -519,14 +525,24 @@ def guidIntervalIds(label: str, timestamp: int = None, location: str = '1'):
         return StreamingResponse(intervalInfoGenerator(), media_type='application/json')
 
 
-@app.get('/datasets/{label}/getPrimitiveList')
-def guidIntervalIds(label: str, begin: int = None, end: int = None, timestamp: int = None, location: str = '1', isPrimitive: bool = True):
+@app.get('/datasets/{label}/getIntervalList')
+def getIntervalList(label: str, \
+                    begin: int = None, \
+                    end: int = None, \
+                    enter: int = None, \
+                    leave: int = None, \
+                    location: str = '1', \
+                    primitive: str = None, \
+                    mode: IntervalFetchMode = IntervalFetchMode.primitive):
     checkDatasetExistence(label)
     checkDatasetHasIntervals(label)
 
     locList = {}
-    if timestamp is None:
+    if enter is None:
         return locList
+
+    if leave is None:
+        leave = enter + 1
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
@@ -534,19 +550,22 @@ def guidIntervalIds(label: str, begin: int = None, end: int = None, timestamp: i
         end = db[label]['meta']['intervalDomain'][1]
 
     prim = None
-    for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(timestamp, timestamp + 1):
-        prim = db[label]['intervals'][i.data]
-
-    if prim is None:
-        return locList
+    if mode is not IntervalFetchMode.duration:
+        for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(enter, leave):
+            prim = db[label]['intervals'][i.data]
+        if prim is None:
+            return locList
 
     for loc in db[label]['intervalIndexes']['locations']:
         locList[loc] = []
         for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
             cur = db[label]['intervals'][i.data]
-            if isPrimitive and cur['Primitive'] == prim['Primitive']:
+            interval_length = (cur['leave']['Timestamp'] - cur['enter']['Timestamp'])
+            if mode is IntervalFetchMode.primitive and cur['Primitive'] == prim['Primitive']:
                 locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
-            elif cur['GUID'] == prim['GUID']:
+            elif mode is IntervalFetchMode.guid and cur['GUID'] == prim['GUID']:
+                locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
+            elif mode is IntervalFetchMode.duration and primitive == cur['Primitive'] and enter <= interval_length <= leave:
                 locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
     return locList
 
@@ -599,6 +618,7 @@ def guidIntervalIds(label: str, guid: str):
 
 @app.get('/datasets/{label}/drawValues')
 def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = None, location: str = None):
+    checkDatasetExistence(label)
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
@@ -615,6 +635,7 @@ def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = Non
 
 @app.get('/datasets/{label}/newMetricData')
 def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = None, location: str = None, metric_type: str = None):
+    checkDatasetExistence(label)
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
@@ -631,6 +652,7 @@ def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = Non
 
 @app.get('/datasets/{label}/ganttChartValues')
 def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
+    checkDatasetExistence(label)
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
@@ -645,6 +667,30 @@ def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
     ret['metadata']['bins'] = bins
 
     return json.dumps(ret)
+
+
+@app.get('/datasets/{label}/getIntervalDuration')
+def getIntervalDuration(label: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None):
+    checkDatasetExistence(label)
+    if begin is None:
+        begin = int(db[label]['meta']['intervalDurationDomain'][primitive][0])
+    if end is None:
+        end = db[label]['meta']['intervalDurationDomain'][primitive][1]
+
+    ret = {}
+    if primitive is None:
+        return ret
+    ret['data'] = db[label]['sparseUtilizationList']['intervalDuration'][primitive].calcIntervalHistogram(bins, begin, end)
+    ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
+    return ret
+
+@app.get('/datasets/{label}/getPrimitiveList')
+def getPrimitiveList(label: str):
+    checkDatasetExistence(label)
+    ret = []
+    for primitive in db[label]['sparseUtilizationList']['intervalDuration']:
+        ret.append(primitive)
+    return ret
 
 #####################
 # Profilier Wrappers#

@@ -31,9 +31,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.wasRerendered = false;
     this.highlightedData = null;
     this.ClickState = {"background":0, "hover":1, "singleClick":2, "doubleClick":3};
+    this.IntervalListMode = {all: "all", primitive: "primitive", guid: "guid", duration: "duration"};
     this.isMouseInside = false;
+    this.pendingHighlightRequest = null;
+    this.renderingInProgress = false;
   }
-
   get isLoading () {
     return super.isLoading || this.linkedState.isLoadingIntervals || this.linkedState.isLoadingTraceback;
   }
@@ -108,8 +110,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       this.xScale.domain(this.linkedState.intervalWindow);
       // Update the axes immediately for smooth dragging responsiveness
       this.drawAxes();
-      // Make sure we render eventually
-      // this.render();
+      // no need to render here, it will get rendered on update
     });
     // const showSpinner = () => { this.drawSpinner(); };
     // this.linkedState.on('intervalStreamStarted', showSpinner);
@@ -120,6 +121,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       this.drawAxes();
       // Make sure we render eventually
       this.render();
+    });
+    this.linkedState.on('newIntervalHistogramWindow', () => {
+        window.clearTimeout(this.intervalHistogramFetchTimeout);
+        this.intervalHistogramFetchTimeout = window.setTimeout(async () => {
+            this.fetchAndDrawHighlightedBars(this.linkedState.intervalHistogramBegin,
+                this.linkedState.intervalHistogramEnd,
+                this.IntervalListMode.duration);
+        }, 300);
     });
     // this.linkedState.on('tracebackUpdated', () => {
     //   // This is an incremental update; we don't need to do a full render()...
@@ -144,8 +153,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
             __self.clearAllTimer();
             var dm = d3.mouse(__self.content.select('.canvas-container').node());
             __self._mouseClickTimeout = window.setTimeout(async () => {
-                __self.drawHighlightedBars(0);
-                __self.fetchPrimitiveList(dm[0], dm[1], true);
+                __self.fetchAndDrawHighlightedBars(dm[0], dm[1], __self.IntervalListMode.primitive);
             }, 300);
         })
         .on('mouseleave', function () {
@@ -161,8 +169,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
                 var dm = d3.mouse(__self.content.select('.canvas-container').node());
                 this._mouseHoverTimeout = window.setTimeout(async () => {
                     if(__self.isMouseInside === true) {
-                        __self.drawHighlightedBars(0);
-                        __self.fetchPrimitiveList(dm[0], dm[1], false);
+                        __self.fetchAndDrawHighlightedBars(dm[0], dm[1], __self.IntervalListMode.guid);
                     }
                 }, 100);
             }
@@ -181,10 +188,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       if(this._mouseClickTimeout) {
           window.clearTimeout(this._mouseClickTimeout);
           this._mouseClickTimeout = null;
-      }
-      if(this.primitiveFetchTimeout) {
-          window.clearTimeout(this.primitiveFetchTimeout);
-          this.primitiveFetchTimeout = null;
       }
   }
 
@@ -229,34 +232,54 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
               });
       }, 100);
   }
-  fetchPrimitiveList(xx, yy, isPrim){
+  fetchIntervalList(xx, yy, mode){
       var __self = this;
-      var tm = __self.localXScale.invert(xx);
-      var loc = __self.yScale.invert(yy);
+      var tm = 0;
+      var loc = 0;
+      if(mode === this.IntervalListMode.guid || mode === this.IntervalListMode.primitive) {
+          tm = __self.localXScale.invert(xx);
+          loc = __self.yScale.invert(yy);
+      } else if(mode === this.IntervalListMode.duration) {
+          tm = xx;
+          loc = yy;
+      }
       //this function will replace the fetching of intervals
-      window.clearTimeout(this.primitiveFetchTimeout);
+      // window.clearTimeout(this.primitiveFetchTimeout); dont clear time out here,
+      // we need to call rendering ends in the finally block
       this.primitiveFetchTimeout = window.setTimeout(async () => {
-          //*****NetworkError on reload is here somewhere******//
           const label = encodeURIComponent(this.linkedState.label);
           var begin = this.linkedState.intervalWindow[0];
           var end = this.linkedState.intervalWindow[1];
-          var endpt = `/datasets/${label}/getPrimitiveList?timestamp=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&isPrimitive=${isPrim}`;
+          var endpt = `/datasets/${label}/getIntervalList?`;
+          endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&mode=${mode}`;
+          endpt += `&primitive=${this.linkedState.selectedPrimitiveHistogram}`;
+          if(mode === this.IntervalListMode.duration) {
+              endpt += `&leave=${Math.ceil(loc)}`;// loc in location isnt used if mode is duration
+          }
           fetch(endpt)
               .then((response) => {
                   return response.json();
               })
               .then((data) => {
                   __self.highlightedData = data;
-                  __self.currentClickState = isPrim?__self.ClickState.singleClick:__self.ClickState.hover;
-                  __self.drawHighlightedBars(__self.currentClickState);
+                  if(mode === __self.IntervalListMode.primitive) {
+                      __self.currentClickState = __self.ClickState.singleClick;
+                  } else if(mode === __self.IntervalListMode.guid) {
+                      __self.currentClickState = __self.ClickState.hover;
+                  } else {
+                      __self.currentClickState = __self.ClickState.background;
+                  }
+                  __self.drawHighlightedBars(mode);
               })
               .catch(err => {
                   err.text.then( errorMessage => {
                       console.warn(errorMessage);
                   });
-              });
+              }).finally(() => {
+                __self.intervalRenderingEnds();
+          });
       }, 100);
-    }
+  }
   draw () {
     super.draw();
 
@@ -341,10 +364,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
   }
   drawBarsCanvas(aggBins){
+      this.highlightedData = null;
       var border = 1;
-      var fillColor = "#D9D9D9";
-      var borderColor = "#737373";
-
       this.localXScale.domain(this.xScale.domain());
       this.localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
@@ -375,68 +396,95 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
             var bucket_pix_offset = this.localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
             var pixel = aggBins.data[location].histogram[bucket];
             if (pixel === 1){
-              ctx.fillStyle = borderColor;
+              ctx.fillStyle = this.linkedState.contentBorderColor;
               ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
               ctx.fillRect(bucket_pix_offset, (loc_offset-border)+this.yScale.bandwidth(), 1, border);
-              ctx.fillStyle = fillColor;
+              ctx.fillStyle = this.linkedState.contentFillColor;
               ctx.rect(bucket_pix_offset, loc_offset+border, 1, this.yScale.bandwidth()-(2*border));
             }
             if (pixel < 1 && pixel > 0){
-              ctx.fillStyle = borderColor;
+              ctx.fillStyle = this.linkedState.contentBorderColor;
               ctx.fillRect(bucket_pix_offset, loc_offset, border, this.yScale.bandwidth());
             }
           }
         }
 
-        ctx.fillStyle = fillColor;
+        ctx.fillStyle = this.linkedState.contentFillColor;
         ctx.fill();
         this.visibleAggBinsMetadata = aggBins.metadata;
-
       }
       this.ctx = ctx;
       this.wasRerendered = true;
-
   }
-  drawHighlightedBars(isClear) {
-      if(this.highlightedData == null)return;
-      var border = 1;
-      var fillColor = "#D9D9D9";
-      var borderColor = "#737373";
-      if(isClear === this.ClickState.hover) {
-          fillColor = this.linkedState.mouseHoverSelectionColor;
-      } else if(isClear === this.ClickState.singleClick) {
-          fillColor = this.linkedState.selectionColor;
+  intervalRenderingBegins(x, y, mode){
+      if(this.renderingInProgress === true) {
+          this.pendingHighlightRequest = {x: x, y: y, mode: mode};
+          return true;
       }
-      var ctx = this.canvasElement.node().getContext("2d");
-      var bins = this.getSpilloverWidth(this._bounds.width);
-      var notDrawn = true;
-      for(var loc in this.highlightedData) {
-          var loc_offset = this.yScale(parseInt(loc));
-          if(this.highlightedData[loc].length === 0)continue;
-          notDrawn = false;
-          for(var i = 0; i < bins; i++){
-              var thisTime = this.linkedState.getTimeStampFromBin(i, this.visibleAggBinsMetadata);
-              var bucket_pix_offset = this.localXScale(thisTime);
-              for (var elm in this.highlightedData[loc]) {
-                  if(thisTime >= this.highlightedData[loc][elm]['enter'] && thisTime <= this.highlightedData[loc][elm]['leave']) {
+      this.renderingInProgress = true;
+      return false;
+  }
+  intervalRenderingEnds(){
+      this.renderingInProgress = false;
+      if(this.pendingHighlightRequest){
+          let x = this.pendingHighlightRequest.x;
+          let y = this.pendingHighlightRequest.y;
+          let mode = this.pendingHighlightRequest.mode;
+          this.pendingHighlightRequest = null;
+          this.fetchAndDrawHighlightedBars(x, y, mode);
+      }
+  }
+  fetchAndDrawHighlightedBars(x, y, mode) {
+      if(this.intervalRenderingBegins(x, y, mode) === true) return;
+      this.drawHighlightedBars(this.IntervalListMode.all);
+      this.fetchIntervalList(x, y, mode);
+  }
+  drawHighlightedBars(mode) {
+      if(this.highlightedData) {
+          var border = 1;
+          var fillColor = this.linkedState.contentFillColor;
+          var borderColor = this.linkedState.contentBorderColor;
+          if (mode === this.IntervalListMode.guid) {
+              fillColor = this.linkedState.mouseHoverSelectionColor;
+          } else if (mode === this.IntervalListMode.primitive) {
+              fillColor = this.linkedState.selectionColor;
+          } else if (mode === this.IntervalListMode.duration) {
+              fillColor = this.linkedState.selectionColor;
+          }
+          var ctx = this.canvasElement.node().getContext("2d");
+          var bins = this.getSpilloverWidth(this._bounds.width);
+          var notDrawn = true;
+          for (var loc in this.highlightedData) {
+              var loc_offset = this.yScale(parseInt(loc));
+              if (this.highlightedData[loc].length === 0) continue;
+              notDrawn = false;
+              for (var i = 0; i < bins; i++) {
+                  var thisTime = this.linkedState.getTimeStampFromBin(i, this.visibleAggBinsMetadata);
+                  var bucket_pix_offset = this.localXScale(thisTime);
+                  for (var elm in this.highlightedData[loc]) {
+                      if (thisTime >= this.highlightedData[loc][elm]['enter'] && thisTime <= this.highlightedData[loc][elm]['leave']) {
 
-                      ctx.fillStyle = borderColor;
-                      ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
-                      ctx.fillRect(bucket_pix_offset, (loc_offset-border)+this.yScale.bandwidth(), 1, border);
+                          ctx.fillStyle = borderColor;
+                          ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
+                          ctx.fillRect(bucket_pix_offset, (loc_offset - border) + this.yScale.bandwidth(), 1, border);
 
 
-                      ctx.fillStyle = fillColor;
-                      ctx.fillRect(bucket_pix_offset, loc_offset+border, 1, this.yScale.bandwidth()-(2*border));
-                      break;
-                  }
-                  if(thisTime < this.highlightedData[loc][elm]['enter']) {
-                      break;
+                          ctx.fillStyle = fillColor;
+                          ctx.fillRect(bucket_pix_offset, loc_offset + border, 1, this.yScale.bandwidth() - (2 * border));
+                          break;
+                      }
+                      if (thisTime < this.highlightedData[loc][elm]['enter']) {
+                          break;
+                      }
                   }
               }
           }
-      }
-      if(notDrawn) {
-          this.currentClickState = this.ClickState.background;
+          if (notDrawn) {
+              this.currentClickState = this.ClickState.background;
+          }
+          if(mode === this.IntervalListMode.all) {
+              this.highlightedData = null;
+          }
       }
   }
   drawBars (intervals) {
@@ -608,9 +656,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         const actualZoomFactor = latentWidth / ((actualBounds.end - actualBounds.begin));
         const zoomCenter = (1 - actualZoomFactor) * overflowAdjustedMousedScreenPont;
 
-        // this.content.selectAll('.bars, .links')
-        // .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
-
         // There isn't a begin / end wheel event, so trigger the update across
         // views immediately
         // window.clearTimeout(this._incrementalIntervalTimeout);
@@ -650,15 +695,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
               .domain(this.xScale.domain())
               .range(this.xScale.range())
           };
-
-          // var ctx = this.canvasElement.node().getContext("2d");
-          //
-          // var buffer = document.createElement("CANVAS");
-          // buffer.height = this.canvasElement.attr('height');
-          // buffer.width = this.canvasElement.attr('width');
-          //
-          // this.buff = buffer.getContext("2d");
-          // this.buff.drawImage(ctx.canvas, 0, 0);
         })
         .on('drag', () => {
           if(this.wasRerendered === true){
@@ -693,7 +729,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           // For responsiveness, draw the axes immediately (the debounced, full
           // render() triggered by changing linkedState may take a while)
           this.drawAxes();
-          // this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
 
           // Patch a temporary translation to the bars / links layers (this gets
           // removed by full drawBars() / drawLinks() calls)

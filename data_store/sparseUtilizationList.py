@@ -18,9 +18,7 @@ class SparseUtilizationList():
         self.cLocationDict[loc] = copy.deepcopy(val)
 
     def sortAtLoc(self, loc):
-        # self.locationDict[loc].sort(key=lambda x: x['index'])
-        sorted(self.locationDict[loc], key=lambda x: x['index'])
-        return
+        self.locationDict[loc].sort(key=lambda x: x['index'])
 
     def calcCurrentUtil(self, index, prior):
         if prior is None:
@@ -78,6 +76,10 @@ class SparseUtilizationList():
 
         return array
 
+    # Calculates histogram for interval duration
+    def calcIntervalHistogram(self, bins=100, begin=None, end=None):
+        return self.calcUtilizationForLocation(bins, begin, end, 1, False)
+
     # Calulates utilization for one location in a Gantt chart
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart
     def calcUtilizationForLocation(self, bins=100, begin=None, end=None, Location=None, isInterval=True):
@@ -131,10 +133,11 @@ async def loadSUL(label, db, log=logToConsole):
     await log('Loading sparse utilization list.')
 
     # create sul obj
-    sul = {'intervals': SparseUtilizationList(), 'metrics': dict()}
+    sul = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'intervalDuration': dict()}
     begin = db[label]['meta']['intervalDomain'][0]
     end = db[label]['meta']['intervalDomain'][1]
     preMetricValue = dict()
+    intervalDuration = dict()
 
     def updateSULForInterval(event, cur_location):
         if 'metrics' in event:
@@ -147,6 +150,18 @@ async def loadSUL(label, db, log=logToConsole):
                 preMetricValue[k]['Timestamp'] = event['Timestamp']
                 preMetricValue[k]['Value'] = value
 
+    def updateIntervalDuration(event):
+        duration = event['leave']['Timestamp'] - event['enter']['Timestamp']
+        if "Primitive" in event:
+            if event['Primitive'] in intervalDuration:
+                if duration in intervalDuration[event['Primitive']]:
+                    intervalDuration[event['Primitive']][duration] = intervalDuration[event['Primitive']][duration] + 1
+                else:
+                    intervalDuration[event['Primitive']][duration] = 1
+            else:
+                intervalDuration[event['Primitive']] = dict()
+                intervalDuration[event['Primitive']][duration] = 1
+
     # we extract relevant data from database
     for loc in db[label]['intervalIndexes']['locations']:
         counter = 0
@@ -155,6 +170,7 @@ async def loadSUL(label, db, log=logToConsole):
             sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0}, loc)
             updateSULForInterval(db[label]['intervals'][i.data]['enter'], loc)
             updateSULForInterval(db[label]['intervals'][i.data]['leave'], loc)
+            updateIntervalDuration(db[label]['intervals'][i.data])
 
         sul['intervals'].sortAtLoc(loc)
         sul['intervals'].locationDict[loc] = np.array(sul['intervals'].locationDict[loc])
@@ -178,6 +194,7 @@ async def loadSUL(label, db, log=logToConsole):
             locStruct['util'][i] = sul['intervals'].locationDict[loc][i]['util']
 
         sul['intervals'].setCLocation(loc, locStruct)
+        # print("interval loc struct initiated")
 
         for key in sul['metrics']:
             length = len(sul['metrics'][key].locationDict[loc])
@@ -188,6 +205,32 @@ async def loadSUL(label, db, log=logToConsole):
                 mlocStruct['util'][i] = sul['metrics'][key].locationDict[loc][i]['util']
 
             sul['metrics'][key].setCLocation(loc, mlocStruct)
+        # print("metric loc struct initiated")
+
+    dummyLocation = 1
+    intervalDurationDomainDict = dict()
+    for primitive in intervalDuration:
+        sul['intervalDuration'][primitive] = SparseUtilizationList()
+        for ind, value in intervalDuration[primitive].items():
+            sul['intervalDuration'][primitive].setIntervalAtLocation({'index': int(ind), 'counter': 0, 'util': value}, dummyLocation)
+
+        sul['intervalDuration'][primitive].sortAtLoc(dummyLocation)
+        length = len(sul['intervalDuration'][primitive].locationDict[dummyLocation])
+        intervalDurationDomainDict[primitive] = [
+            sul['intervalDuration'][primitive].locationDict[dummyLocation][0]['index'],
+            sul['intervalDuration'][primitive].locationDict[dummyLocation][length-1]['index']
+        ]
+        sul['intervalDuration'][primitive].locationDict[dummyLocation] = np.array(sul['intervalDuration'][primitive].locationDict[dummyLocation])
+        LS = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
+        for i in range(length):
+            LS['index'][i] = sul['intervalDuration'][primitive].locationDict[dummyLocation][i]['index']
+            LS['counter'][i] = sul['intervalDuration'][primitive].locationDict[dummyLocation][i]['counter']
+            LS['util'][i] = sul['intervalDuration'][primitive].locationDict[dummyLocation][i]['util']
+            if i > 0:
+                LS['util'][i] = LS['util'][i] + LS['util'][i-1]
+
+        sul['intervalDuration'][primitive].setCLocation(dummyLocation, LS)
+    db[label]['meta']['intervalDurationDomain'] = intervalDurationDomainDict
     db[label]['sparseUtilizationList'] = sul
 
     return
