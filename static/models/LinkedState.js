@@ -39,7 +39,6 @@ class LinkedState extends Model {
     // this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
-    // this.fetchIntervalHistogram();
   }
   get begin () {
     return this.intervalWindow[0];

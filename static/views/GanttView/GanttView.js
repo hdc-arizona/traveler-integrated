@@ -656,9 +656,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         const actualZoomFactor = latentWidth / ((actualBounds.end - actualBounds.begin));
         const zoomCenter = (1 - actualZoomFactor) * overflowAdjustedMousedScreenPont;
 
-        // this.content.selectAll('.bars, .links')
-        // .attr('transform', `translate(${zoomCenter}, 0) scale(${actualZoomFactor}, 1)`);
-
         // There isn't a begin / end wheel event, so trigger the update across
         // views immediately
         // window.clearTimeout(this._incrementalIntervalTimeout);
@@ -698,15 +695,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
               .domain(this.xScale.domain())
               .range(this.xScale.range())
           };
-
-          // var ctx = this.canvasElement.node().getContext("2d");
-          //
-          // var buffer = document.createElement("CANVAS");
-          // buffer.height = this.canvasElement.attr('height');
-          // buffer.width = this.canvasElement.attr('width');
-          //
-          // this.buff = buffer.getContext("2d");
-          // this.buff.drawImage(ctx.canvas, 0, 0);
         })
         .on('drag', () => {
           if(this.wasRerendered === true){
