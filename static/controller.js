@@ -188,10 +188,10 @@ class Controller {
           type: 'component',
           componentName: 'UtilizationView',
           componentState: { label: linkedState.label }
-        }, {
-          type: 'component',
-          componentName: 'IntervalHistogramView',
-          componentState: { label: linkedState.label }
+        // }, {
+        //   type: 'component',
+        //   componentName: 'IntervalHistogramView',
+        //   componentState: { label: linkedState.label }
         }
       ]
       });

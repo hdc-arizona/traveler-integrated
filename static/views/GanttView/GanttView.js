@@ -252,6 +252,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           var end = this.linkedState.intervalWindow[1];
           var endpt = `/datasets/${label}/getIntervalList?`;
           endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&mode=${mode}`;
+          endpt += `&primitive=${this.linkedState.selectedPrimitiveHistogram}`;
           if(mode === this.IntervalListMode.duration) {
               endpt += `&leave=${Math.ceil(loc)}`;// loc in location isnt used if mode is duration
           }

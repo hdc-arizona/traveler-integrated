@@ -29,13 +29,14 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     this.initialDragState = null;
     this.ClickState = {"background":0, "hover":1, "singleClick":2, "doubleClick":3};
     this.isMouseInside = false;
+    this.curPrimitive = this.linkedState.selectedPrimitiveHistogram;
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `IntervalHistogramView${IntervalHistogramView.DOM_COUNT}`;
     IntervalHistogramView.DOM_COUNT++;
   }
   get isLoading () {
-    return super.isLoading || this.linkedState.isLoadingIntervals;
+    return super.isLoading || this.linkedState.isLoadingPrimitiveHistogram;
   }
   get isEmpty () {
     return this.error;
@@ -116,13 +117,12 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         //   console.log("dbl clicked");
         // });
     this.canvasContext = this.canvasElement.node().getContext('2d');
-    var xWindow = [this.linkedState.intervalHistogramBeginLimit, this.linkedState.intervalHistogramEndLimit];
-    this.xScale.domain(xWindow).nice();
-    this.setupBrush();
-    // this.linkedState.on('intervalHistogramUpdated', () => {
-    //   // Full render whenever we have new histograms
-    //   this.updateTheView();
-    // });
+    this.linkedState.fetchIntervalHistogram(this.curPrimitive);
+    this.linkedState.on('intervalHistogramUpdated', () => {
+      if(this.curPrimitive === this.linkedState.selectedPrimitiveHistogram) {
+        this.updateTheView();
+      }
+    });
   }
   clearAllTimer() {
     if(this._mouseHoverTimeout) {
@@ -169,6 +169,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
   updateTheView() {
     var xWindow = [this.linkedState.intervalHistogramBeginLimit, this.linkedState.intervalHistogramEndLimit];
     this.xScale.domain(xWindow).nice();
+    this.setupBrush();
     this.render();
   }
   draw () {
@@ -181,11 +182,8 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
         return;
       }
-      // else if (this.linkedState.tooManyIntervals) {
-      //   this.emptyStateDiv.html('<p>No data in the current view</p>');
-      // } else {
-      //   this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
-      // }
+    } else if(this.isLoading) {
+      return;
     }
     // Update the dimensions of the plot in case we were resized (NOT updated by
     // immediately-drawn things like drawAxes that get executed repeatedly by
@@ -214,8 +212,8 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     var localXScale = this.xScale;
 
     this._bounds = this.getChartBounds();
-    if(this.linkedState.intervalHistogram === null)return;
-    const data = this.linkedState.intervalHistogram;
+    if(!(this.curPrimitive in this.linkedState.intervalHistogram))return;
+    const data = this.linkedState.intervalHistogram[this.curPrimitive];
 
     var maxY = Number.MIN_VALUE;
     var minY = Number.MAX_VALUE;
@@ -292,6 +290,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     const brushDrag = d3.drag()
         .on('start', () => {
           // d3.event.sourceEvent.stopPropagation();
+          this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
           initialState = {
             begin: this.linkedState.intervalHistogramBegin,
             end: this.linkedState.intervalHistogramEnd,
@@ -299,6 +298,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
           };
         })
         .on('drag', () => {
+          this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
           let dx = this.xScale.invert(d3.event.x) - initialState.x;
           let begin = initialState.begin + dx;
           let end = initialState.end + dx;
@@ -319,6 +319,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
           this.drawBrush({ begin, end });
         });
     const leftDrag = d3.drag().on('drag', () => {
+      this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
       // d3.event.sourceEvent.stopPropagation();
       let begin = this.xScale.invert(d3.event.x);
       // clamp to the lowest possible value
@@ -331,6 +332,7 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
       this.drawBrush({ begin });
     });
     const rightDrag = d3.drag().on('drag', () => {
+      this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
       // d3.event.sourceEvent.stopPropagation();
       let end = this.xScale.invert(d3.event.x);
       // clamp to the highest possible value

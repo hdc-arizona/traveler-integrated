@@ -532,6 +532,7 @@ def getIntervalList(label: str, \
                     enter: int = None, \
                     leave: int = None, \
                     location: str = '1', \
+                    primitive: str = None, \
                     mode: IntervalFetchMode = IntervalFetchMode.primitive):
     checkDatasetExistence(label)
     checkDatasetHasIntervals(label)
@@ -564,7 +565,7 @@ def getIntervalList(label: str, \
                 locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
             elif mode is IntervalFetchMode.guid and cur['GUID'] == prim['GUID']:
                 locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
-            elif mode is IntervalFetchMode.duration and enter <= interval_length <= leave:
+            elif mode is IntervalFetchMode.duration and primitive == cur['Primitive'] and enter <= interval_length <= leave:
                 locList[loc].append({'enter': cur['enter']['Timestamp'], 'leave': cur['leave']['Timestamp']})
     return locList
 
@@ -617,6 +618,7 @@ def guidIntervalIds(label: str, guid: str):
 
 @app.get('/datasets/{label}/drawValues')
 def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = None, location: str = None):
+    checkDatasetExistence(label)
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
@@ -633,6 +635,7 @@ def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = Non
 
 @app.get('/datasets/{label}/newMetricData')
 def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = None, location: str = None, metric_type: str = None):
+    checkDatasetExistence(label)
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
@@ -649,6 +652,7 @@ def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = Non
 
 @app.get('/datasets/{label}/ganttChartValues')
 def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
+    checkDatasetExistence(label)
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
@@ -666,17 +670,27 @@ def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
 
 
 @app.get('/datasets/{label}/getIntervalDuration')
-def getIntervalDuration(label: str, bins: int = 100, begin: int = None, end: int = None):
+def getIntervalDuration(label: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None):
+    checkDatasetExistence(label)
     if begin is None:
-        begin = int(db[label]['meta']['intervalDurationDomain'][0])
+        begin = int(db[label]['meta']['intervalDurationDomain'][primitive][0])
     if end is None:
-        end = db[label]['meta']['intervalDurationDomain'][1]
+        end = db[label]['meta']['intervalDurationDomain'][primitive][1]
 
     ret = {}
-    ret['data'] = db[label]['sparseUtilizationList']['intervalDuration'].calcIntervalHistogram(bins, begin, end)
+    if primitive is None:
+        return ret
+    ret['data'] = db[label]['sparseUtilizationList']['intervalDuration'][primitive].calcIntervalHistogram(bins, begin, end)
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 
+@app.get('/datasets/{label}/getPrimitiveList')
+def getPrimitiveList(label: str):
+    checkDatasetExistence(label)
+    ret = []
+    for primitive in db[label]['sparseUtilizationList']['intervalDuration']:
+        ret.append(primitive)
+    return ret
 
 #####################
 # Profilier Wrappers#

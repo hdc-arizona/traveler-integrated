@@ -16,12 +16,13 @@ class LinkedState extends Model {
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
     this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
-    this.intervalHistogram = null;
-    this.intervalHistogramWindow = null;
+    this.intervalHistogram = {};
+    this.intervalHistogramWindow = {};
     this.cursorPosition = null;
     this.selectedPrimitive = null;
     this.selectedGUID = null;
     this.selectedIntervalId = null;
+    this.selectedPrimitiveHistogram = null;
     this.caches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
@@ -38,7 +39,7 @@ class LinkedState extends Model {
     // this.startIntervalStream();
     this.startTracebackStream();
     this.updateHistogram();
-    this.fetchIntervalHistogram();
+    // this.fetchIntervalHistogram();
   }
   get begin () {
     return this.intervalWindow[0];
@@ -60,16 +61,16 @@ class LinkedState extends Model {
     this.trigger('changeMode');
   }
   get intervalHistogramBegin () {
-    return this.intervalHistogramWindow[0];
+    return this.intervalHistogramWindow[this.selectedPrimitiveHistogram][0];
   }
   get intervalHistogramEnd () {
-    return this.intervalHistogramWindow[1];
+    return this.intervalHistogramWindow[this.selectedPrimitiveHistogram][1];
   }
   get intervalHistogramBeginLimit () {
-    return this.intervalHistogram.metadata.begin;
+    return this.intervalHistogram[this.selectedPrimitiveHistogram].metadata.begin;
   }
   get intervalHistogramEndLimit () {
-    return this.intervalHistogram.metadata.end;
+    return this.intervalHistogram[this.selectedPrimitiveHistogram].metadata.end;
   }
   setGanttXResolution(value){
     this.ganttXResolution = value|0;//round down
@@ -117,7 +118,7 @@ class LinkedState extends Model {
     // Clamp to where there's actually data
     begin = Math.max(this.intervalHistogramBeginLimit, begin);
     end = Math.min(this.intervalHistogramEndLimit, end);
-    this.intervalHistogramWindow = [begin, end];
+    this.intervalHistogramWindow[this.selectedPrimitiveHistogram] = [begin, end];
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalHistogramWindow', { begin, end });
     }
@@ -176,7 +177,7 @@ class LinkedState extends Model {
       } else if (fileType === 'otf2') {
         views['GanttView'] = true;
         views['UtilizationView'] = true;
-        views['IntervalHistogramView'] = true;
+        views['IntervalHistogramView'] = false;
       } else if (fileType === 'cpp') {
         views['CppView'] = true;
       } else if (fileType === 'python') {
@@ -202,6 +203,9 @@ class LinkedState extends Model {
   }
   get isLoadingHistogram () {
     return !this.caches.histogram;
+  }
+  get isLoadingPrimitiveHistogram () {
+    return !(this.selectedPrimitiveHistogram in this.intervalHistogram);
   }
   get isAggBinsLoaded(){
     return !(this.caches.ganttAggBins === {});
@@ -330,8 +334,8 @@ class LinkedState extends Model {
           });
       }
     }, 50);
-
   }
+
   fetchMetricBins(){
     if(this.selectedProcMetric.startsWith('PAPI') === true && !(this.selectedProcMetric in this.caches.metricAggBins)) {
       this.caches.metricAggBins[this.selectedProcMetric] = {}
@@ -520,7 +524,7 @@ class LinkedState extends Model {
       this.trigger('histogramsUpdated');
     }, 100);
   }
-  fetchIntervalHistogram(){
+  fetchIntervalHistogram(primitive){
     var bins = 1000;
 
     //this function will replace the fetching of intervals
@@ -529,14 +533,15 @@ class LinkedState extends Model {
       //*****NetworkError on reload is here somewhere******//
       if (bins){
         const label = encodeURIComponent(this.label);
-        var endpt = `/datasets/${label}/getIntervalDuration?bins=${bins}`;
+        var endpt = `/datasets/${label}/getIntervalDuration?bins=${bins}&primitive=${primitive}`;
         fetch(endpt)
             .then((response) => {
               return response.json();
             })
             .then((data) => {
-              this.intervalHistogram = data;
-              this.intervalHistogramWindow = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
+              this.selectedPrimitiveHistogram = primitive;
+              this.intervalHistogram[primitive] = data;
+              this.intervalHistogramWindow[primitive] = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
               this.trigger('intervalHistogramUpdated');
             })
             .catch(err => {
