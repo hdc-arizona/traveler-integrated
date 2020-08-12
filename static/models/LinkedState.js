@@ -15,7 +15,7 @@ class LinkedState extends Model {
     }
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
-    this.intervalWindow = this.metadata.intervalDomain ? Array.from(this.metadata.intervalDomain) : null;
+    this.intervalWindow = this.hasTraceData ? Array.from(this.metadata.intervalDomain) : null;
     this.intervalHistogram = {};
     this.intervalHistogramWindow = {};
     this.cursorPosition = null;
@@ -32,13 +32,15 @@ class LinkedState extends Model {
     (async () => {
       this.primitives = await d3.json(`/datasets/${encodeURIComponent(this.label)}/primitives`);
     })();
-    this.fetchGanttAggBins();
-    this.caches.metricAggBins = {};
-    this._metricAggTimeout = {};
-    this.fetchMetricBins();
-    // this.startIntervalStream();
-    this.startTracebackStream();
-    this.updateHistogram();
+    if (this.hasTraceData) {
+      this.fetchGanttAggBins();
+      this.caches.metricAggBins = {};
+      this._metricAggTimeout = {};
+      this.fetchMetricBins();
+      // this.startIntervalStream();
+      this.startTracebackStream();
+      this.updateHistogram();
+    }
   }
   get begin () {
     return this.intervalWindow[0];
@@ -125,7 +127,9 @@ class LinkedState extends Model {
   selectPrimitive (primitive) {
     if (primitive !== this.selectedPrimitive) {
       this.selectedPrimitive = primitive;
-      this.updateHistogram();
+      if (this.hasTraceData) {
+        this.updateHistogram();
+      }
       this.trigger('primitiveSelected', { primitive });
     }
   }
@@ -186,6 +190,9 @@ class LinkedState extends Model {
       }
     }
     return views;
+  }
+  get hasTraceData () {
+    return !!this.metadata.intervalDomain;
   }
   get isLoadingIntervals () {
     return !!this.caches.intervalStream;
