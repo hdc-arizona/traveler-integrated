@@ -117,68 +117,29 @@ class HelperView extends LinkedMixin(View) {
       };
     };
 
-    this._intervalTimeout = window.setTimeout(async () => {
-      const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetrics`);
-      var menuEntriesNestedList = {};
-      var menuEntriesList = [];
-      procMetricList.forEach(item => {
-        if (item.indexOf(':') > -1) {
-          var res = item.split(':');
-          if (!(res[0] in menuEntriesNestedList)) {
-            menuEntriesNestedList[res[0]] = [];
+    // TODO: we shouldn't be grabbing data like this from a view; we really should
+    // move this into LinkedState.js
+    if (self.linkedState.hasTraceData) {
+      this._intervalTimeout = window.setTimeout(async () => {
+        const procMetricList = await d3.json(`/datasets/${self.linkedState.label}/procMetrics`);
+        var menuEntriesNestedList = {};
+        var menuEntriesList = [];
+        procMetricList.forEach(item => {
+          if (item.indexOf(':') > -1) {
+            var res = item.split(':');
+            if (!(res[0] in menuEntriesNestedList)) {
+              menuEntriesNestedList[res[0]] = [];
+            }
+            menuEntriesNestedList[res[0]].push(hamburgerItemContent(res[1], item));
+          } else {
+            menuEntriesList.push(hamburgerItemContent(item, item));
           }
-          menuEntriesNestedList[res[0]].push(hamburgerItemContent(res[1], item));
-        } else {
-          menuEntriesList.push(hamburgerItemContent(item, item));
-        }
-      });
-      for (const key of Object.keys(menuEntriesNestedList)) {
-        menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
-      }
-
-      self.d3el.select('.hamburger.button')
-        .on('mouseenter', function () {
-          window.controller.tooltip.show({
-            content: `Show views...`,
-            targetBounds: this.getBoundingClientRect()
-          });
-        })
-        .on('click', function () {
-          window.controller.tooltip.showContextMenu({
-            menuEntries: menuEntriesList,
-            targetBounds: this.getBoundingClientRect()
-          });
         });
-    }, 100);
-
-
-    var histogramItemContent = function (title, param) {
-      return {
-        content: title,
-        onClick: () => {
-          var newIHView = {
-            type: 'component',
-            componentName: 'IntervalHistogramView',
-            componentState: {label: self.linkedState.label, metricType: param}
-          };
-          self.linkedState.selectedPrimitiveHistogram = param;
-          window.controller.goldenLayout.root.contentItems[0].contentItems[0].contentItems[0].addChild(newIHView);
+        for (const key of Object.keys(menuEntriesNestedList)) {
+          menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
         }
-      };
-    };
 
-    window.setTimeout(async () => {
-      const primitiveList = await d3.json(`/datasets/${self.linkedState.label}/getPrimitiveList`);
-      var menuEntriesNestedList = {};
-      var menuEntriesList = [];
-      primitiveList.forEach(item => {
-          menuEntriesList.push(histogramItemContent(item, item));
-      });
-      for (const key of Object.keys(menuEntriesNestedList)) {
-        menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
-      }
-
-      self.d3el.select('.primitive.button')
+        self.d3el.select('.hamburger.button')
           .on('mouseenter', function () {
             window.controller.tooltip.show({
               content: `Show views...`,
@@ -191,7 +152,50 @@ class HelperView extends LinkedMixin(View) {
               targetBounds: this.getBoundingClientRect()
             });
           });
-    }, 100);
+      }, 100);
+
+
+      var histogramItemContent = function (title, param) {
+        return {
+          content: title,
+          onClick: () => {
+            var newIHView = {
+              type: 'component',
+              componentName: 'IntervalHistogramView',
+              componentState: {label: self.linkedState.label, metricType: param}
+            };
+            self.linkedState.selectedPrimitiveHistogram = param;
+            window.controller.goldenLayout.root.contentItems[0].contentItems[0].contentItems[0].addChild(newIHView);
+          }
+        };
+      };
+
+      window.setTimeout(async () => {
+        const primitiveList = await d3.json(`/datasets/${self.linkedState.label}/getPrimitiveList`);
+        var menuEntriesNestedList = {};
+        var menuEntriesList = [];
+        primitiveList.forEach(item => {
+            menuEntriesList.push(histogramItemContent(item, item));
+        });
+        for (const key of Object.keys(menuEntriesNestedList)) {
+          menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
+        }
+
+        self.d3el.select('.primitive.button')
+            .on('mouseenter', function () {
+              window.controller.tooltip.show({
+                content: `Show views...`,
+                targetBounds: this.getBoundingClientRect()
+              });
+            })
+            .on('click', function () {
+              window.controller.tooltip.showContextMenu({
+                menuEntries: menuEntriesList,
+                targetBounds: this.getBoundingClientRect()
+              });
+            });
+      }, 100);
+    }
   }
   draw () {}
 }
