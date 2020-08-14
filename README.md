@@ -146,3 +146,26 @@ a few opportunities for scalability:
   should be able to build the indexes more efficiently if we know we'll never
   have to update them, and there's likely some functionality in the original
   library that we could get away with cutting
+
+## Debugging traveler-integrated inside a running JetLag docker container
+Debugging stuff inside a Docker container can be a pain. Assuming the
+`JetLag` and `traveler-integrated` repositories are both in the same directory,
+you can do the following (from `JetLag/docker`):
+
+```bash
+cp ../../traveler-integrated/docker-compose.jetlag.yml ./docker-compose.override.yml
+docker-compose up
+```
+
+Now JetLag will replace its cloned version of the `main` branch of
+`traveler-integrated` with your local repository before starting everything up.
+
+I haven't tested this thoroughly. Likely hiccups:
+
+- This seems to be enough to tweak client-side stuff in `static`, but you'll
+  need to kill and restart the server if you make server-side changes;
+  `docker exec -it trav /bin/bash` should get you started. `serve.py` is likely
+  the only `python3` job if you run `ps -A`
+
+- On non-Linux systems, you'll probably need to rebuild the
+  [C dependencies](#building-c-dependencies) for the docker container

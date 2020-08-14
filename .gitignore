@@ -3,3 +3,4 @@ data
 db
 __pycache__
 .ipynb_checkpoints
+serve.log
