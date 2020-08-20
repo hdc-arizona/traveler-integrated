@@ -13,11 +13,13 @@ class HelperView extends LinkedMixin(View) {
     super({ linkedState });
     this.datasetTemplate = datasetTemplate;
   }
+
   setup () {
     this.d3el.html(this.datasetTemplate);
     this.d3el.select('.label').text(this.linkedState.label);
     this.setupButtonListeners();
   }
+
   setupButtonListeners () {
     const self = this;
 
@@ -55,7 +57,7 @@ class HelperView extends LinkedMixin(View) {
     this.d3el.select('.color.button')
       .on('mouseenter', function () {
         window.controller.tooltip.show({
-          content: `Color by...`,
+          content: 'Color by...',
           targetBounds: this.getBoundingClientRect()
         });
       })
@@ -101,7 +103,7 @@ class HelperView extends LinkedMixin(View) {
           var newProcMetricView = {
             type: 'component',
             componentName: 'LineChartView',
-            componentState: {label: self.linkedState.label, metricType: metricType}
+            componentState: { label: self.linkedState.label, metricType: metricType }
           };
           if (param.startsWith('PAPI') === false) {
             metricType = param;
@@ -142,7 +144,7 @@ class HelperView extends LinkedMixin(View) {
         self.d3el.select('.hamburger.button')
           .on('mouseenter', function () {
             window.controller.tooltip.show({
-              content: `Show views...`,
+              content: 'Show views...',
               targetBounds: this.getBoundingClientRect()
             });
           })
@@ -154,7 +156,6 @@ class HelperView extends LinkedMixin(View) {
           });
       }, 100);
 
-
       var histogramItemContent = function (title, param) {
         return {
           content: title,
@@ -162,7 +163,7 @@ class HelperView extends LinkedMixin(View) {
             var newIHView = {
               type: 'component',
               componentName: 'IntervalHistogramView',
-              componentState: {label: self.linkedState.label, metricType: param}
+              componentState: { label: self.linkedState.label, metricType: param }
             };
             self.linkedState.selectedPrimitiveHistogram = param;
             window.controller.goldenLayout.root.contentItems[0].contentItems[0].contentItems[0].addChild(newIHView);
@@ -175,28 +176,29 @@ class HelperView extends LinkedMixin(View) {
         var menuEntriesNestedList = {};
         var menuEntriesList = [];
         primitiveList.forEach(item => {
-            menuEntriesList.push(histogramItemContent(item, item));
+          menuEntriesList.push(histogramItemContent(item, item));
         });
         for (const key of Object.keys(menuEntriesNestedList)) {
           menuEntriesList.push(hamburgerItemSubContents(key, menuEntriesNestedList[key]));
         }
 
         self.d3el.select('.primitive.button')
-            .on('mouseenter', function () {
-              window.controller.tooltip.show({
-                content: `Show views...`,
-                targetBounds: this.getBoundingClientRect()
-              });
-            })
-            .on('click', function () {
-              window.controller.tooltip.showContextMenu({
-                menuEntries: menuEntriesList,
-                targetBounds: this.getBoundingClientRect()
-              });
+          .on('mouseenter', function () {
+            window.controller.tooltip.show({
+              content: 'Show views...',
+              targetBounds: this.getBoundingClientRect()
             });
+          })
+          .on('click', function () {
+            window.controller.tooltip.showContextMenu({
+              menuEntries: menuEntriesList,
+              targetBounds: this.getBoundingClientRect()
+            });
+          });
       }, 100);
     }
   }
+
   draw () {}
 }
 

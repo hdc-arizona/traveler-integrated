@@ -42,10 +42,12 @@ class UploadView extends IntrospectableMixin(View) {
 
     this.loading = false;
   }
+
   get ready () {
     const label = this.d3el.select('.datasetLabel').node();
     return label && label.value && !window.controller.datasets[label.value] && this.selectedFiles.some(d => d.role !== null);
   }
+
   setup () {
     this.d3el.html(this.resources[0]);
 
@@ -93,6 +95,7 @@ class UploadView extends IntrospectableMixin(View) {
     });
     this.d3el.select('.uploadLog').node().value = 'Upload progress:\n================\n';
   }
+
   draw () {
     this.d3el.select('.ok.button')
       .classed('disabled', !this.ready && !this.loading);
@@ -100,6 +103,7 @@ class UploadView extends IntrospectableMixin(View) {
       .style('display', this.loading ? null : 'none');
     this.drawFiles();
   }
+
   drawFiles () {
     let files = this.d3el.select('.selectedFiles')
       .selectAll('.file').data(this.selectedFiles);
@@ -164,6 +168,7 @@ class UploadView extends IntrospectableMixin(View) {
         }
       });
   }
+
   async uploadFiles () {
     const label = this.d3el.select('.datasetLabel').node().value;
     // TODO: use oboe to stream the log response more cleanly, but unfortunately
@@ -175,7 +180,7 @@ class UploadView extends IntrospectableMixin(View) {
     async function handleResponse (response, message = null) {
       const reader = response.body.getReader();
       while (true) {
-        let { done, value } = await reader.read();
+        const { done, value } = await reader.read();
         if (done) {
           break;
         } else {

@@ -5,11 +5,13 @@ const SvgViewMixin = function (superclass) {
     setupContentElement () {
       return this.d3el.append('svg');
     }
+
     getAvailableSpace () {
       // Don't rely on non-dynamic SVG width / height for available space; use
       // this.d3el instead
       return super.getAvailableSpace(this.d3el);
     }
+
     draw () {
       super.draw();
 
@@ -18,6 +20,7 @@ const SvgViewMixin = function (superclass) {
         .attr('width', bounds.width)
         .attr('height', bounds.height);
     }
+
     setupTab () {
       super.setupTab();
       this.tabElement
@@ -28,19 +31,20 @@ const SvgViewMixin = function (superclass) {
           this.downloadSvg();
         });
     }
+
     downloadSvg () {
       // Adapted from https://stackoverflow.com/a/37387449/1058935
       const containerElements = ['svg', 'g'];
       const relevantStyles = {
-        'svg': ['width', 'height'],
-        'rect': ['fill', 'stroke', 'stroke-width', 'opacity'],
-        'p': ['font', 'opacity'],
+        svg: ['width', 'height'],
+        rect: ['fill', 'stroke', 'stroke-width', 'opacity'],
+        p: ['font', 'opacity'],
         '.node': ['cursor', 'opacity'],
-        'path': ['fill', 'stroke', 'stroke-width', 'opacity'],
-        'circle': ['fill', 'stroke', 'stroke-width', 'opacity'],
-        'line': ['stroke', 'stroke-width', 'opacity'],
-        'text': ['fill', 'font-size', 'text-anchor', 'opacity'],
-        'polygon': ['stroke', 'fill', 'opacity']
+        path: ['fill', 'stroke', 'stroke-width', 'opacity'],
+        circle: ['fill', 'stroke', 'stroke-width', 'opacity'],
+        line: ['stroke', 'stroke-width', 'opacity'],
+        text: ['fill', 'font-size', 'text-anchor', 'opacity'],
+        polygon: ['stroke', 'fill', 'opacity']
       };
       const copyStyles = (original, copy) => {
         const tagName = original.tagName;

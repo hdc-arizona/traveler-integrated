@@ -36,8 +36,9 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
     });
     this.container.on('resize', () => this.render());
   }
+
   get title () {
-    if(this.layoutState.metricType) {
+    if (this.layoutState.metricType) {
       return this.layoutState.label + ' ' + this.layoutState.metricType;
     }
     if (this.layoutState.label) {
@@ -48,14 +49,17 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
     }
     return this.humanReadableType;
   }
+
   get isEmpty () {
     // Should be overridden when a view has nothing to show
     return false;
   }
+
   get isLoading () {
     // Should be overridden when a view is loading data
     return false;
   }
+
   setup () {
     this.d3el.classed(this.type, true);
     this.emptyStateDiv = this.d3el.append('div')
@@ -66,23 +70,28 @@ class GoldenLayoutView extends IntrospectableMixin(View) {
       .classed('spinner', true)
       .style('display', 'none');
   }
+
   setupTab (tabElement = this.tabElement) {
     tabElement.classed(this.type, true);
   }
+
   drawTab (tabElement = this.tabElement) {
     tabElement
       .attr('title', this.title)
       .select(':scope > .lm_title')
       .text(this.title);
   }
+
   setupContentElement () {
     // Default setup is a scrollable div; SvgViewMixin overrides this
     return this.d3el.append('div')
       .classed('scrollArea', true);
   }
+
   getAvailableSpace (content = this.content) {
     return content.node().getBoundingClientRect();
   }
+
   draw () {
     this.emptyStateDiv.style('display', this.isEmpty ? null : 'none');
     // this.spinner.style('display', this.isLoading ? null : 'none');

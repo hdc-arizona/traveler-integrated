@@ -32,26 +32,10 @@ args = parser.parse_args()
 db = DataStore(args.dbDir, args.debug)
 app = FastAPI(
     title=__name__,
-    description='This is a test',
+    description='traveler-integrated API',
     version='0.1.0'
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
-
-# origins = [
-#     "http://localhost.tiangolo.com",
-#     "https://localhost.tiangolo.com",
-#     "http://localhost",
-#     "http://localhost:8080",
-#     "*"
-# ]
-#
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 
 
 prf = Profilier()
@@ -63,9 +47,9 @@ def checkDatasetExistence(label):
         raise HTTPException(status_code=404, detail='Dataset not found')
 
 
-def checkDatasetHasIntervals(label):
-    if 'intervals' not in db[label] or 'intervalIndexes' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not contain indexed interval data')
+def checkDatasetHasTraceData(label):
+    if not db[label]['meta']['hasTraceData']:
+        raise HTTPException(status_code=404, detail='Dataset does not contain trace data')
 
 
 def iterUploadFile(text):
@@ -113,21 +97,27 @@ def create_dataset(label: str, dataset: BasicDataset = None):
             if dataset.newick:
                 db.addSourceFile(label, label + '.newick', 'newick')
                 await db.processNewickTree(label, dataset.newick, logger.log)
+                db.finishLoadingSourceFile(label, label + '.newick')
             if dataset.csv:
                 db.addSourceFile(label, label + '.csv', 'csv')
                 await db.processCsv(label, iter(dataset.csv.splitlines()), logger.log)
+                db.finishLoadingSourceFile(label, label + '.csv')
             if dataset.dot:
                 db.addSourceFile(label, label + '.dot', 'dot')
                 await db.processDot(label, iter(dataset.dot.splitlines()), logger.log)
+                db.finishLoadingSourceFile(label, label + '.dot')
             if dataset.physl:
                 db.processCode(label, label + '.physl', dataset.physl.splitlines(), 'physl')
                 await logger.log('Loaded physl code')
+                db.finishLoadingSourceFile(label, label + '.physl')
             if dataset.python:
                 db.processCode(label, label + '.py', dataset.python.splitlines(), 'python')
                 await logger.log('Loaded python code')
+                db.finishLoadingSourceFile(label, label + '.py')
             if dataset.cpp:
                 db.processCode(label, label + '.cpp', dataset.cpp.splitlines(), 'cpp')
                 await logger.log('Loaded C++ code')
+                db.finishLoadingSourceFile(label, label + '.cpp')
         await db.save(label, logger.log)
         logger.finish()
 
@@ -163,6 +153,7 @@ def add_newick_tree(label: str, file: UploadFile = File(...)):
         db.addSourceFile(label, file.filename, 'newick')
         await db.processNewickTree(label, (await file.read()).decode(), logger.log)
         await db.save(label, logger.log)
+        db.finishLoadingSourceFile(label, file.filename)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
@@ -177,6 +168,7 @@ def add_performance_csv(label: str, file: UploadFile = File(...)):
         db.addSourceFile(label, file.filename, 'csv')
         await db.processCsv(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
+        db.finishLoadingSourceFile(label, file.filename)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
@@ -191,6 +183,7 @@ def add_dot_graph(label: str, file: UploadFile = File(...)):
         db.addSourceFile(label, file.filename, 'dot')
         await db.processDot(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
+        db.finishLoadingSourceFile(label, file.filename)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
@@ -205,6 +198,7 @@ def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
         db.addSourceFile(label, file.filename, 'log')
         await db.processPhylanxLog(label, iterUploadFile(await file.read()), logger.log)
         await db.save(label, logger.log)
+        db.finishLoadingSourceFile(label, file.filename)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
@@ -238,6 +232,7 @@ async def add_otf2_trace(label: str, request: Request, storeEvents: bool = False
         db.addSourceFile(label, 'APEX.otf2', 'otf2')
         await db.processOtf2(label, FakeOtf2File(request), storeEvents, logger.log)
         await loadSUL(label, db)
+        db.finishLoadingSourceFile(label, 'APEX.otf2')
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
@@ -294,60 +289,10 @@ def primitives(label: str):
     return dict(db[label]['primitives'])
 
 
-class HistogramMode(str, Enum):
-    utilization = 'utilization'
-    count = 'count'
-
-
-class IntervalFetchMode(str, Enum):
-    primitive = 'primitive'
-    guid = 'guid'
-    duration = 'duration'
-
-
-@app.get('/datasets/{label}/histogram')
-def histogram(label: str, \
-              mode: HistogramMode = HistogramMode.utilization, \
-              bins: int = 100, \
-              begin: float = None, \
-              end: float = None, \
-              location: str = None, \
-              primitive: str = None):
-    checkDatasetExistence(label)
-    checkDatasetHasIntervals(label)
-
-    if begin is None:
-        begin = db[label]['meta']['intervalDomain'][0]
-    if end is None:
-        end = db[label]['meta']['intervalDomain'][1]
-
-    def modeHelper(indexObj):
-        # TODO: respond with a 204 when the histogram is empty
-        # (d3.js doesn't have a good way to handle 204 error codes)
-        # if indexObj.is_empty():
-        #    raise HTTPException(status_code=204, detail='An index exists for the query, but it is empty')
-        val = getattr(indexObj, 'compute%sHistogram' % (mode.title()))(bins, begin, end)
-        return val
-
-    if location is not None:
-        if location not in db[label]['intervalIndexes']['locations']:
-            raise HTTPException(status_code=404, detail='No index for location: %s' % location)
-        if primitive is not None:
-            if primitive not in db[label]['intervalIndexes']['both'][location]:
-                raise HTTPException(status_code=404, detail='No index for location, primitive combination: %s, %s' % (location, primitive))
-            return modeHelper(db[label]['intervalIndexes']['both'][location][primitive])
-        return modeHelper(db[label]['intervalIndexes']['locations'][location])
-    if primitive is not None:
-        if primitive not in db[label]['intervalIndexes']['primitives']:
-            raise HTTPException(status_code=404, detail='No index for primitive: %s' % primitive)
-        return modeHelper(db[label]['intervalIndexes']['primitives'][primitive])
-    return modeHelper(db[label]['intervalIndexes']['main'])
-
-
 @app.get('/datasets/{label}/intervals')
 def intervals(label: str, begin: float = None, end: float = None, profile: bool = False):
     checkDatasetExistence(label)
-    checkDatasetHasIntervals(label)
+    checkDatasetHasTraceData(label)
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
@@ -389,7 +334,7 @@ def procMetrics(label: str):
 @app.get('/datasets/{label}/procMetrics/{metric}')
 def procMetricValues(label: str, metric: str, begin: float = None, end: float = None):
     checkDatasetExistence(label)
-    # checkDatasetHasIntervals(label)
+    checkDatasetHasTraceData(label)
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
@@ -417,7 +362,7 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
     # objects for drawing lines to the left and right of the queried range when
     # the full traceback is not requested
     checkDatasetExistence(label)
-    checkDatasetHasIntervals(label)
+    checkDatasetHasTraceData(label)
 
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
@@ -487,11 +432,15 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
 
     return StreamingResponse(intervalIdGenerator(), media_type='application/json')
 
+class IntervalFetchMode(str, Enum):
+    primitive = 'primitive'
+    guid = 'guid'
+    duration = 'duration'
 
 @app.get('/datasets/{label}/getIntervalInfo')
 def getIntervalInfo(label: str, timestamp: int = None, location: str = '1'):
     checkDatasetExistence(label)
-    checkDatasetHasIntervals(label)
+    checkDatasetHasTraceData(label)
 
     begin = timestamp
     if begin is None:
@@ -535,7 +484,7 @@ def getIntervalList(label: str, \
                     primitive: str = None, \
                     mode: IntervalFetchMode = IntervalFetchMode.primitive):
     checkDatasetExistence(label)
-    checkDatasetHasIntervals(label)
+    checkDatasetHasTraceData(label)
 
     locList = {}
     if enter is None:
@@ -573,7 +522,7 @@ def getIntervalList(label: str, \
 @app.get('/datasets/{label}/getGUIDList')
 def guidIntervalIds(label: str, timestamp: float = None, location: str = '1'):
     checkDatasetExistence(label)
-    checkDatasetHasIntervals(label)
+    checkDatasetHasTraceData(label)
 
     begin = timestamp
     if begin is None:
@@ -610,7 +559,7 @@ def guidIntervalIds(label: str, timestamp: float = None, location: str = '1'):
 @app.get('/datasets/{label}/guids/{guid}/intervalIds')
 def guidIntervalIds(label: str, guid: str):
     checkDatasetExistence(label)
-    checkDatasetHasIntervals(label)
+    checkDatasetHasTraceData(label)
     if guid not in db[label]['guids']:
         raise HTTPException(status_code=404, detail='GUID %s not found' % guid)
     return db[label]['guids'][guid]

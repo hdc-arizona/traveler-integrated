@@ -14,31 +14,34 @@ class SummaryView extends View {
     this.helperViews = {};
     this.isCollapsed = false;
   }
+
   get isLoading () {
     return window.controller.datasets === undefined;
   }
+
   setup () {
     this.d3el.html(this.resources[1]);
     this.d3el.select('.new.button').on('click', () => {
       window.controller.showModal(UploadView);
     });
     var _self = this;
-    this.d3el.style('left', "0em");
+    this.d3el.style('left', '0em');
     this.d3el.select('.collapses')
-        .on('click', () => {
-          _self.d3el.transition()
-              .duration(1000)
-              .style('left', _self.isCollapsed ? "0em" : "-20em");
-          _self.isCollapsed = !_self.isCollapsed;
-          if(_self.isCollapsed) {
-            _self.d3el.select('.c_right')
-                .attr('src', '/static/img/collapse_right.png');
-          } else {
-            _self.d3el.select('.c_right')
-                .attr('src', '/static/img/collapse_left.png');
-          }
-  });
+      .on('click', () => {
+        _self.d3el.transition()
+          .duration(1000)
+          .style('left', _self.isCollapsed ? '0em' : '-20em');
+        _self.isCollapsed = !_self.isCollapsed;
+        if (_self.isCollapsed) {
+          _self.d3el.select('.c_right')
+            .attr('src', '/static/img/collapse_right.png');
+        } else {
+          _self.d3el.select('.c_right')
+            .attr('src', '/static/img/collapse_left.png');
+        }
+      });
   }
+
   draw () {
     this.d3el.select('.spinner')
       .style('display', this.isLoading ? null : 'none');
@@ -52,6 +55,7 @@ class SummaryView extends View {
 
     this.drawHelperViews();
   }
+
   drawHelperViews () {
     let datasets = this.d3el.select('.datasets').selectAll('.dataset')
       .data(d3.keys(window.controller.datasets), d => d);

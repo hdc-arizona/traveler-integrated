@@ -7,7 +7,6 @@
         <script type="text/javascript" src="node_modules/jquery/dist/jquery.min.js"></script>
         <script type="text/javascript" src="node_modules/d3/dist/d3.min.js"></script>
         <script type="text/javascript" src="node_modules/oboe/dist/oboe-browser.min.js"></script>
-        <link rel="stylesheet/less" type="text/css" href="style/style.less"/>
         <script src="node_modules/codemirror/lib/codemirror.js"></script>
         <script src="node_modules/codemirror/mode/scheme/scheme.js"></script>
         <script src="node_modules/codemirror/mode/python/python.js"></script>
@@ -17,14 +16,10 @@
         <link rel="stylesheet" href="node_modules/codemirror/theme/base16-light.css" />
         <script type="text/javascript" src="node_modules/less/dist/less.min.js" data-log-level="1"></script>
         <script type="text/javascript" src="node_modules/golden-layout/dist/goldenlayout.min.js"></script>
-        <script type="module" src="controller.js"></script>
+        <script type="module" src="Controller.js"></script>
     </head>
     <body>
-      <div class="SummaryView"></div>
-      <div id="layoutRoot" class="gl_keep"></div>
-      <div id="modal" class="gl_keep" style="display:none">
-        <div class="contents"></div>
-      </div>
-      <div id="tooltip" class="gl_keep tooltip" style="display:none"></div>
+      <div class="MenuView"></div>
+      <div class="RootView"></div>
     </body>
 </html>

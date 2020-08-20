@@ -9,7 +9,7 @@ class LinkedState extends Model {
     this.metadata = metadata;
     // Sometimes the locations aren't sorted (todo: enable interactive sorting?)
     if (this.metadata.locationNames) {
-      this.metadata.locationNames.sort(function(a, b) {
+      this.metadata.locationNames.sort(function (a, b) {
         return d3.ascending(parseInt(a), parseInt(b));
       });
     }
@@ -26,7 +26,7 @@ class LinkedState extends Model {
     this.caches = {};
     this._mode = 'Inclusive';
     this.histogramResolution = 512;
-    this.selectedProcMetric = '';//'meminfo:MemFree';
+    this.selectedProcMetric = '';// 'meminfo:MemFree';
 
     // Start processes for collecting data
     (async () => {
@@ -42,49 +42,63 @@ class LinkedState extends Model {
       this.updateHistogram();
     }
   }
+
   get begin () {
     return this.intervalWindow[0];
   }
+
   get end () {
     return this.intervalWindow[1];
   }
+
   get beginLimit () {
     return this.metadata.intervalDomain[0];
   }
+
   get endLimit () {
     return this.metadata.intervalDomain[1];
   }
+
   get mode () {
     return this._mode;
   }
+
   set mode (newMode) {
     this._mode = newMode;
     this.trigger('changeMode');
   }
+
   get intervalHistogramBegin () {
     return this.intervalHistogramWindow[this.selectedPrimitiveHistogram][0];
   }
+
   get intervalHistogramEnd () {
     return this.intervalHistogramWindow[this.selectedPrimitiveHistogram][1];
   }
+
   get intervalHistogramBeginLimit () {
     return this.intervalHistogram[this.selectedPrimitiveHistogram].metadata.begin;
   }
+
   get intervalHistogramEndLimit () {
     return this.intervalHistogram[this.selectedPrimitiveHistogram].metadata.end;
   }
-  setGanttXResolution(value){
-    this.ganttXResolution = value|0;//round down
+
+  setGanttXResolution (value) {
+    this.ganttXResolution = value | 0;// round down
     this.fetchGanttAggBins();
   }
-  setMetricXResolution(value){
-    this.metricXResolution = value|0;//round down
+
+  setMetricXResolution (value) {
+    this.metricXResolution = value | 0;// round down
     this.fetchMetricBins();
   }
+
   setHistogramResolution (value) {
     this.histogramResolution = value;
     this.updateHistogram();
   }
+
   setIntervalWindow ({
     begin = this.begin,
     end = this.end
@@ -107,10 +121,11 @@ class LinkedState extends Model {
       this.stickyTrigger('newIntervalWindow', { begin, end });
     }
   }
+
   setIntervalHistogramWindow ({
-                       begin = this.intervalHistogramBegin,
-                       end = this.intervalHistogramEnd
-                     } = {}) {
+    begin = this.intervalHistogramBegin,
+    end = this.intervalHistogramEnd
+  } = {}) {
     if (this.intervalHistogram === null) {
       throw new Error("Can't set interval window; no interval histogram data");
     }
@@ -124,6 +139,7 @@ class LinkedState extends Model {
       this.stickyTrigger('newIntervalHistogramWindow', { begin, end });
     }
   }
+
   selectPrimitive (primitive) {
     if (primitive !== this.selectedPrimitive) {
       this.selectedPrimitive = primitive;
@@ -133,12 +149,14 @@ class LinkedState extends Model {
       this.trigger('primitiveSelected', { primitive });
     }
   }
+
   selectGUID (guid) {
     if (guid !== this.selectedGUID) {
       this.selectedGUID = guid;
       this.trigger('guidSelected', { guid });
     }
   }
+
   selectIntervalId (intervalId) {
     if (intervalId !== this.selectedIntervalId) {
       this.selectedIntervalId = intervalId;
@@ -146,83 +164,103 @@ class LinkedState extends Model {
       this.trigger('intervalIdSelected', { intervalId });
     }
   }
+
   moveCursor (position) {
     this.cursorPosition = position;
     this.trigger('moveCursor');
   }
+
   getPrimitiveDetails (primitiveName = this.selectedPrimitive) {
     return this.primitives ? this.primitives[primitiveName] : null;
   }
+
   get timeScale () {
     // TODO: identify the color map based on the data, across views...
     return LinkedState.COLOR_SCHEMES[this.mode].timeScale;
   }
+
   get contentFillColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].contentFillColor;
   }
+
   get contentBorderColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].contentBorderColor;
   }
+
   get selectionColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].selectionColor;
   }
+
   get mouseHoverSelectionColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].mouseHoverSelectionColor;
   }
+
   get traceBackColor () {
     return LinkedState.COLOR_SCHEMES[this.mode].traceBackColor;
   }
+
   getPossibleViews () {
     const views = {};
     for (const { fileType } of this.metadata.sourceFiles) {
       if (fileType === 'log' || fileType === 'newick') {
-        views['TreeView'] = true;
+        views.TreeView = true;
       } else if (fileType === 'otf2') {
-        views['GanttView'] = true;
-        views['UtilizationView'] = true;
-        views['IntervalHistogramView'] = false;
+        views.GanttView = true;
+        views.UtilizationView = true;
+        views.IntervalHistogramView = false;
       } else if (fileType === 'cpp') {
-        views['CppView'] = true;
+        views.CppView = true;
       } else if (fileType === 'python') {
-        views['PythonView'] = true;
+        views.PythonView = true;
       } else if (fileType === 'physl') {
-        views['PhyslView'] = true;
+        views.PhyslView = true;
       }
     }
     return views;
   }
+
   get hasTraceData () {
     return !!this.metadata.intervalDomain;
   }
+
   get isLoadingIntervals () {
     return !!this.caches.intervalStream;
   }
+
   get loadedIntervalCount () {
     return Object.keys(this.caches.intervals || {}).length +
       Object.keys(this.caches.newIntervals || {}).length;
   }
+
   get tooManyIntervals () {
     return !!this.caches.intervalOverflow;
   }
+
   get isLoadingTraceback () {
     return !!this.caches.intervalStream;
   }
+
   get isLoadingHistogram () {
     return !this.caches.histogram;
   }
+
   get isLoadingPrimitiveHistogram () {
     return !(this.selectedPrimitiveHistogram in this.intervalHistogram);
   }
-  get isAggBinsLoaded(){
+
+  get isAggBinsLoaded () {
     return !(this.caches.ganttAggBins === {});
   }
-  isMetricBinsLoaded(metric){
+
+  isMetricBinsLoaded (metric) {
     return !(this.caches.metricAggBins[metric] === {});
   }
-  getTimeStampFromBin(bin, metadata){
-    var offset = (metadata.end - metadata.begin)/ metadata.bins;
-    return metadata.begin + (bin*offset);
+
+  getTimeStampFromBin (bin, metadata) {
+    var offset = (metadata.end - metadata.begin) / metadata.bins;
+    return metadata.begin + (bin * offset);
   }
+
   getCurrentIntervals () {
     // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
@@ -230,18 +268,21 @@ class LinkedState extends Model {
     const newIntervals = this.caches.newIntervals || {};
     return Object.assign({}, oldIntervals, newIntervals);
   }
+
   getCurrentGanttAggregrateBins () {
     // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
     const ganttAggBins = this.caches.ganttAggBins || {};
     return Object.assign({}, ganttAggBins);
   }
+
   getCurrentMetricBins (metric) {
     // Combine old data with any new data that's streaming in for more
     // seamless zooming / panning
     const metricAggBins = this.caches.metricAggBins[metric] || {};
     return Object.assign({}, metricAggBins);
   }
+
   getCurrentTraceback () {
     // Returns a right-to-left list of intervals
     let traceback = this.caches.traceback ||
@@ -256,7 +297,7 @@ class LinkedState extends Model {
 
     // Derive a list of intervals from the streamed list of IDs
     const intervals = this.getCurrentIntervals();
-    let linkData = [];
+    const linkData = [];
     for (const intervalId of traceback.visibleIds) {
       if (intervals[intervalId]) {
         linkData.push(intervals[intervalId]);
@@ -303,26 +344,26 @@ class LinkedState extends Model {
     }
     return linkData;
   }
-  //we query intervals as a set of pre-aggregrated pixel-wide bins
+
+  // we query intervals as a set of pre-aggregrated pixel-wide bins
   // the drawing process is significantly simplified and sped up from this
-  fetchGanttAggBins(){
+  fetchGanttAggBins () {
     var bins = this.ganttXResolution;
     var queryRange = this.intervalWindow[1] - this.intervalWindow[0];
 
-    if(typeof this.caches.histogramDomain !== 'undefined'){
+    if (typeof this.caches.histogramDomain !== 'undefined') {
       var begin = (this.intervalWindow[0] - queryRange > this.caches.histogramDomain[0]) ? this.intervalWindow[0] - queryRange : this.intervalWindow[0];
       var end = (this.intervalWindow[1] + queryRange < this.caches.histogramDomain[1]) ? this.intervalWindow[1] + queryRange : this.intervalWindow[1];
-    }
-    else{
+    } else {
       var begin = this.intervalWindow[0];
       var end = this.intervalWindow[1];
     }
 
-    //this function will replace the fetching of intervals
+    // this function will replace the fetching of intervals
     window.clearTimeout(this._ganttAggTimeout);
     this._ganttAggTimeout = window.setTimeout(async () => {
-      //*****NetworkError on reload is here somewhere******//
-      if (bins){
+      //* ****NetworkError on reload is here somewhere******//
+      if (bins) {
         const label = encodeURIComponent(this.label);
         var endpt = `/datasets/${label}/ganttChartValues?bins=${bins}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
         fetch(endpt)
@@ -334,7 +375,7 @@ class LinkedState extends Model {
             this.trigger('intervalsUpdated');
           })
           .catch(err => {
-            err.text.then( errorMessage => {
+            err.text.then(errorMessage => {
               console.warn(errorMessage);
             });
           });
@@ -342,47 +383,45 @@ class LinkedState extends Model {
     }, 50);
   }
 
-  fetchMetricBins(){
-    if(this.selectedProcMetric.startsWith('PAPI') === true && !(this.selectedProcMetric in this.caches.metricAggBins)) {
-      this.caches.metricAggBins[this.selectedProcMetric] = {}
+  fetchMetricBins () {
+    if (this.selectedProcMetric.startsWith('PAPI') === true && !(this.selectedProcMetric in this.caches.metricAggBins)) {
+      this.caches.metricAggBins[this.selectedProcMetric] = {};
     }
 
-    for( const curMetric in this.caches.metricAggBins) {
+    for (const curMetric in this.caches.metricAggBins) {
       var bins = this.metricXResolution;
       var queryRange = this.intervalWindow[1] - this.intervalWindow[0];
       var begin = this.intervalWindow[0];
       var end = this.intervalWindow[1];
-      if(typeof this.caches.histogramDomain !== 'undefined'){
+      if (typeof this.caches.histogramDomain !== 'undefined') {
         begin = (this.intervalWindow[0] - queryRange > this.caches.histogramDomain[0]) ? this.intervalWindow[0] - queryRange : this.intervalWindow[0];
         end = (this.intervalWindow[1] + queryRange < this.caches.histogramDomain[1]) ? this.intervalWindow[1] + queryRange : this.intervalWindow[1];
       }
-      //this function will replace the fetching of intervals
+      // this function will replace the fetching of intervals
       window.clearTimeout(this._metricAggTimeout[curMetric]);
       this._metricAggTimeout[curMetric] = window.setTimeout(async () => {
-        //*****NetworkError on reload is here somewhere******//
-        if (bins){
+        //* ****NetworkError on reload is here somewhere******//
+        if (bins) {
           const label = encodeURIComponent(this.label);
           var endpt = `/datasets/${label}/newMetricData?bins=${bins}&metric_type=${curMetric}&location=1&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
           fetch(endpt)
-              .then((response) => {
-                return response.json();
-              })
-              .then((data) => {
-                this.caches.metricAggBins[curMetric] = data;
-                this.trigger('metricsUpdated');
-              })
-              .catch(err => {
-                err.text.then( errorMessage => {
-                  console.warn(errorMessage)
-                });
+            .then((response) => {
+              return response.json();
+            })
+            .then((data) => {
+              this.caches.metricAggBins[curMetric] = data;
+              this.trigger('metricsUpdated');
+            })
+            .catch(err => {
+              err.text.then(errorMessage => {
+                console.warn(errorMessage);
               });
+            });
         }
       }, 50);
     }
-
-
-
   }
+
   startIntervalStream () {
     // Debounce the start of this expensive process...
     window.clearTimeout(this._intervalTimeout);
@@ -440,6 +479,7 @@ class LinkedState extends Model {
         });
     }, 100);
   }
+
   startTracebackStream () {
     // Debounce the start of this expensive process...
     window.clearTimeout(this._tracebackTimeout);
@@ -490,6 +530,7 @@ class LinkedState extends Model {
         });
     }, 100);
   }
+
   getCurrentHistogramData () {
     return {
       histogram: this.caches.histogram,
@@ -499,6 +540,7 @@ class LinkedState extends Model {
       error: this.caches.histogramError
     };
   }
+
   updateHistogram () {
     // Debounce...
     window.clearTimeout(this._histogramTimeoutNew);
@@ -519,10 +561,10 @@ class LinkedState extends Model {
 
       let maxCount = 0;
 
-      let data = this.caches.histogram.data;
-      let metadata = this.caches.histogram.metadata;
+      const data = this.caches.histogram.data;
+      const metadata = this.caches.histogram.metadata;
       const domain = [metadata.begin, metadata.end];
-      for (let bin in data) {
+      for (const bin in data) {
         maxCount = Math.max(maxCount, data[bin]);
       }
       this.caches.histogramDomain = domain;
@@ -530,55 +572,56 @@ class LinkedState extends Model {
       this.trigger('histogramsUpdated');
     }, 100);
   }
-  fetchIntervalHistogram(primitive){
+
+  fetchIntervalHistogram (primitive) {
     var bins = 1000;
 
-    //this function will replace the fetching of intervals
+    // this function will replace the fetching of intervals
     window.clearTimeout(this._intervalDomainTimeout);
     this._intervalDomainTimeout = window.setTimeout(async () => {
-      //*****NetworkError on reload is here somewhere******//
-      if (bins){
+      //* ****NetworkError on reload is here somewhere******//
+      if (bins) {
         const label = encodeURIComponent(this.label);
         var endpt = `/datasets/${label}/getIntervalDuration?bins=${bins}&primitive=${primitive}`;
         fetch(endpt)
-            .then((response) => {
-              return response.json();
-            })
-            .then((data) => {
-              this.selectedPrimitiveHistogram = primitive;
-              this.intervalHistogram[primitive] = data;
-              this.intervalHistogramWindow[primitive] = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
-              this.trigger('intervalHistogramUpdated');
-            })
-            .catch(err => {
-              err.text.then( errorMessage => {
-                console.warn(errorMessage);
-              });
+          .then((response) => {
+            return response.json();
+          })
+          .then((data) => {
+            this.selectedPrimitiveHistogram = primitive;
+            this.intervalHistogram[primitive] = data;
+            this.intervalHistogramWindow[primitive] = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
+            this.trigger('intervalHistogramUpdated');
+          })
+          .catch(err => {
+            err.text.then(errorMessage => {
+              console.warn(errorMessage);
             });
+          });
       }
     }, 50);
   }
 }
 LinkedState.COLOR_SCHEMES = {
   Inclusive: {
-    contentFillColor: "#d9d9d9",
-    contentBorderColor: "#737373",
+    contentFillColor: '#d9d9d9',
+    contentBorderColor: '#737373',
     mouseHoverSelectionColor: '#ff0500', // red
     selectionColor: '#e6ab02', // yellow
     traceBackColor: '#000000', // black
     timeScale: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] // purple
   },
   Exclusive: {
-    contentFillColor: "#d9d9d9",
-    contentBorderColor: "#737373",
+    contentFillColor: '#d9d9d9',
+    contentBorderColor: '#737373',
     mouseHoverSelectionColor: '#a30012', // red
     selectionColor: '#7570b3', // purple
     traceBackColor: '#000000', // black
     timeScale: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'] // green
   },
   Difference: {
-    contentFillColor: "#d9d9d9",
-    contentBorderColor: "#737373",
+    contentFillColor: '#d9d9d9',
+    contentBorderColor: '#737373',
     mouseHoverSelectionColor: '#a30012', // red
     selectionColor: '#4daf4a', // green
     traceBackColor: '#000000', // black

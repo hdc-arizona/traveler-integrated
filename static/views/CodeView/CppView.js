@@ -8,6 +8,7 @@ class CppView extends CodeView {
     ];
     super(argObj);
   }
+
   get mode () {
     return 'clike';
   }

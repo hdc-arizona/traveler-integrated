@@ -8,6 +8,7 @@ class PhyslView extends CodeView {
     ];
     super(argObj);
   }
+
   get mode () {
     return 'scheme';
   }

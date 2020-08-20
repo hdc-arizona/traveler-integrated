@@ -5,7 +5,7 @@ export default function prettyPrintTime (time) {
     negative = true;
     time = -time;
   }
-  let timeInSeconds = time * 1e-9;
+  const timeInSeconds = time * 1e-9;
   var exp = -Math.floor(Math.log(timeInSeconds) / Math.log(10)) + 1;
 
   if (timeInSeconds > 1) { // second

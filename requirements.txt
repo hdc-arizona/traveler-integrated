@@ -7,4 +7,3 @@ python-multipart>=0.0.5
 diskcache>=4.1.0
 numpy>=1.19.1
 cffi>=1.14.1
-git+https://github.com/alex-r-bigelow/intervaltree.git@master#egg=intervaltree

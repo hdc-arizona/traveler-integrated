@@ -4,12 +4,14 @@ import LinkedMixin from '../common/LinkedMixin.js';
 
 class CodeView extends LinkedMixin(GoldenLayoutView) {
   constructor (argObj) {
-    argObj.resources.push({ type: 'less', url: `views/CodeView/style.less` });
+    argObj.resources.push({ type: 'less', url: 'views/CodeView/style.less' });
     super(argObj);
   }
+
   get mode () {
     throw new Error('This function should be overridden to return an appropriate codeMirror mode');
   }
+
   setup () {
     super.setup();
 
@@ -25,13 +27,14 @@ class CodeView extends LinkedMixin(GoldenLayoutView) {
     this.linkedState.on('primitiveSelected', () => {
       const details = this.linkedState.getPrimitiveDetails();
       if (details) {
-        /*this.codeMirror.setCursor({
+        /* this.codeMirror.setCursor({
           line: details.line,
           ch: details.char
-        });*/
+        }); */
       }
     });
   }
+
   draw () {
     this.codeMirror.refresh();
   }

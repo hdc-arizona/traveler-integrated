@@ -21,6 +21,7 @@ const CursoredViewMixin = function (superclass) {
           this.linkedState.moveCursor(null);
         });
     }
+
     draw () {
       super.draw();
       // This will be called less frequently than updateCursor(), for things
@@ -36,6 +37,7 @@ const CursoredViewMixin = function (superclass) {
         .attr('height', bounds.height);
       this.updateCursor();
     }
+
     updateCursor () {
       let position = this.linkedState.cursorPosition;
       if (position !== null) {

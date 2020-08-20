@@ -3,9 +3,11 @@ const IntrospectableMixin = function (superclass) {
     get type () {
       return this.constructor.type;
     }
+
     get lowerCamelCaseType () {
       return this.constructor.lowerCamelCaseType;
     }
+
     get humanReadableType () {
       return this.constructor.humanReadableType;
     }

@@ -5,6 +5,7 @@ const LinkedMixin = function (superclass) {
       this.linkedState = argObj.linkedState;
       this.linkedState.on('changeMode', () => { this.render(); });
     }
+
     get isLoading () {
       return this.linkedState.primitives === undefined;
     }

@@ -8,9 +8,11 @@ class TreeComparisonView extends SvgViewMixin(GoldenLayoutView) {
     this.content.append('text')
       .text('TODO: Tree comparison view');
   }
+
   get isEmpty () {
     return true;
   }
+
   draw () {
     super.draw();
 

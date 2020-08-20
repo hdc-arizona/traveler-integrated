@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "description": "An integrated visualization system for connecting OTF2 stack traces and aggregate expression trees",
   "scripts": {
-    "serve": "serve ."
+    "lint": "eslint '**/*.js' --quiet",
+    "lintFix": "eslint '**/*.js' --fix"
   },
   "repository": {
     "type": "git",
@@ -16,13 +17,22 @@
   },
   "homepage": "https://github.com/alex-r-bigelow/traveler-integrated#readme",
   "dependencies": {
-    "codemirror": "^5.48.0",
-    "d3": "^5.9.7",
+    "@ukijs/ui": "^0.2.1",
+    "codemirror": "^5.56.0",
+    "d3": "^5.16.0",
     "golden-layout": "^1.5.9",
-    "jquery": "^3.4.1",
-    "less": "^3.9.0",
-    "oboe": "^2.1.4",
-    "serve": "^11.0.2",
-    "uki": "^0.3.0"
+    "jquery": "^3.5.1",
+    "less": "^3.12.2",
+    "oboe": "^2.1.5",
+    "uki": "^0.7.2"
+  },
+  "devDependencies": {
+    "eslint": "^7.7.0",
+    "eslint-config-semistandard": "^15.0.1",
+    "eslint-config-standard": "^14.1.1",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.0.1"
   }
 }

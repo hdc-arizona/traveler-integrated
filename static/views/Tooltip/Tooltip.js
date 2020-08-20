@@ -7,15 +7,19 @@ class Tooltip extends View {
       { type: 'less', url: 'views/Tooltip/style.less' }
     ]);
   }
+
   setup () {
     this.hide();
   }
+
   draw () {
     // TODO: migrate a lot of the show() stuff here
   }
+
   hide () {
     this.show({ content: null });
   }
+
   /**
      * @param  {String | Function} [content='']
      * The message that will be displayed; an empty string hides the tooltip.
@@ -78,7 +82,7 @@ class Tooltip extends View {
       } else {
         tooltip.html(content);
       }
-      let tooltipBounds = tooltip.node().getBoundingClientRect();
+      const tooltipBounds = tooltip.node().getBoundingClientRect();
 
       let left;
       let top;
@@ -150,6 +154,7 @@ class Tooltip extends View {
       }
     }
   }
+
   /**
      * @param  {Array} [menuEntries]
      * A list of objects for each menu item. Each object should have two

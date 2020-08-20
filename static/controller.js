@@ -12,7 +12,7 @@ import UtilizationView from './views/UtilizationView/UtilizationView.js';
 import recolorImageFilter from './utils/recolorImageFilter.js';
 import LineChartView from './views/LineChartView/LineChartView.js';
 import ProcMetricView from './views/ProcMetricView/ProcMetricView.js';
-import IntervalHistogramView from "./views/IntervalHistogramView/IntervalHistogramView.js";
+import IntervalHistogramView from './views/IntervalHistogramView/IntervalHistogramView.js';
 
 const viewClassLookup = {
   TreeView,
@@ -35,8 +35,9 @@ class Controller {
     this.getDatasets();
     this.setupLayout();
   }
+
   async getDatasets () {
-    const datasetList = await d3.json(`/datasets`);
+    const datasetList = await d3.json('/datasets');
     const metas = await Promise.all(datasetList.map(d => d3.json(`/datasets/${encodeURIComponent(d)}`)));
     this.datasets = {};
     for (const [index, label] of datasetList.entries()) {
@@ -56,6 +57,7 @@ class Controller {
       }
     }
   }
+
   getLinkedState (label) {
     // Get a linkedState object from an existing view that this new one
     // should communicate with, or create it if it doesn't exist
@@ -63,6 +65,7 @@ class Controller {
         (this.summaryView.helperViews[label] && this.summaryView.helperViews[label].linkedState) ||
         new LinkedState(label, this.datasets[label]);
   }
+
   setupLayout () {
     this.goldenLayout = new GoldenLayout({
       settings: {
@@ -78,7 +81,7 @@ class Controller {
     for (const [className, ViewClass] of Object.entries(viewClassLookup)) {
       const self = this;
       this.goldenLayout.registerComponent(className, function (container, state) {
-        let linkedState = self.getLinkedState(state.label);
+        const linkedState = self.getLinkedState(state.label);
         // Create the view
         const view = new ViewClass({ container, state, linkedState });
         // Store the view
@@ -122,6 +125,7 @@ class Controller {
       this.renderAllViews();
     });
   }
+
   handleViewDestruction (view) {
     // Free up stuff in our lookups for garbage collection when views are closed
     const label = view.layoutState.label;
@@ -132,6 +136,7 @@ class Controller {
       }
     }
   }
+
   renderAllViews () {
     this.summaryView.render();
     if (this.modal) {
@@ -143,6 +148,7 @@ class Controller {
       }
     }
   }
+
   raiseView (view) {
     let child = view.container;
     let parent = child.parent;
@@ -154,6 +160,7 @@ class Controller {
       parent.setActiveContentItem(child);
     }
   }
+
   closeAllViews (linkedState) {
     for (const layout of this.goldenLayout.root.getItemsById(linkedState.label)) {
       layout.remove();
@@ -162,6 +169,7 @@ class Controller {
       view.container.close();
     }
   }
+
   assembleViews (linkedState) {
     const views = linkedState.getPossibleViews();
     const existingLayout = this.goldenLayout.root.getItemsById(linkedState.label)[0];
@@ -170,7 +178,7 @@ class Controller {
       existingLayout.remove();
     }
 
-    let newLayout = { type: 'row', content: [], title: linkedState.label, id: linkedState.label };
+    const newLayout = { type: 'row', content: [], title: linkedState.label, id: linkedState.label };
     // Put Gantt and Utilization views in a column
     if (views.GanttView && views.UtilizationView) {
       delete views.GanttView;
@@ -193,7 +201,7 @@ class Controller {
         //   componentName: 'IntervalHistogramView',
         //   componentState: { label: linkedState.label }
         }
-      ]
+        ]
       });
     }
     // Put all code views into a stack, and share a column with a tree
@@ -249,6 +257,7 @@ class Controller {
       this.goldenLayout.root.contentItems[0].addChild(newLayout);
     }
   }
+
   getView (className, label) {
     if (className === 'SummaryView') {
       return this.summaryView;
@@ -257,12 +266,14 @@ class Controller {
         this.views[label].find(view => view.constructor.name === className);
     }
   }
+
   showModal (ModalViewClass) {
     d3.select('#modal').style('display', null);
     const modalContents = d3.select('#modal .contents')
       .attr('class', `contents ${ModalViewClass.type}`);
     this.modal = new ModalViewClass(modalContents);
   }
+
   hideModal () {
     this.modal = null;
     d3.select('#modal').style('display', 'none');

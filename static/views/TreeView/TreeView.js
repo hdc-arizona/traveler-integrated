@@ -22,12 +22,15 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       this.render();
     })();
   }
+
   get isLoading () {
     return super.isLoading || !this.tree;
   }
+
   get isEmpty () {
     return this.tree !== undefined && this.tree instanceof Error;
   }
+
   setup () {
     super.setup();
 
@@ -66,6 +69,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       this.render();
     });
   }
+
   draw () {
     super.draw();
 
@@ -97,6 +101,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       delete this._collapsedParent;
     }
   }
+
   updateLayout (transition) {
     // Compute the minimum VERTICAL layout (mbostock's example / the d3 docs are
     // really confusing about this), with fixed node sizes / separation—we'll
@@ -142,6 +147,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       .attr('width', xRange[1] + this.wideNodeWidth + this.margin.right)
       .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
   }
+
   drawLegend () {
     // TODO: need to move the color scale stuff to this.linkedState so that
     // other views can use it
@@ -185,6 +191,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       .attr('width', (d, i) => axisScale(windows[i][1]) - axisScale(windows[i][0]))
       .attr('fill', d => d);
   }
+
   drawNodes (transition) {
     let nodes = this.content.select('.nodeLayer').selectAll('.node')
       .data(this.tree.descendants(), d => d.data.name);
@@ -323,14 +330,15 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
               return true;
             }
             return false;
-          }).style("stroke", "#ffd92f")
-            .style("opacity", 0.75);
+          }).style('stroke', '#ffd92f')
+            .style('opacity', 0.75);
         }
       }).on('mouseleave', () => {
         window.controller.tooltip.hide();
-        d3.selectAll('.hoveredLinks').style("opacity", 0);
+        d3.selectAll('.hoveredLinks').style('opacity', 0);
       });
   }
+
   drawLinks (transition) {
     let links = this.content.select('.linkLayer').selectAll('.link')
       .data(this.tree.links(), d => d.source.data.name + d.target.data.name);
@@ -382,53 +390,51 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     d3.selectAll('.hoveredLinks').remove();
 
     // Find each node's matches and add the coordinates to the list myMatches
-    var allMatches = allNodes.forEach(function(source){
-        source.myMatches = [];
-        var startx = source.x;
-        var starty = source.y; 
-        source.myMatches.push({x: startx, y: starty});
+    var allMatches = allNodes.forEach(function (source) {
+      source.myMatches = [];
+      var startx = source.x;
+      var starty = source.y;
+      source.myMatches.push({ x: startx, y: starty });
 
-        // Helper function to get important part of the variable/function/primitive's name
-        const getImportantName = displayName => {
-          var name = "";
-          if ((displayName) && (
-            (displayName.includes("define-variable")) ||
-            (displayName.includes("variable")) ||
-            (displayName.includes("access-variable")) ||
-            (displayName.includes("access-argument")) ||
-            (displayName.includes("access-function")))) {
-            name = displayName.split("/")[1].split("(")[0];
+      // Helper function to get important part of the variable/function/primitive's name
+      const getImportantName = displayName => {
+        var name = '';
+        if ((displayName) && (
+          (displayName.includes('define-variable')) ||
+            (displayName.includes('variable')) ||
+            (displayName.includes('access-variable')) ||
+            (displayName.includes('access-argument')) ||
+            (displayName.includes('access-function')))) {
+          name = displayName.split('/')[1].split('(')[0];
+        }
+        return name;
+      };
+
+      if (source.data.name) {
+        var importantName = '';
+        const displayName = state.getPrimitiveDetails(source.data.name).display_name;
+        if (displayName) importantName = getImportantName(displayName);
+
+        // Find the nodes that match my name
+        allNodes.forEach(function (dest) {
+          var otherImportantName = '';
+          const otherDisplayName = state.getPrimitiveDetails(dest.data.name).display_name;
+          if (otherDisplayName) otherImportantName = getImportantName(otherDisplayName);
+
+          if (importantName && (importantName == otherImportantName)) {
+            var edge_data = { x: dest.x, y: dest.y };
+            source.myMatches.push(edge_data);
+            source.myMatches.push({ x: startx, y: starty });
           }
-          return name;
-        }
-
-        if (source.data.name) {
-
-          var importantName = "";
-          const displayName = state.getPrimitiveDetails(source.data.name).display_name;
-          if (displayName) importantName = getImportantName(displayName);
-
-          // Find the nodes that match my name
-          allNodes.forEach(function(dest){
-
-            var otherImportantName = "";
-            const otherDisplayName = state.getPrimitiveDetails(dest.data.name).display_name;
-            if (otherDisplayName) otherImportantName = getImportantName(otherDisplayName);
-
-            if (importantName && (importantName == otherImportantName) ){
-              var edge_data = {x: dest.x, y: dest.y};
-              source.myMatches.push(edge_data);
-              source.myMatches.push({x: startx, y: starty});
-            }  
-          })
-        }
-        return source.myMatches;
+        });
+      }
+      return source.myMatches;
     });
 
     // Now any source node in allNodes has the attribute source.myMatches
-    //console.log(allNodes[3].myMatches);
-    
-    let hoveredLinks = this.content.select('.nodeLayer').selectAll('.node')
+    // console.log(allNodes[3].myMatches);
+
+    const hoveredLinks = this.content.select('.nodeLayer').selectAll('.node')
       .data(allNodes, d => d.myMatches);
     const hLinksEnter = hoveredLinks.enter().append('path').classed('hoveredLinks', true);
     const hLinksExit = hoveredLinks.exit();
@@ -436,24 +442,22 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     // Helper function for computing the paths
     const pathToMatches = listOfCoords => {
       var path = '';
-      for (var i=0; i<listOfCoords.length; i++) {
+      for (var i = 0; i < listOfCoords.length; i++) {
         if (i % 2 == 1) path += 'L ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
         if (i % 2 == 0) path += 'M ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
       }
       return path;
-    }
+    };
     hLinksEnter
-    .attr("class", "hoveredLinks")
-    .style("stroke", "#ffd92f")
-    .style("stroke-width", "3px")
-    .style("opacity", 0)
-    .attr("d", link => {
-      return pathToMatches(link.myMatches);
-    });
+      .attr('class', 'hoveredLinks')
+      .style('stroke', '#ffd92f')
+      .style('stroke-width', '3px')
+      .style('opacity', 0)
+      .attr('d', link => {
+        return pathToMatches(link.myMatches);
+      });
   }
 }
-
-
 
 TreeView.COLOR_MAPS = {
   INCLUSIVE: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'], // purple

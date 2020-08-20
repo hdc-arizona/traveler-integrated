@@ -22,7 +22,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.metricValueCount = 0;
     this.hoverIndex = -1;
     this.curMetric = 'meminfo:MemFree';
-    if(this.linkedState.selectedProcMetric.startsWith('PAPI') === false) {
+    if (this.linkedState.selectedProcMetric.startsWith('PAPI') === false) {
       this.curMetric = this.linkedState.selectedProcMetric;
     }
 
@@ -30,9 +30,11 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.uniqueDomId = `ProcMetricView${ProcMetricView.DOM_COUNT}`;
     ProcMetricView.DOM_COUNT++;
   }
+
   get isEmpty () {
     return this.error || this.metricValueCount === 0;
   }
+
   getChartBounds () {
     const bounds = this.getAvailableSpace();
     const result = {
@@ -47,6 +49,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.yScale.range([0, result.height]);
     return result;
   }
+
   setup () {
     super.setup();
     var __self = this;
@@ -78,10 +81,12 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     });
     this.updateTheView();
   }
-  updateTheView() {
+
+  updateTheView () {
     this.getData();
     this.xScale.domain(this.linkedState.intervalWindow);
   }
+
   getData () {
     // Debounce the start of this expensive process...
     // (but flag that we're loading)
@@ -98,7 +103,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       // const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}`)
       var begin = Math.floor(this.linkedState.intervalWindow[0]);
       var end = Math.ceil(this.linkedState.intervalWindow[1]);
-      console.log(begin + " " + end);
+      console.log(begin + ' ' + end);
       const currentStream = this.stream = oboe(`/datasets/${label}/procMetrics/${this.curMetric}?begin=${begin}&end=${end}`)
         .fail(error => {
           this.metricValueCount = 0;
@@ -111,8 +116,8 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
             this.abort();
           } else {
             self.isMetricLoading = true;
-            var val = metricList['Value'];
-            self.newCache[metricList['Timestamp']] = val;
+            var val = metricList.Value;
+            self.newCache[metricList.Timestamp] = val;
             maxY = Math.max(maxY, val);
             minY = Math.min(minY, val);
             self.metricValueCount++;
@@ -138,6 +143,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       this.render();
     }, 100);
   }
+
   draw () {
     super.draw();
 
@@ -145,7 +151,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       return;
     } else if (this.isEmpty) {
       if (this.error) {
-        this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
+        this.emptyStateDiv.html('<p>Error communicating with the server</p>');
       } else if (this.metricValueCount === 0) {
         this.emptyStateDiv.html('<p>No data in the current view</p>');
       } else {
@@ -172,11 +178,13 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     // Update the incremental flag so that we can call render again if needed
     this.waitingOnIncrementalRender = false;
   }
+
   drawClip () {
     this.content.select('clipPath rect')
       .attr('width', this._bounds.width)
       .attr('height', this._bounds.height);
   }
+
   drawAxes () {
     const bounds = this.getChartBounds();
     // Update the x axis
@@ -198,6 +206,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
     this.content.select('.yAxisLabel')
       .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
   }
+
   drawLines (data) {
     // console.log('drawing again');
     var _self = this;
@@ -270,6 +279,7 @@ class ProcMetricView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLa
       .style('stroke-width', 2)
       .style('opacity', 1.0);
   }
+
   setupZoomAndPan () {
     this.initialDragState = null;
     let latentWidth = null;
