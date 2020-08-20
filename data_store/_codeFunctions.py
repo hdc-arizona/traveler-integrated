@@ -4,6 +4,7 @@ def processCode(self, label, name, codeLines, codeType):
     assert codeType in ['physl', 'python', 'cpp']
     self.addSourceFile(label, name, codeType)
     self.datasets[label][codeType] = '\n'.join(codeLines)
+    self.finishLoadingSourceFile(label, name)
 
 async def processCodeFile(self, label, file, codeType, log=logToConsole):
     self.processCode(label, file.name, file.read().splitlines(), codeType)

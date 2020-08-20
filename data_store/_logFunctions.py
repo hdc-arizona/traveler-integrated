@@ -66,3 +66,4 @@ async def processPhylanxLogFile(self, label, file, log=logToConsole):
             yield line
     self.addSourceFile(label, file.name, 'log')
     await self.processPhylanxLog(label, lineGenerator(), log)
+    self.finishLoadingSourceFile(label, file.name)

@@ -40,3 +40,4 @@ async def processDotFile(self, label, file, log=logToConsole):
             yield line
     self.addSourceFile(label, file.name, 'dot')
     await self.processDot(label, lineGenerator(), log)
+    self.finishLoadingSourceFile(label, file.name)

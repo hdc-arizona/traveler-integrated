@@ -47,6 +47,7 @@ def processEvent(self, label, event, eventId):
     return (newR, seenR)
 
 async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
+    self.datasets[label]['meta']['hasTraceData'] = True
     self.addSourceFile(label, file.name, 'otf2')
 
     # Set up database files
@@ -154,7 +155,7 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
     # Now that we've seen all the locations, store that list in our metadata
     locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
 
-    def createNewInterval(event, lastEvent, intervalId):
+    async def createNewInterval(event, lastEvent, intervalId):
         newInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId}
         # Copy all of the attributes from the OTF2 events into the interval object. If the values
         # differ (or it's the timestamp), put them in nested enter / leave objects. Otherwise, put
@@ -167,6 +168,8 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
             elif attr != 'Timestamp' and attr != 'metrics' and event[attr] == lastEvent[attr]:  # pylint: disable=unsubscriptable-object
                 newInterval[attr] = event[attr]
             else:
+                if attr == 'Location':
+                    await log('WARNING: ENTER and LEAVE have different locations')
                 newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
                 newInterval['leave'][attr] = event[attr]
         return newInterval
@@ -174,6 +177,8 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
     # Combine the sorted enter / leave events into intervals
     await log('Combining enter / leave events into intervals (.=2500 intervals)')
     numIntervals = mismatchedIntervals = 0
+    intervalDomain = [float('inf'), float('-inf')]
+    endOrderIntervalIdList = sortedlist(key=lambda i: i[0])
     for location, eventList in self.sortedEventsByLocation.items():
         lastEventStack = []
         currentInterval = None
@@ -188,7 +193,7 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                     dummyEvent['Timestamp'] = event['Timestamp'] - 1  # add a new dummy leave event in 1 time unit ago
                     if 'metrics' in event:
                         dummyEvent['metrics'] = copy.deepcopy(event['metrics'])
-                    currentInterval = createNewInterval(dummyEvent, lastEventStack[-1], intervalId)
+                    currentInterval = await createNewInterval(dummyEvent, lastEventStack[-1], intervalId)
                 lastEventStack.append(event)
             elif event['Event'] == 'LEAVE':
                 # Finish a interval
@@ -197,7 +202,7 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                     await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['Primitive'])
                     continue
                 lastEvent = lastEventStack.pop()
-                currentInterval = createNewInterval(event, lastEvent, intervalId)
+                currentInterval = await createNewInterval(event, lastEvent, intervalId)
                 if len(lastEventStack) > 0:
                     lastEventStack[-1]['Timestamp'] = event['Timestamp'] + 1  # move the enter event to after 1 time unit
             if currentInterval is not None:
@@ -205,6 +210,11 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                 if 'Primitive' not in currentInterval:
                     mismatchedIntervals += 1
                 intervals[intervalId] = currentInterval
+                # Update intervalDomain
+                intervalDomain[0] = min(intervalDomain[0], currentInterval['enter']['Timestamp'])
+                intervalDomain[1] = max(intervalDomain[1], currentInterval['leave']['Timestamp'])
+                # Insert the id into the endOrderIntervalIdList
+                endOrderIntervalIdList.add((currentInterval['leave']['Timestamp'], intervalId))
                 # Log that we've finished the finished interval
                 numIntervals += 1
                 if numIntervals % 2500 == 0:
@@ -217,66 +227,13 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
             # TODO: fibonacci data triggers this... why?
             await log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
     del self.sortedEventsByLocation
+    self.datasets[label]['meta']['intervalDomain'] = intervalDomain
     await log('')
     await log('Finished creating %i intervals; %i refer to mismatching primitives' % (numIntervals, mismatchedIntervals))
 
-    # Now for indexing: we want per-location indexes, per-primitive indexes,
-    # as well as both filters at the same time (we key by locations first)
-    # TODO: these are all built in memory... should probably find a way to
-    # make a diskcache-like version of IntervalTree:
-    for location in locationNames:
-        intervalIndexes['locations'][location] = IntervalTree()
-        intervalIndexes['both'][location] = {}
-    for primitive in primitives.keys():
-        intervalIndexes['primitives'][primitive] = IntervalTree()
-        for location in locationNames:
-            intervalIndexes['both'][location][primitive] = IntervalTree()
-
-    await log('Assembling interval indexes (.=2500 intervals)')
-    count = 0
-    async def intervalIterator():
-        nonlocal count
-        for intervalId, intervalObj in intervals.items():
-            enter = intervalObj['enter']['Timestamp']
-            leave = intervalObj['leave']['Timestamp'] + 1
-            # Need to add one because IntervalTree can't handle zero-length intervals
-            # (and because IntervalTree is not inclusive of upper bounds in queries)
-
-            iv = Interval(enter, leave, intervalId)
-
-            # Add the interval to the appropriate indexes (piggybacked off
-            # the construction of the main index):
-            location = intervalObj['Location']
-            intervalIndexes['locations'][location].add(iv)
-            if 'Primitive' in intervalObj:
-                intervalIndexes['primitives'][intervalObj['Primitive']].add(iv)
-                intervalIndexes['both'][location][intervalObj['Primitive']].add(iv)
-            elif 'Primitive' in intervalObj['enter']:
-                intervalIndexes['primitives'][intervalObj['enter']['Primitive']].add(iv)
-                intervalIndexes['both'][location][intervalObj['enter']['Primitive']].add(iv)
-
-            count += 1
-            if count % 2500 == 0:
-                await log('.', end='')
-            if count % 100000 == 0:
-                await log('processed %i intervals' % count)
-
-            yield iv
-    # Iterate through all intervals to construct the main index:
-    intervalIndexes['main'] = IntervalTree([iv async for iv in intervalIterator()])
-
-    # Store the domain of the data from the computed index as metadata
-    self.datasets[label]['meta']['intervalDomain'] = [
-        intervalIndexes['main'].top_node.begin,
-        intervalIndexes['main'].top_node.end
-    ]
-    await log('')
-    await log('Finished indexing %i intervals' % count)
-
     await log('Connecting intervals with the same GUID (.=2500 intervals)')
     intervalCount = missingCount = newLinks = seenLinks = 0
-    for iv in intervalIndexes['main'].iterOverlap(endOrder=True):
-        intervalId = iv.data
+    for _, intervalId in endOrderIntervalIdList:
         intervalObj = intervals[intervalId]
 
         # Parent GUIDs refer to the one in the enter event, not the leave event
@@ -331,3 +288,4 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
     await log('Finished connecting intervals')
     await log('Interval links created: %i, Intervals without prior parent GUIDs: %i' % (intervalCount, missingCount))
     await log('New primitive links based on GUIDs: %d, Observed existing links: %d' % (newLinks, seenLinks))
+    self.finishLoadingSourceFile(label, file.name)

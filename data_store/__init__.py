@@ -78,7 +78,17 @@ class DataStore:
     def addSourceFile(self, label, fileName, fileType):
         # Have to do this separately because meta is a diskcache
         sourceFiles = self.datasets[label]['meta']['sourceFiles']
-        sourceFiles.append({'fileName': fileName, 'fileType': fileType})
+        sourceFiles.append({'fileName': fileName, 'fileType': fileType, 'stillLoading': True})
+        self.datasets[label]['meta']['sourceFiles'] = sourceFiles
+
+    def finishLoadingSourceFile(self, label, fileName):
+        sourceFiles = self.datasets[label]['meta']['sourceFiles']
+        sourceFile = next((f for f in sourceFiles if f['fileName'] == fileName), None)
+        if sourceFile is not None:
+            sourceFile['stillLoading'] = False
+        else:
+            raise Error("Can't finish unknown source file: " + fileName)
+        # Tell the diskcache that something has been updated
         self.datasets[label]['meta']['sourceFiles'] = sourceFiles
 
     def addTree(self, label, tree, sourceType):

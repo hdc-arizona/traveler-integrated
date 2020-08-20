@@ -45,3 +45,4 @@ async def processNewickTree(self, label, newickText, log=logToConsole):
 async def processNewickFile(self, label, file, log=logToConsole):
     self.addSourceFile(label, file.name, 'newick')
     await self.processNewickTree(label, file.read(), log)
+    self.finishLoadingSourceFile(label, file.name)

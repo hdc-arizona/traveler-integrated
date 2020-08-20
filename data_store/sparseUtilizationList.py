@@ -163,14 +163,16 @@ async def loadSUL(label, db, log=logToConsole):
                 intervalDuration[event['Primitive']][duration] = 1
 
     # we extract relevant data from database
-    for loc in db[label]['intervalIndexes']['locations']:
+    for intervalObj in db[label]['intervals'].values():
+        loc = intervalObj['Location']
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['enter']['Timestamp']), 'counter': 1, 'util': 0}, loc)
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['leave']['Timestamp']), 'counter': -1, 'util': 0}, loc)
+        updateSULForInterval(intervalObj['enter'], loc)
+        updateSULForInterval(intervalObj['leave'], loc)
+        updateIntervalDuration(intervalObj)
+
+    for loc in db[label]['meta']['locationNames']:
         counter = 0
-        for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
-            sul['intervals'].setIntervalAtLocation({'index': int(i.begin), 'counter': 1, 'util': 0}, loc)
-            sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0}, loc)
-            updateSULForInterval(db[label]['intervals'][i.data]['enter'], loc)
-            updateSULForInterval(db[label]['intervals'][i.data]['leave'], loc)
-            updateIntervalDuration(db[label]['intervals'][i.data])
 
         sul['intervals'].sortAtLoc(loc)
         sul['intervals'].locationDict[loc] = np.array(sul['intervals'].locationDict[loc])

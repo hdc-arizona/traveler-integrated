@@ -40,3 +40,4 @@ async def processCsvFile(self, label, file, log=logToConsole):
             yield line
     self.addSourceFile(label, file.name, 'csv')
     await self.processCsv(label, lineGenerator(), log)
+    self.finishLoadingSourceFile(label, file.name)
