@@ -230,13 +230,13 @@ class FakeOtf2File:  # pylint: disable=R0903
 
 
 @app.post('/datasets/{label}/otf2')
-async def add_otf2_trace(label: str, request: Request, storeEvents: bool = False):  # request: Request
+async def add_otf2_trace(label: str, request: Request):  # request: Request
     checkDatasetExistence(label)
     logger = ClientLogger()
 
     async def startProcess():
         db.addSourceFile(label, 'APEX.otf2', 'otf2')
-        await db.processOtf2(label, FakeOtf2File(request), storeEvents, logger.log)
+        await db.processOtf2(label, FakeOtf2File(request), logger.log)
         await loadSUL(label, db)
         logger.finish()
 

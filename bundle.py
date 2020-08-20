@@ -8,7 +8,15 @@ from data_store.sparseUtilizationList import loadSUL
 
 parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
 parser.add_argument('-l', '--label', dest='label', type=str, default='Latest',
-                    help='Label for the bundled dataset (default: "Latest"). Providing a label that already exists in the database will bundle with/overwrite any previous data. If globbing multiple inputs, this should be a regular expression, where the first capturing group indicates which files go together (e.g. --input data/*/phylanxLog.txt --otf2 data/*/OTF2_archive/APEX.otf2 --label data/([^/]*) would merge datasets based on their common directory name). Note that any captured "/" characters will be removed.')
+                    help=('Label for the bundled dataset (default: "Latest"). Providing a '
+                          'label that already exists in the database will bundle '
+                          'with/overwrite any previous data. If globbing multiple inputs, '
+                          'this should be a regular expression, where the first capturing '
+                          'group indicates which files go together (e.g. --input '
+                          'data/*/phylanxLog.txt --otf2 data/*/OTF2_archive/APEX.otf2 '
+                          '--label data/([^/]*) would merge datasets based on their common '
+                          'directory name). Note that any captured "/" characters will be '
+                          'removed.'))
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
                     help='Directory to store the bundled data (default: /tmp/traveler-integrated)')
 parser.add_argument('-i', '--input', dest='input', type=str, metavar='path', nargs='*', default=[],
@@ -29,8 +37,6 @@ parser.add_argument('-c', '--cpp', dest='cpp', type=str, metavar='path', nargs='
                     help='Input C++ source code file')
 parser.add_argument('-s', '--debug', dest='debug', action='store_true',
                     help='Store additional information for debugging source files, etc.')
-parser.add_argument('-e', '--events', dest='events', action='store_true',
-                    help='Collect all events, not just intervals')
 
 class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
@@ -131,7 +137,7 @@ async def main():
 
             # Handle otf2
             if 'otf2' in paths:
-                await db.processOtf2(label, FakeFile(paths['otf2']), args['events'])
+                await db.processOtf2(label, FakeFile(paths['otf2']))
                 await loadSUL(label, db)
 
 

@@ -1,9 +1,9 @@
 import re
 from .loggers import logToConsole
 
-from ._newickFunctions import treeModeParser, unflaggedTreeParser
-from ._dotFunctions import dotModeParser
-from ._csvFunctions import perfModeParser
+from ._newick_functions import treeModeParser, unflaggedTreeParser
+from ._dot_functions import dotModeParser
+from ._csv_functions import perfModeParser
 
 # Tools for handling a combined log file
 timeParser = re.compile(r'time: ([\d\.]+)')

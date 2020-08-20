@@ -3,7 +3,6 @@ import os
 import re
 import diskcache #pylint: disable=import-error
 from blist import sortedlist #pylint: disable=import-error
-from intervaltree import Interval, IntervalTree #pylint: disable=import-error
 from .loggers import logToConsole
 
 # Tools for handling OTF2 traces
@@ -41,29 +40,17 @@ def processEvent(self, label, event, eventId):
             # all this up in memory could be a problem...
             self.sortedEventsByLocation[event['Location']] = sortedlist(key=lambda i: i[0])
         self.sortedEventsByLocation[event['Location']].add((event['Timestamp'], event))
-    # Store the event, if we're collecting them:
-    if self.datasets[label]['meta']['storedEvents']:
-        self.datasets[label]['events'][eventId] = event
     return (newR, seenR)
 
-async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
+async def processOtf2(self, label, file, log=logToConsole):
     self.datasets[label]['meta']['hasTraceData'] = True
     self.addSourceFile(label, file.name, 'otf2')
 
     # Set up database files
     labelDir = os.path.join(self.dbDir, label)
-    primitives = self.datasets[label]['primitives']
     intervals = self.datasets[label]['intervals'] = diskcache.Index(os.path.join(labelDir, 'intervals.diskCacheIndex'))
-    intervalIndexes = self.datasets[label]['intervalIndexes'] = {
-        'primitives': {},
-        'locations': {},
-        'both': {}
-    }
     procMetrics = self.datasets[label]['procMetrics'] = diskcache.Index(os.path.join(labelDir, 'procMetrics.diskCacheIndex'))
     guids = self.datasets[label]['guids'] = diskcache.Index(os.path.join(labelDir, 'guids.diskCacheIndex'))
-    self.datasets[label]['meta']['storedEvents'] = storeEvents
-    if storeEvents:
-        self.datasets[label]['events'] = diskcache.Index(os.path.join(labelDir, 'events.diskCacheIndex'))
 
     if 'procMetricList' not in procMetrics:
         procMetrics['procMetricList'] = []
@@ -153,7 +140,7 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
     await log('Metrics included: %d; skpped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
 
     # Now that we've seen all the locations, store that list in our metadata
-    locationNames = self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
+    self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
 
     async def createNewInterval(event, lastEvent, intervalId):
         newInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId}

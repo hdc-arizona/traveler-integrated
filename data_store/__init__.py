@@ -8,7 +8,7 @@ from .loggers import logToConsole, ClientLogger
 # Possible files / metadata structures that we create / open / update
 diskCacheIndices = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
 requiredDiskCacheIndices = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['intervalIndexes', 'trees', 'physl', 'python', 'cpp', 'sparseUtilizationList']
+pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
 
@@ -38,8 +38,6 @@ class DataStore:
                 ppath = os.path.join(labelDir, ptype + '.pickle')
                 if os.path.exists(ppath):
                     await log('Loading %s %s...' % (label, ptype))
-                    if ptype == 'intervalIndexes':
-                        await log('(may take a while if %s is large)' % label)
                     self.datasets[label][ptype] = pickle.load(open(ppath, 'rb'))
                 elif ptype in requiredPickleDicts:
                     raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), ppath)
@@ -87,7 +85,7 @@ class DataStore:
         if sourceFile is not None:
             sourceFile['stillLoading'] = False
         else:
-            raise Error("Can't finish unknown source file: " + fileName)
+            raise Exception("Can't finish unknown source file: " + fileName)
         # Tell the diskcache that something has been updated
         self.datasets[label]['meta']['sourceFiles'] = sourceFiles
 
@@ -117,7 +115,8 @@ class DataStore:
         if primitiveName in primitives:
             # Already existed
             if updatedSources:
-                primitives[primitiveName] = primitive # tells the primitives diskcache that there was an update
+                # tell the primitives diskcache that there was an update
+                primitives[primitiveName] = primitive
             return (primitive, 0)
         primitiveChunks = primitiveName.split('$')
         primitive['name'] = primitiveChunks[0]
@@ -135,10 +134,12 @@ class DataStore:
         primitiveLinks = self.datasets[label]['primitiveLinks']
         if child not in parentPrimitive['children']:
             parentPrimitive['children'].append(child)
-            primitives[parent] = parentPrimitive # tells the primitives diskcache that there was an update
+            # tell the primitives diskcache that there was an update
+            primitives[parent] = parentPrimitive
         if parent not in childPrimitive['parents']:
             childPrimitive['parents'].append(parent)
-            primitives[child] = childPrimitive # tells the primitives diskcache that there was an update
+            # tell the primitives diskcache that there was an update
+            primitives[child] = childPrimitive
 
         linkId = parent + '_' + child
         link = primitiveLinks.get(linkId, {'parent': parent, 'child': child})
@@ -151,14 +152,16 @@ class DataStore:
         if linkId in primitiveLinks:
             # Already existed
             if updatedSources:
-                primitiveLinks[linkId] = link # tells the primitiveLinks diskcache that there was an update
+                # tell the primitiveLinks diskcache that there was an update
+                primitiveLinks[linkId] = link
             return (link, 0)
         primitiveLinks[linkId] = link
         return (link, 1)
 
-    from ._newickFunctions import processNewickTree, processNewickNode, processNewickFile
-    from ._dotFunctions import processDotLine, processDot, processDotFile
-    from ._csvFunctions import processCsvLine, processCsv, processCsvFile
-    from ._codeFunctions import processCode, processCodeFile
-    from ._logFunctions import processPhylanxLog, processPhylanxLogFile
-    from ._otf2Functions import processEvent, processOtf2
+    # pylint: disable=C0415
+    from ._newick_functions import processNewickTree, processNewickNode, processNewickFile
+    from ._dot_functions import processDotLine, processDot, processDotFile
+    from ._csv_functions import processCsvLine, processCsv, processCsvFile
+    from ._code_functions import processCode, processCodeFile
+    from ._log_functions import processPhylanxLog, processPhylanxLogFile
+    from ._otf2_functions import processEvent, processOtf2
