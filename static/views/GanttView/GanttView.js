@@ -133,30 +133,16 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
                 this.IntervalListMode.duration);
         }, 300);
     });
-    // this.linkedState.on('tracebackUpdated', () => {
-    //   // This is an incremental update; we don't need to do a full render()...
-    //   // (but still debounce this, as we don't want to call drawLinks() for
-    //   // every new interval)
-    //   window.clearTimeout(this._incrementalTracebackTimeout);
-    //   this._incrementalTracebackTimeout = window.setTimeout(() => {
-    //     this.drawLinks(this.linkedState.getCurrentTraceback());
-    //   });
-    // });
-    // const justFullRender = () => { this.render(); };
-    // this.linkedState.on('primitiveSelected', justFullRender);
-    // this.linkedState.on('intervalStreamFinished', justFullRender);
-    // this.linkedState.on('tracebackStreamFinished', justFullRender);
 
-      this.currentClickState = this.ClickState.background;
-      var __self = this;
-      // mouse events
+    this.currentClickState = this.ClickState.background;
+    var __self = this;
+    // mouse events
 
     this.canvasElement = this.content.select('.gantt-canvas')
         .on('click', function() {
             __self.clearAllTimer();
             var dm = d3.mouse(__self.content.select('.canvas-container').node());
             __self._mouseClickTimeout = window.setTimeout(async () => {
-                // __self.fetchAndDrawHighlightedBars(dm[0], dm[1], __self.IntervalListMode.primitive);
                 __self.selectedTimestamp = __self.localXScale.invert(dm[0]);
                 __self.selectedLocation = __self.yScale.invert(dm[1]);
                 __self.fetchIntervalTraceList();
@@ -175,7 +161,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
                 var dm = d3.mouse(__self.content.select('.canvas-container').node());
                 this._mouseHoverTimeout = window.setTimeout(async () => {
                     if(__self.isMouseInside === true) {
-                        __self.fetchAndDrawHighlightedBars(dm[0], dm[1], __self.IntervalListMode.guid);
+                        var tm = __self.localXScale.invert(dm[0]);
+                        var loc = __self.yScale.invert(dm[1]);
+                        __self.fetchAndDrawHighlightedBars(tm, loc, __self.IntervalListMode.guid);
                     }
                 }, 100);
             }
@@ -240,15 +228,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
   }
   fetchIntervalList(xx, yy, mode){
       var __self = this;
-      var tm = 0;
-      var loc = 0;
-      if(mode === this.IntervalListMode.guid || mode === this.IntervalListMode.primitive) {
-          tm = __self.localXScale.invert(xx);
-          loc = __self.yScale.invert(yy);
-      } else if(mode === this.IntervalListMode.duration) {
-          tm = xx;
-          loc = yy;
-      }
+      var tm = xx;
+      var loc = yy;
       // window.clearTimeout(this.primitiveFetchTimeout); dont clear time out here,
       // we need to call rendering ends in the finally block
       this.primitiveFetchTimeout = window.setTimeout(async () => {
@@ -290,7 +271,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       if(__self.selectedTimestamp === null || __self.selectedLocation === null)return;
       var tm = __self.selectedTimestamp;
       var loc = __self.selectedLocation;
-      console.log(tm, loc);
       window.clearTimeout(this.intervalTraceListTimeout);
       // we need to call rendering ends in the finally block
       this.intervalTraceListTimeout = window.setTimeout(async () => {
@@ -307,6 +287,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
                   __self.traceBackLines = data;
                   __self.initialDragState = null;
                   __self.render();
+                  __self.fetchAndDrawHighlightedBars(__self.selectedTimestamp, __self.selectedLocation, __self.IntervalListMode.primitive);
               })
               .catch(err => {
                   err.text.then( errorMessage => {
