@@ -199,10 +199,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         preD = {'x': xx, 'y':data.data.max[i-1]};
       }
       this.drawLines(dd, preD, true);
-      if(dd.y != preD.y) {
-        this.drawCircle(dd, true);
-        this.drawCircle(preD, true);
-      }
 
       d = data.data.min[i];
       dd = {'x': x, 'y': d};
@@ -211,10 +207,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         preD = {'x': xx, 'y':data.data.min[i-1]};
       }
       this.drawLines(dd, preD, true);
-      if(dd.y != preD.y) {
-        this.drawCircle(dd, true);
-        this.drawCircle(preD, true);
-      }
     };
     this.wasRendered = true;
   }
