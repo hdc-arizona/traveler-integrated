@@ -362,7 +362,7 @@ class LinkedState extends Model {
         //*****NetworkError on reload is here somewhere******//
         if (bins){
           const label = encodeURIComponent(this.label);
-          var endpt = `/datasets/${label}/newMetricData?bins=${bins}&metric_type=${curMetric}&location=1&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
+          var endpt = `/datasets/${label}/newMetricData?bins=${bins}&metric_type=${curMetric}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
           fetch(endpt)
               .then((response) => {
                 return response.json();

@@ -63,18 +63,16 @@ class SparseUtilizationList():
     # Calculates metric histogram
     def calcMetricHistogram(self, bins=100, begin=None, end=None, location=None):
         array = []
-        isFirst = True
         if location is not None:
             return self.calcUtilizationForLocation(bins, begin, end, location, False)
         for location in self.locationDict:
             temp = self.calcUtilizationForLocation(bins, begin, end, location, False)
-            if isFirst is True:
-                isFirst = False
-                array = temp
-            for i in range(bins):
-                array = array + temp
-
-        return array
+            array.append(temp)
+        array = np.asarray(array)
+        avgArray = np.mean(array, axis=0)
+        minArray = np.amin(array, axis=0)
+        maxArray = np.amax(array, axis=0)
+        return {"min": minArray.tolist(), "max": maxArray.tolist(), "average": avgArray.tolist()}
 
     # Calculates histogram for interval duration
     def calcIntervalHistogram(self, bins=100, begin=None, end=None):
