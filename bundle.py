@@ -20,7 +20,8 @@ parser.add_argument('-l', '--label', dest='label', type=str, default='Latest',
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
                     help='Directory to store the bundled data (default: /tmp/traveler-integrated)')
 parser.add_argument('-i', '--input', dest='input', type=str, metavar='path', nargs='*', default=[],
-                    help='STDOUT from phylanx run as a file or pipe (should contain the tree, graph, and performance CSV)')
+                    help=('STDOUT from phylanx run as a file or pipe (should contain the '
+                          'tree, graph, and performance CSV)'))
 parser.add_argument('-t', '--tree', dest='tree', type=str, metavar='path', nargs='*', default=[],
                     help='Input newick tree as its own file')
 parser.add_argument('-p', '--performance', dest='performance', type=str, metavar='path', nargs='*', default=[],

@@ -8,7 +8,7 @@ from .loggers import logToConsole, ClientLogger
 # Possible files / metadata structures that we create / open / update
 diskCacheIndices = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
 requiredDiskCacheIndices = ['meta', 'primitives', 'primitiveLinks']
-pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList']
+pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList', 'intervalIndex']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
 
@@ -66,6 +66,9 @@ class DataStore:
             self.datasets[label][ptype] = {}
         for listType in requiredMetaLists:
             self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, [])
+        # Initially flag the data as NOT having trace data; this will be overridden
+        # if OTF2 data is uploaded
+        self.datasets[label]['meta']['hasTraceData'] = False
 
     def purgeDataset(self, label):
         del self.datasets[label]
@@ -164,4 +167,4 @@ class DataStore:
     from ._csv_functions import processCsvLine, processCsv, processCsvFile
     from ._code_functions import processCode, processCodeFile
     from ._log_functions import processPhylanxLog, processPhylanxLogFile
-    from ._otf2_functions import processEvent, processOtf2
+    from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree, connectIntervals
