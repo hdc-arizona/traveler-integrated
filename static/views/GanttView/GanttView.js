@@ -36,6 +36,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.pendingHighlightRequest = null;
     this.renderingInProgress = false;
     this.traceBackLines = null;
+    this.selectedTimestamp = null;
+    this.selectedLocation = null;
   }
   get isLoading () {
     return super.isLoading || this.linkedState.isLoadingIntervals || this.linkedState.isLoadingTraceback;
@@ -155,7 +157,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
             var dm = d3.mouse(__self.content.select('.canvas-container').node());
             __self._mouseClickTimeout = window.setTimeout(async () => {
                 // __self.fetchAndDrawHighlightedBars(dm[0], dm[1], __self.IntervalListMode.primitive);
-                __self.fetchIntervalTraceList(dm[0], dm[1], __self.IntervalListMode.primitive);
+                __self.selectedTimestamp = __self.localXScale.invert(dm[0]);
+                __self.selectedLocation = __self.yScale.invert(dm[1]);
+                __self.fetchIntervalTraceList();
             }, 300);
         })
         .on('mouseleave', function () {
@@ -281,10 +285,11 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           });
       }, 100);
   }
-  fetchIntervalTraceList(xx, yy, mode){
+  fetchIntervalTraceList(){
       var __self = this;
-      var tm = __self.localXScale.invert(xx);
-      var loc = __self.yScale.invert(yy);
+      if(__self.selectedTimestamp === null || __self.selectedLocation === null)return;
+      var tm = __self.selectedTimestamp;
+      var loc = __self.selectedLocation;
       console.log(tm, loc);
       window.clearTimeout(this.intervalTraceListTimeout);
       // we need to call rendering ends in the finally block
@@ -294,9 +299,6 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           var end = this.linkedState.intervalWindow[1];
           var endpt = `/datasets/${label}/getIntervalTraceList?`;
           endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
-          if(mode === this.IntervalListMode.duration) {
-              endpt += `&leave=${Math.ceil(loc)}`;// loc in location isnt used if mode is duration
-          }
           fetch(endpt)
               .then((response) => {
                   return response.json();
@@ -697,6 +699,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
               this.linkedState.setIntervalWindow(clampWindow(begin, end));
               this.currentClickState = this.ClickState.background;
+              this.fetchIntervalTraceList();
           }
         }));
   }
