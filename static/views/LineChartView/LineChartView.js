@@ -162,50 +162,72 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
 
     this._bounds = this.getChartBounds();
     const data = this.linkedState.getCurrentMetricBins(this.curMetric);
-
+    if(data.data === undefined)return;
     var maxY = Number.MIN_VALUE;
     var minY = Number.MAX_VALUE;
 
-    for (var i = 0; i < data.data.length; i++) {
+    for (var i = 0; i < data.metadata.bins; i++) {
       var t = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
       if(t < this._bounds.width) continue;
       if(t > (2*this._bounds.width)) break;
-      var d = data.data[i];
-      maxY = Math.max(maxY, d);
-      minY = Math.min(minY, d);
+      maxY = Math.max(maxY, data.data.max[i]);
+      minY = Math.min(minY, data.data.min[i]);
     }
     this.setYDomain({'max':maxY, 'min':minY});
 
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
-    data.data.forEach((d, i) => {
+    for (var i = 0; i < data.metadata.bins; i++) {
+      var d = data.data.average[i];
       var x = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
       var dd = {'x': x, 'y': d};
       var preD = dd;
       if(i>0) {
         var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
-        preD = {'x': xx, 'y':data.data[i-1]};
+        preD = {'x': xx, 'y':data.data.average[i-1]};
       }
-      this.drawLines(dd, preD);
+      this.drawLines(dd, preD, false);
       if(dd.y != preD.y) {
-        this.drawCircle(dd);
-        this.drawCircle(preD);
+        this.drawCircle(dd, false);
+        this.drawCircle(preD, false);
       }
-    });
+
+      d = data.data.max[i];
+      dd = {'x': x, 'y': d};
+      preD = dd;
+      if(i>0) {
+        preD = {'x': xx, 'y':data.data.max[i-1]};
+      }
+      this.drawLines(dd, preD, true);
+
+      d = data.data.min[i];
+      dd = {'x': x, 'y': d};
+      preD = dd;
+      if(i>0) {
+        preD = {'x': xx, 'y':data.data.min[i-1]};
+      }
+      this.drawLines(dd, preD, true);
+    };
     this.wasRendered = true;
   }
-  drawLines (d, preD) {
+  drawLines (d, preD, isGray) {
     this.canvasContext.beginPath();
     this.canvasContext.strokeStyle = 'black';
+    if(isGray) {
+      this.canvasContext.strokeStyle = 'grey';
+    }
     this.canvasContext.moveTo(preD.x, this.yScale(preD.y));
     this.canvasContext.lineTo(d.x, this.yScale(d.y));
     this.canvasContext.stroke();
   }
-  drawCircle(d) {
+  drawCircle(d, isGray) {
     var radius = 2;
     this.canvasContext.beginPath();
     this.canvasContext.arc(d.x, this.yScale(d.y), radius, 0, 2 * Math.PI, false);
     this.canvasContext.fillStyle = 'black';
+    if(isGray) {
+      this.canvasContext.fillStyle = 'grey';
+    }
     this.canvasContext.fill();
   }
   drawSpinner () {

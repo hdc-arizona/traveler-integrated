@@ -411,18 +411,33 @@ def procMetricValues(label: str, metric: str, begin: float = None, end: float = 
     return StreamingResponse(procMetricGenerator(), media_type='application/json')
 
 
-@app.get('/datasets/{label}/intervals/{intervalId}/trace')
-def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):
+@app.get('/datasets/{label}/getIntervalTraceList')
+def getIntervalTraceList(label: str, \
+                         enter: int = None, \
+                         location: str = '1', \
+                         begin: float = None, \
+                         end: float = None):
     # This streams back a list of string IDs, as well as two special metadata
     # objects for drawing lines to the left and right of the queried range when
     # the full traceback is not requested
     checkDatasetExistence(label)
     checkDatasetHasIntervals(label)
 
+    locList = {}
+    if enter is None:
+        return locList
+    leave = enter + 1
     if begin is None:
         begin = db[label]['meta']['intervalDomain'][0]
     if end is None:
         end = db[label]['meta']['intervalDomain'][1]
+
+    intervalId = None
+    for i in db[label]['intervalIndexes']['locations'][location].iterOverlap(enter, leave):
+        intervalId = i.data
+        break
+    if intervalId is None:
+        return locList
 
     def intervalIdGenerator():
         yield '['
@@ -456,7 +471,14 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
             if yieldComma:
                 yield ','
             yieldComma = True
-            yield '"%s"' % intervalObj['intervalId']
+            # yield '"%s"' % intervalObj['intervalId']
+            yield json.dumps({
+                'type': 'middle',
+                'right_location': intervalObj['Location'],
+                'right_timestamp': intervalObj['enter']['Timestamp'],
+                'left_location': intervalObj['lastParentInterval']['location'],
+                'left_timestamp': intervalObj['lastParentInterval']['endTimestamp']
+            })
             lastInterval = intervalObj
             parentId = intervalObj['lastParentInterval']['id']
             intervalObj = db[label]['intervals'][parentId]
@@ -467,7 +489,13 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
             if yieldComma:
                 yield ','
             yieldComma = True
-            yield '"%s"' % intervalObj['intervalId']
+            # yield '"%s"' % intervalObj['intervalId']
+            yield json.dumps({
+                'type': 'middle_last',
+                'id': intervalObj['intervalId'],
+                'location': intervalObj['Location'],
+                'endTimestamp': intervalObj['leave']['Timestamp']
+            })
         elif lastInterval and lastInterval['leave']['Timestamp'] >= begin:
             # Yield some metadata about the interval beyond the begin boundary,
             # so the client can draw lines beyond the window (and won't need
