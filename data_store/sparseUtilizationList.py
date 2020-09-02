@@ -134,8 +134,8 @@ async def loadSUL(label, db, log=logToConsole):
 
     # create sul obj
     sul = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'intervalDuration': dict()}
-    begin = db[label]['meta']['intervalDomain'][0]
-    end = db[label]['meta']['intervalDomain'][1]
+    begin = db[label]['info']['intervalDomain'][0]
+    end = db[label]['info']['intervalDomain'][1]
     preMetricValue = dict()
     intervalDuration = dict()
 
@@ -171,7 +171,7 @@ async def loadSUL(label, db, log=logToConsole):
         updateSULForInterval(intervalObj['leave'], loc)
         updateIntervalDuration(intervalObj)
 
-    for loc in db[label]['meta']['locationNames']:
+    for loc in db[label]['info']['locationNames']:
         counter = 0
 
         sul['intervals'].sortAtLoc(loc)
@@ -232,7 +232,7 @@ async def loadSUL(label, db, log=logToConsole):
                 LS['util'][i] = LS['util'][i] + LS['util'][i-1]
 
         sul['intervalDuration'][primitive].setCLocation(dummyLocation, LS)
-    db[label]['meta']['intervalDurationDomain'] = intervalDurationDomainDict
+    db[label]['info']['intervalDurationDomain'] = intervalDurationDomainDict
     db[label]['sparseUtilizationList'] = sul
 
     return

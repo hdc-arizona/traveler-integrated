@@ -44,7 +44,6 @@ def processEvent(self, label, event):
     return (newR, seenR)
 
 async def processOtf2(self, label, file, log=logToConsole):
-    self.datasets[label]['meta']['hasTraceData'] = True
     self.addSourceFile(label, file.name, 'otf2')
     await self.processRawTrace(label, file, log)
     await self.combineIntervals(label, log)
@@ -144,8 +143,8 @@ async def processRawTrace(self, label, file, log):
     await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
     await log('Metrics included: %d; skpped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
 
-    # Now that we've seen all the locations, store that list in our metadata
-    self.datasets[label]['meta']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
+    # Now that we've seen all the locations, store that list in our info
+    self.datasets[label]['info']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
 
 async def combineIntervals(self, label, log):
     # Set up database file
@@ -234,8 +233,8 @@ async def combineIntervals(self, label, log):
     # Clean up temporary lists
     del self.sortedEventsByLocation
 
-    # Store the full domain of the data in the datasets' metadata
-    self.datasets[label]['meta']['intervalDomain'] = intervalDomain
+    # Store the full domain of the data in the datasets' info
+    self.datasets[label]['info']['intervalDomain'] = intervalDomain
 
     await log('')
     await log('Finished creating %i intervals; %i refer to mismatching primitives' % (numIntervals, mismatchedIntervals))

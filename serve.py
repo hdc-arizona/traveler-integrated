@@ -29,27 +29,10 @@ args = parser.parse_args()
 db = DataStore(args.dbDir, args.debug)
 app = FastAPI(
     title=__name__,
-    description='This is a test',
-    version='0.1.0'
+    description='This is the API for traveler-integrated',
+    version='0.1.1'
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
-
-# origins = [
-#     "http://localhost.tiangolo.com",
-#     "https://localhost.tiangolo.com",
-#     "http://localhost",
-#     "http://localhost:8080",
-#     "*"
-# ]
-#
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
 
 prf = Profilier()
 profile = False
@@ -58,12 +41,12 @@ profile = False
 def checkDatasetIsReady(label):
     if label not in db:
         raise HTTPException(status_code=404, detail='Dataset not found')
-    for sourceFile in db[label]['meta']['sourceFiles']:
+    for sourceFile in db[label]['info']['sourceFiles']:
         if sourceFile['stillLoading']:
             raise HTTPException(status_code=503, detail='Dataset is still loading')
 
 def checkDatasetHasTraceData(label):
-    if not db[label]['meta']['hasTraceData']:
+    if not db[label]['info']['hasTraceData']:
         raise HTTPException(status_code=404, detail='Dataset does not contain trace data')
 
 
@@ -84,7 +67,7 @@ def list_datasets():
 @app.get('/datasets/{label}')
 def get_dataset(label: str):
     checkDatasetIsReady(label)
-    return db[label]['meta']
+    return db[label]['info']
 
 class BasicDataset(BaseModel):  # pylint: disable=R0903
     # TODO: ideally, these should all be UploadFile arguments instead of
@@ -274,14 +257,14 @@ def get_cpp(label: str):
 
 
 @app.post('/datasets/{label}/cpp')
-async def add_c_plus_plus(label: str, file: UploadFile = File(...)):
+async def add_cpp(label: str, file: UploadFile = File(...)):
     checkDatasetIsReady(label)
     db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
     await db.save(label)
 
 
 @app.get('/datasets/{label}/primitives')
-def primitives(label: str):
+def get_primitives(label: str):
     checkDatasetIsReady(label)
     return dict(db[label]['primitives'])
 
@@ -298,9 +281,9 @@ def procMetricValues(label: str, metric: str, begin: float = None, end: float = 
     checkDatasetHasTraceData(label)
 
     if begin is None:
-        begin = db[label]['meta']['intervalDomain'][0]
+        begin = db[label]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['meta']['intervalDomain'][1]
+        end = db[label]['info']['intervalDomain'][1]
 
     def procMetricGenerator():
         yield '['
@@ -329,9 +312,9 @@ def getIntervals(label: str, \
     checkDatasetHasTraceData(label)
 
     if begin is None:
-        begin = db[label]['meta']['intervalDomain'][0]
+        begin = db[label]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['meta']['intervalDomain'][1]
+        end = db[label]['info']['intervalDomain'][1]
 
     def intervalGenerator():
         yield '['
@@ -381,9 +364,9 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
     checkDatasetHasTraceData(label)
 
     if begin is None:
-        begin = db[label]['meta']['intervalDomain'][0]
+        begin = db[label]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['meta']['intervalDomain'][1]
+        end = db[label]['info']['intervalDomain'][1]
 
     def intervalIdGenerator():
         yield '['
@@ -455,9 +438,9 @@ def get_utilization_histogram(label: str, bins: int = 100, begin: int = None, en
     checkDatasetHasTraceData(label)
 
     if begin is None:
-        begin = db[label]['meta']['intervalDomain'][0]
+        begin = db[label]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['meta']['intervalDomain'][1]
+        end = db[label]['info']['intervalDomain'][1]
 
     ret = {}
     if location is None:
@@ -474,9 +457,9 @@ def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = Non
     checkDatasetHasTraceData(label)
 
     if begin is None:
-        begin = db[label]['meta']['intervalDomain'][0]
+        begin = db[label]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['meta']['intervalDomain'][1]
+        end = db[label]['info']['intervalDomain'][1]
 
     ret = {}
     if location is None:
@@ -493,9 +476,9 @@ def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
     checkDatasetHasTraceData(label)
 
     if begin is None:
-        begin = db[label]['meta']['intervalDomain'][0]
+        begin = db[label]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['meta']['intervalDomain'][1]
+        end = db[label]['info']['intervalDomain'][1]
 
     ret = {}
     ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcGanttHistogram(bins, begin, end)
@@ -514,9 +497,9 @@ def getIntervalDuration(label: str, bins: int = 100, begin: int = None, end: int
     checkDatasetHasTraceData(label)
 
     if begin is None:
-        begin = int(db[label]['meta']['intervalDurationDomain'][primitive][0])
+        begin = int(db[label]['info']['intervalDurationDomain'][primitive][0])
     if end is None:
-        end = db[label]['meta']['intervalDurationDomain'][primitive][1]
+        end = db[label]['info']['intervalDurationDomain'][primitive][1]
 
     ret = {}
     if primitive is None:

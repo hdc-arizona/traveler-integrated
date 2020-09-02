@@ -6,8 +6,8 @@ import diskcache #pylint: disable=import-error
 from .loggers import logToConsole, ClientLogger
 
 # Possible files / metadata structures that we create / open / update
-diskCacheIndices = ['meta', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
-requiredDiskCacheIndices = ['meta', 'primitives', 'primitiveLinks']
+diskCacheIndices = ['info', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
+requiredDiskCacheIndices = ['info', 'primitives', 'primitiveLinks']
 pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList', 'intervalIndex']
 requiredMetaLists = ['sourceFiles']
 requiredPickleDicts = ['trees']
@@ -42,7 +42,7 @@ class DataStore:
                 elif ptype in requiredPickleDicts:
                     raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), ppath)
             for listType in requiredMetaLists:
-                self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, [])
+                self.datasets[label]['info'][listType] = self.datasets[label]['info'].get(listType, [])
 
     def datasetList(self):
         return list(self.datasets.keys())
@@ -65,10 +65,7 @@ class DataStore:
         for ptype in requiredPickleDicts:
             self.datasets[label][ptype] = {}
         for listType in requiredMetaLists:
-            self.datasets[label]['meta'][listType] = self.datasets[label]['meta'].get(listType, [])
-        # Initially flag the data as NOT having trace data; this will be overridden
-        # if OTF2 data is uploaded
-        self.datasets[label]['meta']['hasTraceData'] = False
+            self.datasets[label]['info'][listType] = self.datasets[label]['info'].get(listType, [])
 
     def purgeDataset(self, label):
         del self.datasets[label]
@@ -77,20 +74,23 @@ class DataStore:
             shutil.rmtree(labelDir)
 
     def addSourceFile(self, label, fileName, fileType):
-        # Have to do this separately because meta is a diskcache
-        sourceFiles = self.datasets[label]['meta']['sourceFiles']
+        # Have to do this separately because info is a diskcache
+        sourceFiles = self.datasets[label]['info']['sourceFiles']
         sourceFiles.append({'fileName': fileName, 'fileType': fileType, 'stillLoading': True})
-        self.datasets[label]['meta']['sourceFiles'] = sourceFiles
+        self.datasets[label]['info']['sourceFiles'] = sourceFiles
+
+    def getSourceFile(self, label, fileType):
+        return next((x for x in self.datasets[label]['info']['sourceFiles'] if x['fileType'] == fileType))
 
     def finishLoadingSourceFile(self, label, fileName):
-        sourceFiles = self.datasets[label]['meta']['sourceFiles']
+        sourceFiles = self.datasets[label]['info']['sourceFiles']
         sourceFile = next((f for f in sourceFiles if f['fileName'] == fileName), None)
         if sourceFile is not None:
             sourceFile['stillLoading'] = False
         else:
             raise Exception("Can't finish unknown source file: " + fileName)
         # Tell the diskcache that something has been updated
-        self.datasets[label]['meta']['sourceFiles'] = sourceFiles
+        self.datasets[label]['info']['sourceFiles'] = sourceFiles
 
     def addTree(self, label, tree, sourceType):
         self.datasets[label]['trees'][sourceType] = tree
