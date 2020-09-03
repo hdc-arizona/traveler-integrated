@@ -19,7 +19,7 @@ addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Values?: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 memInfoMetricParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Values?: \("meminfo:([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
-def processEvent(self, label, event):
+def processEvent(self, datasetId, event):
     newR = seenR = 0
 
     if 'Region' in event:
@@ -27,13 +27,13 @@ def processEvent(self, label, event):
         primitiveName = event['Region'].replace('::eval', '')
         event['Primitive'] = primitiveName
         del event['Region']
-        primitive, newR = self.processPrimitive(label, primitiveName, 'otf2')
+        primitive, newR = self.processPrimitive(datasetId, primitiveName, 'otf2')
         seenR = 1 if newR == 0 else 0
         if self.debugSources is True:
             if 'eventCount' not in primitive:
                 primitive['eventCount'] = 0
             primitive['eventCount'] += 1
-        self.datasets[label]['primitives'][primitiveName] = primitive
+        self[datasetId]['primitives'][primitiveName] = primitive
     # Add enter / leave events to per-location lists
     if event['Event'] == 'ENTER' or event['Event'] == 'LEAVE':
         if not event['Location'] in self.sortedEventsByLocation:
@@ -43,18 +43,17 @@ def processEvent(self, label, event):
         self.sortedEventsByLocation[event['Location']].add((event['Timestamp'], event))
     return (newR, seenR)
 
-async def processOtf2(self, label, file, log=logToConsole):
-    self.addSourceFile(label, file.name, 'otf2')
-    await self.processRawTrace(label, file, log)
-    await self.combineIntervals(label, log)
-    await self.buildIntervalTree(label, log)
-    await self.connectIntervals(label, log)
-    self.finishLoadingSourceFile(label, file.name)
+async def processOtf2(self, datasetId, file, log=logToConsole):
+    self.addSourceFile(datasetId, file.name, 'otf2')
+    await self.processRawTrace(datasetId, file, log)
+    await self.combineIntervals(datasetId, log)
+    await self.buildIntervalTree(datasetId, log)
+    self.finishLoadingSourceFile(datasetId, file.name)
 
-async def processRawTrace(self, label, file, log):
+async def processRawTrace(self, datasetId, file, log):
     # Set up database file for procMetrics
-    labelDir = os.path.join(self.dbDir, label)
-    procMetrics = self.datasets[label]['procMetrics'] = diskcache.Index(os.path.join(labelDir, 'procMetrics.diskCacheIndex'))
+    idDir = os.path.join(self.dbDir, datasetId)
+    procMetrics = self[datasetId]['procMetrics'] = diskcache.Index(os.path.join(idDir, 'procMetrics.diskCacheIndex'))
 
     if 'procMetricList' not in procMetrics:
         procMetrics['procMetricList'] = []
@@ -108,7 +107,7 @@ async def processRawTrace(self, label, file, log):
         elif eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
             if currentEvent is not None:
-                counts = self.processEvent(label, currentEvent)
+                counts = self.processEvent(datasetId, currentEvent)
                 # Log that we've processed another event
                 numEvents += 1
                 if numEvents % 2500 == 0:
@@ -135,7 +134,7 @@ async def processRawTrace(self, label, file, log):
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
     # The last event will never have had a chance to be processed:
     if currentEvent is not None:
-        counts = self.processEvent(label, currentEvent)
+        counts = self.processEvent(datasetId, currentEvent)
         newR += counts[0]
         seenR += counts[1]
     await log('')
@@ -144,12 +143,12 @@ async def processRawTrace(self, label, file, log):
     await log('Metrics included: %d; skpped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
 
     # Now that we've seen all the locations, store that list in our info
-    self.datasets[label]['info']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
+    self[datasetId]['info']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
 
-async def combineIntervals(self, label, log):
+async def combineIntervals(self, datasetId, log):
     # Set up database file
-    labelDir = os.path.join(self.dbDir, label)
-    intervals = self.datasets[label]['intervals'] = diskcache.Index(os.path.join(labelDir, 'intervals.diskCacheIndex'))
+    idDir = os.path.join(self.dbDir, datasetId)
+    intervals = self[datasetId]['intervals'] = diskcache.Index(os.path.join(idDir, 'intervals.diskCacheIndex'))
 
     # Helper function for creating interval objects
     async def createNewInterval(event, lastEvent, intervalId):
@@ -227,24 +226,25 @@ async def combineIntervals(self, label, log):
             currentInterval = None
         # Make sure there are no trailing ENTER events
         if len(lastEventStack) > 0:
-            # TODO: fibonacci data triggers this... why?
+            # TODO: this seems to be triggered by recent distributed runs;
+            # probably not a big deal as they're usually shudown_action events?
             await log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
 
     # Clean up temporary lists
     del self.sortedEventsByLocation
 
     # Store the full domain of the data in the datasets' info
-    self.datasets[label]['info']['intervalDomain'] = intervalDomain
+    self[datasetId]['info']['intervalDomain'] = intervalDomain
 
     await log('')
     await log('Finished creating %i intervals; %i refer to mismatching primitives' % (numIntervals, mismatchedIntervals))
 
-async def buildIntervalTree(self, label, log):
+async def buildIntervalTree(self, datasetId, log):
     await log('Building IntervalTree index of intervals (.=2500 intervals)')
     count = 0
     async def intervalIterator():
         nonlocal count
-        for intervalId, intervalObj in self.datasets[label]['intervals'].items():
+        for intervalId, intervalObj in self[datasetId]['intervals'].items():
             enter = intervalObj['enter']['Timestamp']
             leave = intervalObj['leave']['Timestamp'] + 1
             # Need to add one because IntervalTree can't handle zero-length intervals
@@ -260,20 +260,20 @@ async def buildIntervalTree(self, label, log):
 
             yield iTreeInterval
     # Iterate through all intervals to construct the main index:
-    self.datasets[label]['intervalIndex'] = IntervalTree([iTreeInterval async for iTreeInterval in intervalIterator()])
+    self[datasetId]['intervalIndex'] = IntervalTree([iTreeInterval async for iTreeInterval in intervalIterator()])
     await log('')
     await log('Finished indexing %i intervals' % count)
 
-async def connectIntervals(self, label, log):
+async def connectIntervals(self, datasetId, log):
     await log('Connecting intervals with the same GUID (.=2500 intervals)')
 
     # Set up db file
-    labelDir = os.path.join(self.dbDir, label)
-    guids = self.datasets[label]['guids'] = diskcache.Index(os.path.join(labelDir, 'guids.diskCacheIndex'))
+    idDir = os.path.join(self.dbDir, datasetId)
+    guids = self[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
 
     intervalCount = missingCount = newLinks = seenLinks = 0
     for _, intervalId in self.endOrderIntervalIdList:
-        intervalObj = self.datasets[label]['intervals'][intervalId]
+        intervalObj = self[datasetId]['intervals'][intervalId]
 
         # Parent GUIDs refer to the one in the enter event, not the leave event
         guid = intervalObj.get('GUID', intervalObj['enter'].get('GUID', None))
@@ -291,7 +291,7 @@ async def connectIntervals(self, label, log):
         if parentGuid is not None and parentGuid in guids:
             foundPrior = False
             for parentIntervalId in reversed(guids[parentGuid]):
-                parentInterval = self.datasets[label]['intervals'][parentIntervalId]
+                parentInterval = self[datasetId]['intervals'][parentIntervalId]
                 if parentInterval['enter']['Timestamp'] <= intervalObj['enter']['Timestamp']:
                     foundPrior = True
                     intervalCount += 1
@@ -302,7 +302,7 @@ async def connectIntervals(self, label, log):
                         'endTimestamp': parentInterval['leave']['Timestamp']
                     }
                     # Because intervals is a diskcache, it needs a copy to know that something changed
-                    self.datasets[label]['intervals'][intervalId] = intervalObj.copy()
+                    self[datasetId]['intervals'][intervalId] = intervalObj.copy()
 
                     # While we're here, note the parent-child link in the primitive graph
                     # (for now, only assume links from the parent's leave interval to the
@@ -310,7 +310,7 @@ async def connectIntervals(self, label, log):
                     child = intervalObj.get('Primitive', intervalObj['enter'].get('Primitive', None))
                     parent = parentInterval.get('Primitive', intervalObj['leave'].get('Primitive', None))
                     if child is not None and parent is not None:
-                        newLinkCount = self.addPrimitiveChild(label, parent, child, 'otf2')[1]
+                        newLinkCount = self.addPrimitiveChild(datasetId, parent, child, 'otf2')[1]
                         newLinks += newLinkCount
                         seenLinks += 1 if newLinkCount == 0 else 0
                     break

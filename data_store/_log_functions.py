@@ -8,7 +8,7 @@ from ._csv_functions import perfModeParser
 # Tools for handling a combined log file
 timeParser = re.compile(r'time: ([\d\.]+)')
 
-async def processPhylanxLog(self, label, lines, log=logToConsole):
+async def processPhylanxLog(self, datasetId, lines, log=logToConsole):
     mode = None
     newR = seenR = newL = seenL = maxTime = 0
     for line in lines:
@@ -18,7 +18,7 @@ async def processPhylanxLog(self, label, lines, log=logToConsole):
                 await log('Parsing tree...')
             elif unflaggedTreeParser.match(line):
                 await log('Parsing unflagged line that looks like a newick tree...')
-                await self.processNewickTree(label, line)
+                await self.processNewickTree(datasetId, line)
             elif dotModeParser.match(line):
                 mode = 'dot'
                 await log('Parsing graph...')
@@ -29,10 +29,10 @@ async def processPhylanxLog(self, label, lines, log=logToConsole):
                 time = 1000000000 * float(timeParser.match(line)[1])
                 await log('Total inclusive time from phylanx log (converted to ns): %f' % time)
         elif mode == 'tree':
-            await self.processNewickTree(label, line, log)
+            await self.processNewickTree(datasetId, line, log)
             mode = None
         elif mode == 'dot':
-            counts = self.processDotLine(label, line)
+            counts = self.processDotLine(datasetId, line)
             if counts is not None:
                 newR += counts[0]
                 seenR += counts[1]
@@ -45,7 +45,7 @@ async def processPhylanxLog(self, label, lines, log=logToConsole):
                 await log('New links: %d, Observed existing links: %d' % (newL, seenL))
                 newR = seenR = newL = seenL = 0
         elif mode == 'perf':
-            counts = self.processCsvLine(label, line)
+            counts = self.processCsvLine(datasetId, line)
             if counts is not None:
                 newR += counts[0]
                 seenR += 1 if counts[0] == 0 else 0
@@ -60,10 +60,10 @@ async def processPhylanxLog(self, label, lines, log=logToConsole):
             # Should never reach this point
             assert False
 
-async def processPhylanxLogFile(self, label, file, log=logToConsole):
+async def processPhylanxLogFile(self, datasetId, file, log=logToConsole):
     def lineGenerator():
         for line in file:
             yield line
-    self.addSourceFile(label, file.name, 'log')
-    await self.processPhylanxLog(label, lineGenerator(), log)
-    self.finishLoadingSourceFile(label, file.name)
+    self.addSourceFile(datasetId, file.name, 'log')
+    await self.processPhylanxLog(datasetId, lineGenerator(), log)
+    self.finishLoadingSourceFile(datasetId, file.name)
