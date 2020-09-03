@@ -41,10 +41,6 @@ parser.add_argument('-a', '--tags', dest='tags', type=str,
                     help=('Tags to be attached to the dataset (when bundling multiple '
                           'datasets, the same tags are attached to all datasets bundled '
                           'at the same time). Separate tags with commas.'))
-parser.add_argument('-b', '--id', dest='id', type=str,
-                    help=('Specify the id for the dataset that is used internally, '
-                          'and will be used for directory names inside --db_dir. '
-                          'Default is a random UUID.'))
 
 class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
@@ -111,11 +107,11 @@ async def main():
         if 'input' in paths and ('tree' in paths or 'performance' in paths or 'graph' in paths):
             raise Exception('Don\'t use --input with --tree, --performance, or --graph for the same --label: %s' % label)
         try:
-            await logToConsole('#################' + ''.join(['#' for x in range(len(label))]))
-            await logToConsole('Adding data for: %s' % label)
-
             # Initialize the dataset
-            datasetId = db.createDataset(args['id'])['info']['datasetId']
+            datasetId = db.createDataset()['info']['datasetId']
+
+            await logToConsole('#################' + ''.join(['#' for x in range(len(label))]))
+            await logToConsole('Adding data for: %s (%s)' % (datasetId, label))
 
             # Assign any tags
             if args['tags'] is not None:

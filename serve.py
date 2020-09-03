@@ -3,7 +3,6 @@ import os
 import argparse
 import json
 import asyncio
-from collections import deque
 from enum import Enum
 
 import uvicorn  # pylint: disable=import-error
@@ -14,7 +13,6 @@ from starlette.requests import Request  # pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
 from data_store import DataStore, ClientLogger
 from data_store.sparseUtilizationList import loadSUL
-from profiling_tools.profilier import Profilier
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
@@ -34,21 +32,32 @@ app = FastAPI(
 )
 app.mount('/static', StaticFiles(directory='static'), name='static')
 
-prf = Profilier()
-profile = False
+def validateDataset(datasetId, requiredFiles=[], filesMustBeReady=[], allFilesMustBeReady=False):
+    if datasetId not in db:
+        # Not strictly RESTful, but we also support looking up datasets by their label
+        for dataset in db:
+            if dataset['info']['label'] == datasetId:
+                datasetId = dataset['info']['datasetId']
+                break
+        if datasetId not in db:
+            raise HTTPException(status_code=404, detail='Dataset not found')
 
+    requiredFiles = set(requiredFiles)
+    filesMustBeReady = set(filesMustBeReady)
+    allFilesReady = True
+    for sourceFile in db[datasetId]['info']['sourceFiles']:
+        requiredFiles.discard(sourceFile['fileType'])
+        if not sourceFile['stillLoading']:
+            allFilesReady = False
+            filesMustBeReady.discard(sourceFile['fileType'])
+    if len(requiredFiles) > 0:
+        raise HTTPException(status_code=404, detail='Dataset does not contain required data: %s' % ', '.join(requiredFiles))
+    if allFilesMustBeReady and not allFilesReady:
+        raise HTTPException(status_code=503, detail='Dataset is not finished loading')
+    if len(filesMustBeReady) > 0:
+        raise HTTPException(status_code=503, detail='Required data still loading: %s' % ', '.join(filesMustBeReady))
 
-def checkDatasetIsReady(label):
-    if label not in db:
-        raise HTTPException(status_code=404, detail='Dataset not found')
-    for sourceFile in db[label]['info']['sourceFiles']:
-        if sourceFile['stillLoading']:
-            raise HTTPException(status_code=503, detail='Dataset is still loading')
-
-def checkDatasetHasTraceData(label):
-    if not db[label]['info']['hasTraceData']:
-        raise HTTPException(status_code=404, detail='Dataset does not contain trace data')
-
+    return datasetId
 
 def iterUploadFile(text):
     for line in text.decode().splitlines():
@@ -62,60 +71,65 @@ def index():
 
 @app.get('/datasets')
 def list_datasets():
-    return db.datasetList()
+    for dataset in db:
+        yield dataset['info']
 
-@app.get('/datasets/{label}')
-def get_dataset(label: str):
-    checkDatasetIsReady(label)
-    return db[label]['info']
+@app.get('/datasets/{datasetId}')
+def get_dataset(datasetId: str):
+    datasetId = validateDataset(datasetId)
+    return db[datasetId]['info']
 
-class BasicDataset(BaseModel):  # pylint: disable=R0903
+class BasicDataset(BaseModel):
     # TODO: ideally, these should all be UploadFile arguments instead of
     # expecting pre-parsed strings, however, AFAIK there isn't a FastAPI way to
     # allow optional UploadFile arguments
+    label: str = 'Untitled dataset'
     newick: str = None
     csv: str = None
     dot: str = None
     physl: str = None
     python: str = None
     cpp: str = None
+    tags: list = None
 
-@app.post('/datasets/{label}', status_code=201)
-def create_dataset(label: str, dataset: BasicDataset = None):
-    if label in db:
-        raise HTTPException(status_code=409, detail='Dataset with label %s already exists' % label)
+@app.post('/datasets', status_code=201)
+def create_dataset(dataset: BasicDataset = None):
     logger = ClientLogger()
 
     async def startProcess():
-        db.createDataset(label)
+        datasetId = db.createDataset()['info']['datasetId']
         if dataset:
+            if dataset.tags:
+                tags = {t : True for t in dataset.tags}
+                db.addTags(datasetId, tags)
             if dataset.newick:
-                db.addSourceFile(label, label + '.newick', 'newick')
-                await db.processNewickTree(label, dataset.newick, logger.log)
+                db.addSourceFile(datasetId, dataset.label + '.newick', 'newick')
+                await db.processNewickTree(datasetId, dataset.newick, logger.log)
             if dataset.csv:
-                db.addSourceFile(label, label + '.csv', 'csv')
-                await db.processCsv(label, iter(dataset.csv.splitlines()), logger.log)
+                db.addSourceFile(datasetId, dataset.label + '.csv', 'csv')
+                await db.processCsv(datasetId, iter(dataset.csv.splitlines()), logger.log)
             if dataset.dot:
-                db.addSourceFile(label, label + '.dot', 'dot')
-                await db.processDot(label, iter(dataset.dot.splitlines()), logger.log)
+                db.addSourceFile(datasetId, dataset.label + '.dot', 'dot')
+                await db.processDot(datasetId, iter(dataset.dot.splitlines()), logger.log)
             if dataset.physl:
-                db.processCode(label, label + '.physl', dataset.physl.splitlines(), 'physl')
+                db.processCode(datasetId, dataset.label + '.physl', dataset.physl.splitlines(), 'physl')
                 await logger.log('Loaded physl code')
             if dataset.python:
-                db.processCode(label, label + '.py', dataset.python.splitlines(), 'python')
+                db.processCode(datasetId, dataset.label + '.py', dataset.python.splitlines(), 'python')
                 await logger.log('Loaded python code')
             if dataset.cpp:
-                db.processCode(label, label + '.cpp', dataset.cpp.splitlines(), 'cpp')
+                db.processCode(datasetId, dataset.label + '.cpp', dataset.cpp.splitlines(), 'cpp')
                 await logger.log('Loaded C++ code')
-        await db.save(label, logger.log)
+
+        await db.save(datasetId, logger.log)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
-@app.delete('/datasets/{label}')
-def delete_dataset(label: str):
-    checkDatasetIsReady(label)
-    db.purgeDataset(label)
+@app.delete('/datasets/{datasetId}')
+def delete_dataset(datasetId: str):
+    datasetId = validateDataset(datasetId, allFilesMustBeReady=True)
+    del db[datasetId]
 
 
 class TreeSource(str, Enum):
@@ -123,64 +137,64 @@ class TreeSource(str, Enum):
     otf2 = 'otf2'
     graph = 'graph'
 
-@app.get('/datasets/{label}/tree')
-def get_tree(label: str, source: TreeSource = TreeSource.newick):
-    checkDatasetIsReady(label)
-    if source not in db[label]['trees']:
+@app.get('/datasets/{datasetId}/tree')
+def get_tree(datasetId: str, source: TreeSource = TreeSource.newick):
+    datasetId = validateDataset(datasetId)
+    if source not in db[datasetId]['trees']:
         raise HTTPException(status_code=404, detail='Dataset does not contain %s tree data' % source.value)
-    return db[label]['trees'][source]
+    return db[datasetId]['trees'][source]
 
-@app.post('/datasets/{label}/tree')
-def add_newick_tree(label: str, file: UploadFile = File(...)):
-    checkDatasetIsReady(label)
+@app.post('/datasets/{datasetId}/tree')
+def add_newick_tree(datasetId: str, file: UploadFile = File(...)):
+    datasetId = validateDataset(datasetId)
     logger = ClientLogger()
 
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'newick')
-        await db.processNewickTree(label, (await file.read()).decode(), logger.log)
-        await db.save(label, logger.log)
+        db.addSourceFile(datasetId, file.filename, 'newick')
+        await db.processNewickTree(datasetId, (await file.read()).decode(), logger.log)
+        await db.save(datasetId, logger.log)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 
-@app.post('/datasets/{label}/csv')
-def add_performance_csv(label: str, file: UploadFile = File(...)):
-    checkDatasetIsReady(label)
+@app.post('/datasets/{datasetId}/csv')
+def add_performance_csv(datasetId: str, file: UploadFile = File(...)):
+    datasetId = validateDataset(datasetId)
     logger = ClientLogger()
 
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'csv')
-        await db.processCsv(label, iterUploadFile(await file.read()), logger.log)
-        await db.save(label, logger.log)
+        db.addSourceFile(datasetId, file.filename, 'csv')
+        await db.processCsv(datasetId, iterUploadFile(await file.read()), logger.log)
+        await db.save(datasetId, logger.log)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 
-@app.post('/datasets/{label}/dot')
-def add_dot_graph(label: str, file: UploadFile = File(...)):
-    checkDatasetIsReady(label)
+@app.post('/datasets/{datasetId}/dot')
+def add_dot_graph(datasetId: str, file: UploadFile = File(...)):
+    datasetId = validateDataset(datasetId)
     logger = ClientLogger()
 
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'dot')
-        await db.processDot(label, iterUploadFile(await file.read()), logger.log)
-        await db.save(label, logger.log)
+        db.addSourceFile(datasetId, file.filename, 'dot')
+        await db.processDot(datasetId, iterUploadFile(await file.read()), logger.log)
+        await db.save(datasetId, logger.log)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 
-@app.post('/datasets/{label}/log')
-def add_full_phylanx_log(label: str, file: UploadFile = File(...)):
-    checkDatasetIsReady(label)
+@app.post('/datasets/{datasetId}/log')
+def add_full_phylanx_log(datasetId: str, file: UploadFile = File(...)):
+    datasetId = validateDataset(datasetId)
     logger = ClientLogger()
 
     async def startProcess():
-        db.addSourceFile(label, file.filename, 'log')
-        await db.processPhylanxLog(label, iterUploadFile(await file.read()), logger.log)
-        await db.save(label, logger.log)
+        db.addSourceFile(datasetId, file.filename, 'log')
+        await db.processPhylanxLog(datasetId, iterUploadFile(await file.read()), logger.log)
+        await db.save(datasetId, logger.log)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
@@ -204,123 +218,115 @@ class FakeOtf2File:  # pylint: disable=R0903
                     line = line[i+1:]
                     done = False
 
-@app.post('/datasets/{label}/otf2')
-async def add_otf2_trace(label: str, request: Request):  # request: Request
-    checkDatasetIsReady(label)
+@app.post('/datasets/{datasetId}/otf2')
+async def add_otf2_trace(datasetId: str, request: Request):  # request: Request
+    datasetId = validateDataset(datasetId)
     logger = ClientLogger()
 
     async def startProcess():
-        db.addSourceFile(label, 'APEX.otf2', 'otf2')
-        await db.processOtf2(label, FakeOtf2File(request), logger.log)
-        await loadSUL(label, db)
+        db.addSourceFile(datasetId, 'APEX.otf2', 'otf2')
+        await db.processOtf2(datasetId, FakeOtf2File(request), logger.log)
+        await loadSUL(datasetId, db)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')
 
 
-@app.get('/datasets/{label}/physl')
-def get_physl(label: str):
-    checkDatasetIsReady(label)
-    if 'physl' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not include physl source code')
-    return db[label]['physl']
+@app.get('/datasets/{datasetId}/physl')
+def get_physl(datasetId: str):
+    datasetId = validateDataset(datasetId, requiredFiles=['physl'], filesMustBeReady=['physl'])
+    return db[datasetId]['physl']
 
 
-@app.post('/datasets/{label}/physl')
-async def add_physl(label: str, file: UploadFile = File(...)):
-    checkDatasetIsReady(label)
-    db.processCode(label, file.filename, iterUploadFile(await file.read()), 'physl')
-    await db.save(label)
+@app.post('/datasets/{datasetId}/physl')
+async def add_physl(datasetId: str, file: UploadFile = File(...)):
+    datasetId = validateDataset(datasetId)
+    db.processCode(datasetId, file.filename, iterUploadFile(await file.read()), 'physl')
+    await db.save(datasetId)
 
 
-@app.get('/datasets/{label}/python')
-def get_python(label: str):
-    checkDatasetIsReady(label)
-    if 'python' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not include python source code')
-    return db[label]['python']
+@app.get('/datasets/{datasetId}/python')
+def get_python(datasetId: str):
+    datasetId = validateDataset(datasetId, requiredFiles=['python'], filesMustBeReady=['python'])
+    return db[datasetId]['python']
 
 
-@app.post('/datasets/{label}/python')
-async def add_python(label: str, file: UploadFile = File(...)):
-    checkDatasetIsReady(label)
-    db.processCode(label, file.filename, iterUploadFile(await file.read()), 'python')
-    await db.save(label)
+@app.post('/datasets/{datasetId}/python')
+async def add_python(datasetId: str, file: UploadFile = File(...)):
+    datasetId = validateDataset(datasetId)
+    db.processCode(datasetId, file.filename, iterUploadFile(await file.read()), 'python')
+    await db.save(datasetId)
 
 
-@app.get('/datasets/{label}/cpp')
-def get_cpp(label: str):
-    checkDatasetIsReady(label)
-    if 'cpp' not in db[label]:
-        raise HTTPException(status_code=404, detail='Dataset does not include C++ source code')
-    return db[label]['cpp']
+@app.get('/datasets/{datasetId}/cpp')
+def get_cpp(datasetId: str):
+    datasetId = validateDataset(datasetId, requiredFiles=['cpp'], filesMustBeReady=['cpp'])
+    return db[datasetId]['cpp']
 
 
-@app.post('/datasets/{label}/cpp')
-async def add_cpp(label: str, file: UploadFile = File(...)):
-    checkDatasetIsReady(label)
-    db.processCode(label, file.filename, iterUploadFile(await file.read()), 'cpp')
-    await db.save(label)
+@app.post('/datasets/{datasetId}/cpp')
+async def add_cpp(datasetId: str, file: UploadFile = File(...)):
+    datasetId = validateDataset(datasetId)
+    db.processCode(datasetId, file.filename, iterUploadFile(await file.read()), 'cpp')
+    await db.save(datasetId)
 
 
-@app.get('/datasets/{label}/primitives')
-def get_primitives(label: str):
-    checkDatasetIsReady(label)
-    return dict(db[label]['primitives'])
+@app.get('/datasets/{datasetId}/primitives')
+def get_primitives(datasetId: str):
+    datasetId = validateDataset(datasetId)
+    return dict(db[datasetId]['primitives'])
 
 
-@app.get('/datasets/{label}/procMetrics')
-def procMetrics(label: str):
-    checkDatasetIsReady(label)
-    return db[label]['procMetrics']['procMetricList']
+@app.get('/datasets/{datasetId}/procMetrics')
+def get_procMetrics(datasetId: str):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'])
+    return db[datasetId]['info']['procMetricList']
 
 
-@app.get('/datasets/{label}/procMetrics/{metric}')
-def procMetricValues(label: str, metric: str, begin: float = None, end: float = None):
-    checkDatasetIsReady(label)
-    checkDatasetHasTraceData(label)
+@app.get('/datasets/{datasetId}/procMetrics/{metric}')
+def get_procMetric_values(datasetId: str, metric: str, begin: float = None, end: float = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
-        begin = db[label]['info']['intervalDomain'][0]
+        begin = db[datasetId]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['info']['intervalDomain'][1]
+        end = db[datasetId]['info']['intervalDomain'][1]
 
     def procMetricGenerator():
         yield '['
         firstItem = True
-        for tm in db[label]['procMetrics'][metric]:
-            if float(tm) < begin or float(tm) > end:
+        for timestamp in db[datasetId]['procMetrics'][metric]:
+            if float(timestamp) < begin or float(timestamp) > end:
                 continue
             if not firstItem:
                 yield ','
-            yield json.dumps(db[label]['procMetrics'][metric][tm])
+            yield json.dumps(db[datasetId]['procMetrics'][metric][timestamp])
             firstItem = False
         yield ']'
 
     return StreamingResponse(procMetricGenerator(), media_type='application/json')
 
-@app.get('/datasets/{label}/intervals')
-def getIntervals(label: str, \
-                 begin: int = None, \
-                 end: int = None, \
-                 minDuration: int = None, \
-                 maxDuration: int = None, \
-                 location: str = None, \
-                 guid: int = None, \
-                 primitive: str = None):
-    checkDatasetIsReady(label)
-    checkDatasetHasTraceData(label)
+@app.get('/datasets/{datasetId}/intervals')
+def get_intervals(datasetId: str, \
+                  begin: int = None, \
+                  end: int = None, \
+                  minDuration: int = None, \
+                  maxDuration: int = None, \
+                  location: str = None, \
+                  guid: int = None, \
+                  primitive: str = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
-        begin = db[label]['info']['intervalDomain'][0]
+        begin = db[datasetId]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['info']['intervalDomain'][1]
+        end = db[datasetId]['info']['intervalDomain'][1]
 
     def intervalGenerator():
         yield '['
         firstItem = True
-        for i in db[label]['intervalIndex'].iterOverlap(begin, end):
-            intervalObj = db[label]['intervals'][i.data]
+        for i in db[datasetId]['intervalIndex'].iterOverlap(begin, end):
+            intervalObj = db[datasetId]['intervals'][i.data]
 
             # Filter by location
             if location is not None and intervalObj['Location'] != location:
@@ -349,28 +355,23 @@ def getIntervals(label: str, \
             firstItem = False
         yield ']'
 
-    if profile:
-        # Consume the generator without storing the yielded strings
-        return deque(intervalGenerator(), maxlen=0)
-    else:
-        return StreamingResponse(intervalGenerator(), media_type='application/json')
+    return StreamingResponse(intervalGenerator(), media_type='application/json')
 
-@app.get('/datasets/{label}/intervals/{intervalId}/trace')
-def intervalTrace(label: str, intervalId: str, begin: float = None, end: float = None):
+@app.get('/datasets/{datasetId}/intervals/{intervalId}/trace')
+def intervalTrace(datasetId: str, intervalId: str, begin: float = None, end: float = None):
     # This streams back a list of string IDs, as well as two special metadata
     # objects for drawing lines to the left and right of the queried range when
     # the full traceback is not requested
-    checkDatasetIsReady(label)
-    checkDatasetHasTraceData(label)
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
-        begin = db[label]['info']['intervalDomain'][0]
+        begin = db[datasetId]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['info']['intervalDomain'][1]
+        end = db[datasetId]['info']['intervalDomain'][1]
 
     def intervalIdGenerator():
         yield '['
-        targetInterval = intervalObj = db[label]['intervals'][intervalId]
+        targetInterval = intervalObj = db[datasetId]['intervals'][intervalId]
         lastInterval = None
         yieldComma = False
 
@@ -379,7 +380,7 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
         while 'lastParentInterval' in intervalObj and intervalObj['enter']['Timestamp'] > end:
             lastInterval = intervalObj
             parentId = intervalObj['lastParentInterval']['id']
-            intervalObj = db[label]['intervals'][parentId]
+            intervalObj = db[datasetId]['intervals'][parentId]
 
         if targetInterval != intervalObj:
             # Because the target interval isn't in the query window, yield some
@@ -403,7 +404,7 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
             yield '"%s"' % intervalObj['intervalId']
             lastInterval = intervalObj
             parentId = intervalObj['lastParentInterval']['id']
-            intervalObj = db[label]['intervals'][parentId]
+            intervalObj = db[datasetId]['intervals'][parentId]
 
         if 'lastParentInterval' not in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
             # We ran out of intervals, and the last one was in range; just yield
@@ -432,56 +433,53 @@ def intervalTrace(label: str, intervalId: str, begin: float = None, end: float =
     return StreamingResponse(intervalIdGenerator(), media_type='application/json')
 
 
-@app.get('/datasets/{label}/utilizationHistogram')
-def get_utilization_histogram(label: str, bins: int = 100, begin: int = None, end: int = None, location: str = None):
-    checkDatasetIsReady(label)
-    checkDatasetHasTraceData(label)
+@app.get('/datasets/{datasetId}/utilizationHistogram')
+def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None, end: int = None, location: str = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
-        begin = db[label]['info']['intervalDomain'][0]
+        begin = db[datasetId]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['info']['intervalDomain'][1]
+        end = db[datasetId]['info']['intervalDomain'][1]
 
     ret = {}
     if location is None:
-        ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
     else:
-        ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 
 
-@app.get('/datasets/{label}/newMetricData')
-def newMetricData(label: str, bins: int = 100, begin: int = None, end: int = None, location: str = None, metric_type: str = None):
-    checkDatasetIsReady(label)
-    checkDatasetHasTraceData(label)
+@app.get('/datasets/{datasetId}/newMetricData')
+def newMetricData(datasetId: str, bins: int = 100, begin: int = None, end: int = None, location: str = None, metric_type: str = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
-        begin = db[label]['info']['intervalDomain'][0]
+        begin = db[datasetId]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['info']['intervalDomain'][1]
+        end = db[datasetId]['info']['intervalDomain'][1]
 
     ret = {}
     if location is None:
-        ret['data'] = db[label]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end)
     else:
-        ret['data'] = db[label]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end, location)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end, location)
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 
 
-@app.get('/datasets/{label}/ganttChartValues')
-def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
-    checkDatasetIsReady(label)
-    checkDatasetHasTraceData(label)
+@app.get('/datasets/{datasetId}/ganttChartValues')
+def ganttChartValues(datasetId: str, bins: int=100, begin: int=None, end: int=None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
-        begin = db[label]['info']['intervalDomain'][0]
+        begin = db[datasetId]['info']['intervalDomain'][0]
     if end is None:
-        end = db[label]['info']['intervalDomain'][1]
+        end = db[datasetId]['info']['intervalDomain'][1]
 
     ret = {}
-    ret['data'] = db[label]['sparseUtilizationList']['intervals'].calcGanttHistogram(bins, begin, end)
+    ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcGanttHistogram(bins, begin, end)
 
     ret['metadata'] = {}
     ret['metadata']['begin'] = begin
@@ -491,51 +489,21 @@ def ganttChartValues(label: str, bins: int=100, begin: int=None, end: int=None):
     return json.dumps(ret)
 
 
-@app.get('/datasets/{label}/getIntervalDuration')
-def getIntervalDuration(label: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None):
-    checkDatasetIsReady(label)
-    checkDatasetHasTraceData(label)
+@app.get('/datasets/{datasetId}/getIntervalDuration')
+def getIntervalDuration(datasetId: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
-        begin = int(db[label]['info']['intervalDurationDomain'][primitive][0])
+        begin = int(db[datasetId]['info']['intervalDurationDomain'][primitive][0])
     if end is None:
-        end = db[label]['info']['intervalDurationDomain'][primitive][1]
+        end = db[datasetId]['info']['intervalDurationDomain'][primitive][1]
 
     ret = {}
     if primitive is None:
         return ret
-    ret['data'] = db[label]['sparseUtilizationList']['intervalDuration'][primitive].calcIntervalHistogram(bins, begin, end)
+    ret['data'] = db[datasetId]['sparseUtilizationList']['intervalDuration'][primitive].calcIntervalHistogram(bins, begin, end)
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
-
-#####################
-# Profilier Wrappers#
-#####################
-
-@app.get('/profile/start')
-def profileStart():
-    prf.reset()
-
-@app.get('/profile/datasets/{label}/utilizationHistogram')
-def profile_get_utilization_histogram(label: str, bins: int = 100, begin: int = None, end: int = None, location: str = None):
-    prf.start()
-    ret = get_utilization_histogram(label, bins, begin, end, location)
-    prf.end()
-
-    return ret
-
-@app.get('/profile/datasets/{label}/intervals')
-def profileIntervals(label: str, begin: float = None, end: float = None):
-    prf.start()
-    getIntervals(label, begin, end, True)
-    prf.end()
-
-    return 0
-
-@app.get('/profile/print/{sortby}/{filename}/{numberOfRuns}')
-def profilePrint(sortby: str, filename: str, numberOfRuns: int):
-    prf.dumpAverageStats(sortby, filename, numberOfRuns)
-
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())

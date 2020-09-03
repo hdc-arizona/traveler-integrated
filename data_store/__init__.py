@@ -63,15 +63,17 @@ class DataStore:
         if os.path.exists(idDir):
             shutil.rmtree(idDir)
 
+    def __iter__(self):
+        yield from self.datasets.values()
+
     def generateUniqueDatasetId(self):
         datasetId = None
         while datasetId is None or datasetId in self:
             datasetId = str(uuid.uuid4())
         return datasetId
 
-    def createDataset(self, datasetId=None):
-        if datasetId is None:
-            datasetId = self.generateUniqueDatasetId()
+    def createDataset(self):
+        datasetId = self.generateUniqueDatasetId()
         idDir = os.path.join(self.dbDir, datasetId)
         if datasetId in self or os.path.exists(idDir):
             del self[datasetId]
@@ -93,9 +95,6 @@ class DataStore:
         sourceFiles.append({'fileName': fileName, 'fileType': fileType, 'stillLoading': True})
         self[datasetId]['info']['sourceFiles'] = sourceFiles
 
-    def getSourceFile(self, datasetId, fileType):
-        return next((f for f in self[datasetId]['info']['sourceFiles'] if f['fileType'] == fileType), None)
-
     def finishLoadingSourceFile(self, datasetId, fileName):
         sourceFiles = self[datasetId]['info']['sourceFiles']
         sourceFile = next((f for f in sourceFiles if f['fileName'] == fileName), None)
@@ -105,14 +104,6 @@ class DataStore:
             raise Exception("Can't finish unknown source file: " + fileName)
         # Tell the diskcache that something has been updated
         self[datasetId]['info']['sourceFiles'] = sourceFiles
-
-    def checkDatasetIsReady(self, datasetId):
-        if datasetId not in self:
-            return False
-        for sourceFile in self[datasetId]['info']['sourceFiles']:
-            if sourceFile['stillLoading']:
-                return False
-        return True
 
     def addTags(self, datasetId, tags):
         self[datasetId]['info']['tags'].update(tags)

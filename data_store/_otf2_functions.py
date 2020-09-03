@@ -54,9 +54,8 @@ async def processRawTrace(self, datasetId, file, log):
     # Set up database file for procMetrics
     idDir = os.path.join(self.dbDir, datasetId)
     procMetrics = self[datasetId]['procMetrics'] = diskcache.Index(os.path.join(idDir, 'procMetrics.diskCacheIndex'))
+    self[datasetId]['info']['procMetricList'] = []
 
-    if 'procMetricList' not in procMetrics:
-        procMetrics['procMetricList'] = []
     # Temporary counters / lists for sorting
     numEvents = 0
     self.sortedEventsByLocation = {}
@@ -91,19 +90,15 @@ async def processRawTrace(self, datasetId, file, log):
                     includedMetrics += 1
                     currentEvent['metrics'][metricType] = value #pylint: disable=unsubscriptable-object
                 metricTypePapi = 'PAPI' + ':' + metricType
-                pm = procMetrics['procMetricList']
-                if metricTypePapi not in pm:
-                    pm.append(metricTypePapi)
-                    procMetrics['procMetricList'] = pm
+                if metricTypePapi not in self[datasetId]['info']['procMetricList']:
+                    self[datasetId]['info']['procMetricList'].append(metricTypePapi)
+                    self[datasetId]['info']['procMetricList'] = self[datasetId]['info']['procMetricList']
             else: # do the other meminfo status io parsing here
                 if metricType not in procMetrics:
                     procMetrics[metricType] = {}
-                    pm = procMetrics['procMetricList']
-                    pm.append(metricType)
-                    procMetrics['procMetricList'] = pm
-                val = procMetrics[metricType]
-                val[str(timestamp)] = {'Timestamp': timestamp, 'Value':  value}
-                procMetrics[metricType] = val
+                    self[datasetId]['info']['procMetricList'].append(metricType)
+                    self[datasetId]['info']['procMetricList'] = self[datasetId]['info']['procMetricList']
+                procMetrics[metricType][str(timestamp)] = {'Timestamp': timestamp, 'Value':  value}
         elif eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
             if currentEvent is not None:
@@ -211,8 +206,6 @@ async def combineIntervals(self, datasetId, log):
                 # Update intervalDomain
                 intervalDomain[0] = min(intervalDomain[0], currentInterval['enter']['Timestamp'])
                 intervalDomain[1] = max(intervalDomain[1], currentInterval['leave']['Timestamp'])
-                # Insert the id into the endOrderIntervalIdList
-                self.endOrderIntervalIdList.add((currentInterval['leave']['Timestamp'], intervalId))
                 # Log that we've finished the finished interval
                 numIntervals += 1
                 if numIntervals % 2500 == 0:
