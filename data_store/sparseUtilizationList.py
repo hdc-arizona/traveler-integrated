@@ -129,13 +129,13 @@ class SparseUtilizationList():
 
 # In charge of loading interval data into our integral list
 # I have no idea how we want to load interval data :/
-async def loadSUL(label, db, log=logToConsole):
+async def loadSUL(datasetId, db, log=logToConsole):
     await log('Loading sparse utilization list.')
 
     # create sul obj
     sul = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'intervalDuration': dict()}
-    begin = db[label]['meta']['intervalDomain'][0]
-    end = db[label]['meta']['intervalDomain'][1]
+    begin = db[datasetId]['info']['intervalDomain'][0]
+    end = db[datasetId]['info']['intervalDomain'][1]
     preMetricValue = dict()
     intervalDuration = dict()
 
@@ -163,14 +163,16 @@ async def loadSUL(label, db, log=logToConsole):
                 intervalDuration[event['Primitive']][duration] = 1
 
     # we extract relevant data from database
-    for loc in db[label]['intervalIndexes']['locations']:
+    for intervalObj in db[datasetId]['intervals'].values():
+        loc = intervalObj['Location']
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['enter']['Timestamp']), 'counter': 1, 'util': 0}, loc)
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['leave']['Timestamp']), 'counter': -1, 'util': 0}, loc)
+        updateSULForInterval(intervalObj['enter'], loc)
+        updateSULForInterval(intervalObj['leave'], loc)
+        updateIntervalDuration(intervalObj)
+
+    for loc in db[datasetId]['info']['locationNames']:
         counter = 0
-        for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
-            sul['intervals'].setIntervalAtLocation({'index': int(i.begin), 'counter': 1, 'util': 0}, loc)
-            sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0}, loc)
-            updateSULForInterval(db[label]['intervals'][i.data]['enter'], loc)
-            updateSULForInterval(db[label]['intervals'][i.data]['leave'], loc)
-            updateIntervalDuration(db[label]['intervals'][i.data])
 
         sul['intervals'].sortAtLoc(loc)
         sul['intervals'].locationDict[loc] = np.array(sul['intervals'].locationDict[loc])
@@ -182,7 +184,7 @@ async def loadSUL(label, db, log=logToConsole):
         for i, criticalPt in enumerate(sul['intervals'].locationDict[loc]):
             counter += criticalPt['counter']
             criticalPt['counter'] = counter
-            if i is 0:
+            if i == 0:
                 criticalPt['util'] = sul['intervals'].calcCurrentUtil(criticalPt['index'], None)
             else:
                 criticalPt['util'] = sul['intervals'].calcCurrentUtil(criticalPt['index'], sul['intervals'].locationDict[loc][i-1])
@@ -230,7 +232,7 @@ async def loadSUL(label, db, log=logToConsole):
                 LS['util'][i] = LS['util'][i] + LS['util'][i-1]
 
         sul['intervalDuration'][primitive].setCLocation(dummyLocation, LS)
-    db[label]['meta']['intervalDurationDomain'] = intervalDurationDomainDict
-    db[label]['sparseUtilizationList'] = sul
+    db[datasetId]['info']['intervalDurationDomain'] = intervalDurationDomainDict
+    db[datasetId]['sparseUtilizationList'] = sul
 
     return
