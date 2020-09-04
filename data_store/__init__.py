@@ -105,10 +105,13 @@ class DataStore:
         # Tell the diskcache that something has been updated
         self[datasetId]['info']['sourceFiles'] = sourceFiles
 
+    def rename(self, datasetId, newLabel):
+        self[datasetId]['info']['label'] = newLabel
+
     def addTags(self, datasetId, tags):
-        self[datasetId]['info']['tags'].update(tags)
-        # Tell the diskcache that something has been updated
-        self[datasetId]['info']['tags'] = self[datasetId]['info']['tags']
+        existingTags = self[datasetId]['info']['tags']
+        existingTags.update(tags)
+        self[datasetId]['info']['tags'] = existingTags
 
     def addTree(self, datasetId, tree, sourceType):
         self[datasetId]['trees'][sourceType] = tree
@@ -185,4 +188,4 @@ class DataStore:
     from ._csv_functions import processCsvLine, processCsv, processCsvFile
     from ._code_functions import processCode, processCodeFile
     from ._log_functions import processPhylanxLog, processPhylanxLogFile
-    from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree
+    from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree, buildSparseUtilizationLists

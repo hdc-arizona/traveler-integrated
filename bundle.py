@@ -4,18 +4,21 @@ import argparse
 import subprocess
 import asyncio
 from data_store import DataStore, logToConsole
-from data_store.sparseUtilizationList import loadSUL
 
-parser = argparse.ArgumentParser(description='Bundle data directly from phylanx stdout, individual tree / performance / graph files, OTF2 traces, and/or source code files')
-parser.add_argument('-l', '--label', dest='label', type=str, default='Untitled dataset',
-                    help=('Label for the bundled dataset (default: "Untitled dataset"). Providing a '
-                          'label that already exists in the database will bundle '
-                          'with/overwrite any previous data. If globbing multiple inputs, '
-                          'this should be a regular expression, where the first capturing '
-                          'group indicates which files go together (e.g. --input '
-                          'data/*/phylanxLog.txt --otf2 data/*/OTF2_archive/APEX.otf2 '
-                          '--label data/([^/]*) would merge datasets based on their common '
-                          'directory name, and use that directory name as the label).'))
+parser = argparse.ArgumentParser( \
+    description=('Bundle data directly from phylanx stdout, individual tree / '
+                 'performance / graph files, OTF2 traces, and/or source code files'))
+parser.add_argument('-l', '--label', dest='label', type=str, default='Untitled dataset', \
+    help=('Label for the bundled dataset (default: "Untitled dataset"). Providing a '
+          'label that already exists in the database will bundle with/overwrite '
+          'any previous data. If globbing multiple inputs, this should be a '
+          'regular expression, where the first capturing group indicates which '
+          'files go together. For example: \n'
+          '--input data/*/phylanxLog.txt \n'
+          '--otf2 data/*/OTF2_archive/APEX.otf2 \n'
+          '--label data/([^/]*) \n'
+          'would merge datasets based on their common directory name, and use '
+          'that directory name as the label.'))
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
                     help='Directory to store the bundled data (default: /tmp/traveler-integrated)')
 parser.add_argument('-i', '--input', dest='input', type=str, metavar='path', nargs='*', default=[],
@@ -113,9 +116,12 @@ async def main():
             await logToConsole('#################' + ''.join(['#' for x in range(len(label))]))
             await logToConsole('Adding data for: %s (%s)' % (datasetId, label))
 
+            # Assign its name
+            db.rename(datasetId, label)
+
             # Assign any tags
             if args['tags'] is not None:
-                tags = { t : True for t in args['tags'].split(',') }
+                tags = {t : True for t in args['tags'].split(',')}
                 db.addTags(datasetId, tags)
 
             # Handle performance files
@@ -147,7 +153,6 @@ async def main():
             # Handle otf2
             if 'otf2' in paths:
                 await db.processOtf2(datasetId, FakeFile(paths['otf2']))
-                await loadSUL(datasetId, db)
 
 
             # Save all the data

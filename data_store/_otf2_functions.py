@@ -1,9 +1,11 @@
 import copy
 import os
 import re
-import diskcache #pylint: disable=import-error
-from blist import sortedlist #pylint: disable=import-error
-from intervaltree import Interval, IntervalTree #pylint: disable=import-error
+import diskcache
+import numpy as np
+from blist import sortedlist
+from intervaltree import Interval, IntervalTree
+from .sparseUtilizationList import SparseUtilizationList
 from .loggers import logToConsole
 
 # Tools for handling OTF2 traces
@@ -48,13 +50,14 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     await self.processRawTrace(datasetId, file, log)
     await self.combineIntervals(datasetId, log)
     await self.buildIntervalTree(datasetId, log)
+    await self.buildSparseUtilizationLists(datasetId, log)
     self.finishLoadingSourceFile(datasetId, file.name)
 
 async def processRawTrace(self, datasetId, file, log):
     # Set up database file for procMetrics
     idDir = os.path.join(self.dbDir, datasetId)
     procMetrics = self[datasetId]['procMetrics'] = diskcache.Index(os.path.join(idDir, 'procMetrics.diskCacheIndex'))
-    self[datasetId]['info']['procMetricList'] = []
+    procMetricList = self[datasetId]['info']['procMetricList'] = []
 
     # Temporary counters / lists for sorting
     numEvents = 0
@@ -91,13 +94,13 @@ async def processRawTrace(self, datasetId, file, log):
                     currentEvent['metrics'][metricType] = value #pylint: disable=unsubscriptable-object
                 metricTypePapi = 'PAPI' + ':' + metricType
                 if metricTypePapi not in self[datasetId]['info']['procMetricList']:
-                    self[datasetId]['info']['procMetricList'].append(metricTypePapi)
-                    self[datasetId]['info']['procMetricList'] = self[datasetId]['info']['procMetricList']
+                    procMetricList.append(metricTypePapi)
+                    self[datasetId]['info']['procMetricList'] = procMetricList
             else: # do the other meminfo status io parsing here
                 if metricType not in procMetrics:
                     procMetrics[metricType] = {}
-                    self[datasetId]['info']['procMetricList'].append(metricType)
-                    self[datasetId]['info']['procMetricList'] = self[datasetId]['info']['procMetricList']
+                    procMetricList.append(metricType)
+                    self[datasetId]['info']['procMetricList'] = procMetricList
                 procMetrics[metricType][str(timestamp)] = {'Timestamp': timestamp, 'Value':  value}
         elif eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
@@ -160,6 +163,7 @@ async def combineIntervals(self, datasetId, log):
                 newInterval[attr] = event[attr]
             else:
                 if attr == 'Location':
+                    await log('')
                     await log('WARNING: ENTER and LEAVE have different locations')
                 newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
                 newInterval['leave'][attr] = event[attr]
@@ -192,6 +196,7 @@ async def combineIntervals(self, datasetId, log):
                 # Finish a interval
                 if len(lastEventStack) == 0:
                     # TODO: factorial data used to trigger this... why?
+                    await log('')
                     await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['Primitive'])
                     continue
                 lastEvent = lastEventStack.pop()
@@ -217,6 +222,7 @@ async def combineIntervals(self, datasetId, log):
         if len(lastEventStack) > 0:
             # TODO: this seems to be triggered by recent distributed runs;
             # probably not a big deal as they're usually shudown_action events?
+            await log('')
             await log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
 
     # Clean up temporary lists
@@ -252,3 +258,124 @@ async def buildIntervalTree(self, datasetId, log):
     self[datasetId]['intervalIndex'] = IntervalTree([iTreeInterval async for iTreeInterval in intervalIterator()])
     await log('')
     await log('Finished indexing %i intervals' % count)
+
+async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
+    # create sul obj
+    sul = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict()}
+    preMetricValue = dict()
+    intervalDuration = dict()
+
+    def updateSULForInterval(event, cur_location):
+        if 'metrics' in event:
+            for k, value in event['metrics'].items():
+                if k not in sul['metrics']:
+                    sul['metrics'][k] = SparseUtilizationList()
+                    preMetricValue[k] = {'Timestamp': 0, 'Value': 0}
+                current_rate = (value - preMetricValue[k]['Value']) / (event['Timestamp'] - preMetricValue[k]['Timestamp'])
+                sul['metrics'][k].setIntervalAtLocation({'index': int(event['Timestamp']), 'counter': 0, 'util': current_rate}, cur_location)
+                preMetricValue[k]['Timestamp'] = event['Timestamp']
+                preMetricValue[k]['Value'] = value
+
+    def updateIntervalDuration(event):
+        duration = event['leave']['Timestamp'] - event['enter']['Timestamp']
+        if 'Primitive' in event:
+            durationCounts = intervalDuration[event['Primitive']] = intervalDuration.get(event['Primitive'], dict())
+            durationCounts[duration] = durationCounts.get(duration, 0) + 1
+
+    # First pass through all the intervals
+    count = 0
+    await log('Building SparseUtilizationList index of intervals (.=2500 intervals)')
+    for intervalObj in self[datasetId]['intervals'].values():
+        loc = intervalObj['Location']
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['enter']['Timestamp']), 'counter': 1, 'util': 0}, loc)
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['leave']['Timestamp']), 'counter': -1, 'util': 0}, loc)
+        updateSULForInterval(intervalObj['enter'], loc)
+        updateSULForInterval(intervalObj['leave'], loc)
+        updateIntervalDuration(intervalObj)
+
+        count += 1
+        if count % 2500 == 0:
+            await log('.', end='')
+        if count % 100000 == 0:
+            await log('processed %i intervals' % count)
+
+    await log('')
+    await log('Finished indexing %s intervals' % count)
+
+    # Do a quick check for discrepancies between the primitives we saw, and
+    # the other primitives that we expect
+    expectedPrimitives = set(self[datasetId]['primitives'].keys())
+    observedPrimitives = set(intervalDuration.keys())
+    extraExpected = expectedPrimitives - observedPrimitives
+    extraObserved = observedPrimitives - expectedPrimitives
+    if len(extraExpected) > 0:
+        await log('WARNING: Did not observe intervals for primitives: ' + ', '.join(extraExpected))
+    if len(extraObserved) > 0:
+        await log('WARNING: Observed intervals for unknown primitives: ' + ', '.join(extraObserved))
+
+    await log('Summarizing each location...')
+    for loc in self[datasetId]['info']['locationNames']:
+        counter = 0
+
+        sul['intervals'].sortAtLoc(loc)
+        sul['intervals'].locationDict[loc] = np.array(sul['intervals'].locationDict[loc])
+        for key in sul['metrics']:
+            sul['metrics'][key].sortAtLoc(loc)
+            sul['metrics'][key].locationDict[loc] = np.array(sul['metrics'][key].locationDict[loc])
+
+        length = len(sul['intervals'].locationDict[loc])
+        for i, criticalPt in enumerate(sul['intervals'].locationDict[loc]):
+            counter += criticalPt['counter']
+            criticalPt['counter'] = counter
+            if i == 0:
+                criticalPt['util'] = sul['intervals'].calcCurrentUtil(criticalPt['index'], None)
+            else:
+                criticalPt['util'] = sul['intervals'].calcCurrentUtil(criticalPt['index'], sul['intervals'].locationDict[loc][i-1])
+
+        locStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
+        for i in range(length):
+            locStruct['index'][i] = sul['intervals'].locationDict[loc][i]['index']
+            locStruct['counter'][i] = sul['intervals'].locationDict[loc][i]['counter']
+            locStruct['util'][i] = sul['intervals'].locationDict[loc][i]['util']
+
+        sul['intervals'].setCLocation(loc, locStruct)
+        # print("interval loc struct initiated")
+
+        for key in sul['metrics']:
+            length = len(sul['metrics'][key].locationDict[loc])
+            mlocStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
+            for i in range(length):
+                mlocStruct['index'][i] = sul['metrics'][key].locationDict[loc][i]['index']
+                mlocStruct['counter'][i] = sul['metrics'][key].locationDict[loc][i]['counter']
+                mlocStruct['util'][i] = sul['metrics'][key].locationDict[loc][i]['util']
+
+            sul['metrics'][key].setCLocation(loc, mlocStruct)
+        # print("metric loc struct initiated")
+
+    # Now construct per-primitive SparseUtilizationLists
+    await log('Summarizing primitives...')
+    dummyLocation = 1
+    for primitive in intervalDuration:
+        sul['primitives'][primitive] = SparseUtilizationList()
+        for duration, count in intervalDuration.get(primitive, dict()).items():
+            sul['primitives'][primitive].setIntervalAtLocation({'index': int(duration), 'counter': 0, 'util': count}, dummyLocation)
+
+        sul['primitives'][primitive].sortAtLoc(dummyLocation)
+        length = len(sul['primitives'][primitive].locationDict[dummyLocation])
+        primitiveDetails = self[datasetId]['primitives'][primitive]
+        primitiveDetails['intervalDomain'] = [
+            sul['primitives'][primitive].locationDict[dummyLocation][0]['index'],
+            sul['primitives'][primitive].locationDict[dummyLocation][length-1]['index']
+        ]
+        self[datasetId]['primitives'][primitive] = primitiveDetails # self[datasetId]['primitives'] needs to be told that something changed
+        sul['primitives'][primitive].locationDict[dummyLocation] = np.array(sul['primitives'][primitive].locationDict[dummyLocation])
+        LS = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
+        for i in range(length):
+            LS['index'][i] = sul['primitives'][primitive].locationDict[dummyLocation][i]['index']
+            LS['counter'][i] = sul['primitives'][primitive].locationDict[dummyLocation][i]['counter']
+            LS['util'][i] = sul['primitives'][primitive].locationDict[dummyLocation][i]['util']
+            if i > 0:
+                LS['util'][i] = LS['util'][i] + LS['util'][i-1]
+
+        sul['primitives'][primitive].setCLocation(dummyLocation, LS)
+    self[datasetId]['sparseUtilizationList'] = sul

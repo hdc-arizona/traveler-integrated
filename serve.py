@@ -12,7 +12,6 @@ from starlette.staticfiles import StaticFiles  # pylint: disable=import-error
 from starlette.requests import Request  # pylint: disable=import-error
 from starlette.responses import RedirectResponse, StreamingResponse #pylint: disable=import-error
 from data_store import DataStore, ClientLogger
-from data_store.sparseUtilizationList import loadSUL
 
 parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
@@ -35,6 +34,7 @@ app.mount('/static', StaticFiles(directory='static'), name='static')
 def validateDataset(datasetId, requiredFiles=[], filesMustBeReady=[], allFilesMustBeReady=False):
     if datasetId not in db:
         # Not strictly RESTful, but we also support looking up datasets by their label
+        print('validating', datasetId)
         for dataset in db:
             if dataset['info']['label'] == datasetId:
                 datasetId = dataset['info']['datasetId']
@@ -233,7 +233,6 @@ async def add_otf2_trace(datasetId: str, request: Request):  # request: Request
     async def startProcess():
         db.addSourceFile(datasetId, 'APEX.otf2', 'otf2')
         await db.processOtf2(datasetId, FakeOtf2File(request), logger.log)
-        await loadSUL(datasetId, db)
         db.finishLoadingSourceFile(datasetId, 'APEX.otf2')
         logger.finish()
 
@@ -255,9 +254,9 @@ async def add_physl(datasetId: str, file: UploadFile = File(...)):
 
 @app.get('/datasets/{datasetId}/python')
 def get_python(datasetId: str):
+    print('python endpoint', datasetId)
     datasetId = validateDataset(datasetId, requiredFiles=['python'], filesMustBeReady=['python'])
     return db[datasetId]['python']
-
 
 @app.post('/datasets/{datasetId}/python')
 async def add_python(datasetId: str, file: UploadFile = File(...)):
@@ -284,6 +283,10 @@ def get_primitives(datasetId: str):
     datasetId = validateDataset(datasetId)
     return dict(db[datasetId]['primitives'])
 
+@app.get('/datasets/{datasetId}/primitives/{primitive}')
+def get_primitive(datasetId: str, primitive: str):
+    datasetId = validateDataset(datasetId)
+    return db[datasetId]['primitives'][primitive]
 
 @app.get('/datasets/{datasetId}/procMetrics')
 def get_procMetrics(datasetId: str):
@@ -440,13 +443,8 @@ def intervalTrace(datasetId: str, intervalId: str, begin: float = None, end: flo
 
     return StreamingResponse(intervalIdGenerator(), media_type='application/json')
 
-class IntervalFetchMode(str, Enum):
-    primitive = 'primitive'
-    guid = 'guid'
-    duration = 'duration'
-
 @app.get('/datasets/{datasetId}/utilizationHistogram')
-def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None, end: int = None, location: str = None):
+def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None, end: int = None, location: str = None, primitive: str = None):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
@@ -454,11 +452,16 @@ def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
+    if location is not None and primitive is not None:
+        raise HTTPException(status_code=501, detail='Utilization histograms for both locations and primitives not yet supported.')
+
     ret = {}
     if location is None:
         ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
-    else:
+    elif primitive is None:
         ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
+    else:
+        ret['data'] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcIntervalHistogram(bins, begin, end)
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 
@@ -499,23 +502,6 @@ def ganttChartValues(datasetId: str, bins: int=100, begin: int=None, end: int=No
     ret['metadata']['bins'] = bins
 
     return json.dumps(ret)
-
-
-@app.get('/datasets/{datasetId}/getIntervalDuration')
-def getIntervalDuration(datasetId: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None):
-    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
-
-    if begin is None:
-        begin = int(db[datasetId]['info']['intervalDurationDomain'][primitive][0])
-    if end is None:
-        end = db[datasetId]['info']['intervalDurationDomain'][primitive][1]
-
-    ret = {}
-    if primitive is None:
-        return ret
-    ret['data'] = db[datasetId]['sparseUtilizationList']['intervalDuration'][primitive].calcIntervalHistogram(bins, begin, end)
-    ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
-    return ret
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(db.load())
