@@ -1,4 +1,4 @@
-from .loggers import logToConsole
+from . import logToConsole
 
 def processCode(self, datasetId, name, codeLines, codeType):
     assert codeType in ['physl', 'python', 'cpp']

@@ -1,6 +1,6 @@
 import re
 import newick
-from .loggers import logToConsole
+from . import logToConsole
 
 # Tools for handling the tree
 treeModeParser = re.compile(r'Tree information for function:')

@@ -3,7 +3,6 @@ import copy
 
 import numpy as np
 import json
-from .loggers import logToConsole
 from profiling_tools._cCalcBin import ffi, lib
 
 class SparseUtilizationList():

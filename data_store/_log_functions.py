@@ -1,5 +1,5 @@
 import re
-from .loggers import logToConsole
+from . import logToConsole
 
 from ._newick_functions import treeModeParser, unflaggedTreeParser
 from ._dot_functions import dotModeParser

@@ -1,5 +1,5 @@
 import re
-from .loggers import logToConsole
+from . import logToConsole
 
 # Tools for handling the performance csv
 perfModeParser = re.compile(r'primitive_instance,display_name,count,time,eval_direct')

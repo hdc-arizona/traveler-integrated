@@ -6,7 +6,7 @@ import numpy as np
 from blist import sortedlist
 from intervaltree import Interval, IntervalTree
 from .sparseUtilizationList import SparseUtilizationList
-from .loggers import logToConsole
+from . import logToConsole
 
 # Tools for handling OTF2 traces
 eventLineParser = re.compile(r'^(\S+)\s+(\d+)\s+(\d+)\s+(.*)$')

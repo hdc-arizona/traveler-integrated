@@ -1,5 +1,5 @@
 import re
-from .loggers import logToConsole
+from . import logToConsole
 
 # Tools for handling the DOT graph
 dotModeParser = re.compile(r'graph "[^"]*" {')

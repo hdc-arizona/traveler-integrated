@@ -1,11 +1,11 @@
 import os
+import sys
 import shutil
 import pickle
 import errno
 import uuid
 from copy import deepcopy
 import diskcache
-from .loggers import logToConsole, ClientLogger
 
 # Possible files / metadata structures that we create / open / update
 diskCacheIndices = ['info', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
@@ -17,6 +17,10 @@ defaultInfo = {
     'tags': {},
     'label': 'Untitled dataset'
 }
+
+async def logToConsole(value, end='\n'):
+    sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
+    sys.stderr.flush()
 
 class DataStore:
     def __init__(self, dbDir='/tmp/traveler-integrated', debugSources=False):
