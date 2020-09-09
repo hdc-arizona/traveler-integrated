@@ -178,27 +178,19 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
     for (var i = 0; i < data.metadata.bins; i++) {
-      var d = data.data.average[i];
       var x = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
+
+      var d = data.data.average[i];
+      var avgD = {'x': x, 'y': d};
+      d = data.data.max[i];
       var dd = {'x': x, 'y': d};
       var preD = dd;
-      if(i>0) {
-        var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
-        preD = {'x': xx, 'y':data.data.average[i-1]};
-      }
-      this.drawLines(dd, preD, false);
-      if(dd.y != preD.y) {
-        this.drawCircle(dd, false);
-        this.drawCircle(preD, false);
-      }
-
-      d = data.data.max[i];
-      dd = {'x': x, 'y': d};
-      preD = dd;
       if(i>0) {
         preD = {'x': xx, 'y':data.data.max[i-1]};
       }
       this.drawLines(dd, preD, true);
+      var upperD = dd;
+      var upperPreD = preD;
 
       d = data.data.min[i];
       dd = {'x': x, 'y': d};
@@ -207,8 +199,35 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
         preD = {'x': xx, 'y':data.data.min[i-1]};
       }
       this.drawLines(dd, preD, true);
-    };
+      // this.drawShadedArea(upperPreD, upperD, preD, dd);
+
+      d = data.data.std[i];
+      dd = {'x': x, 'y': avgD.y + d};
+      preD = {'x': x, 'y': avgD.y - d};
+      this.drawLines(dd, preD, true);
+
+
+      preD = avgD;
+      if(i>0) {
+        var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
+        preD = {'x': xx, 'y':data.data.average[i-1]};
+      }
+      this.drawLines(avgD, preD, false);
+      // if(avgD.y != preD.y) {
+      //   this.drawCircle(avgD, false);
+      //   this.drawCircle(preD, false);
+      // }
+    }
     this.wasRendered = true;
+  }
+  drawShadedArea(upperLeft, upperRight, lowerLeft, lowerRight){
+    this.canvasContext.beginPath();
+    this.canvasContext.moveTo(upperLeft.x, this.yScale(upperLeft.y));
+    this.canvasContext.lineTo(upperRight.x, this.yScale(upperRight.y));
+    this.canvasContext.lineTo(lowerRight.x, this.yScale(lowerRight.y));
+    this.canvasContext.lineTo(lowerLeft.x, this.yScale(lowerLeft.y));
+    this.canvasContext.fillStyle = 'grey';
+    this.canvasContext.fill();
   }
   drawLines (d, preD, isGray) {
     this.canvasContext.beginPath();

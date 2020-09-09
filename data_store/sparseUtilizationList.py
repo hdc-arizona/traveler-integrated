@@ -72,7 +72,8 @@ class SparseUtilizationList():
         avgArray = np.mean(array, axis=0)
         minArray = np.amin(array, axis=0)
         maxArray = np.amax(array, axis=0)
-        return {"min": minArray.tolist(), "max": maxArray.tolist(), "average": avgArray.tolist()}
+        stdArray = np.std(array, axis=0)
+        return {"min": minArray.tolist(), "max": maxArray.tolist(), "average": avgArray.tolist(), "std": stdArray.tolist()}
 
     # Calculates histogram for interval duration
     def calcIntervalHistogram(self, bins=100, begin=None, end=None):
