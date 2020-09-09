@@ -178,24 +178,15 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
     for (var i = 0; i < data.metadata.bins; i++) {
-      var d = data.data.average[i];
       var x = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
+
+      var d = data.data.average[i];
+      var avgD = {'x': x, 'y': d};
+      d = data.data.max[i];
       var dd = {'x': x, 'y': d};
       var preD = dd;
       if(i>0) {
         var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
-        preD = {'x': xx, 'y':data.data.average[i-1]};
-      }
-      this.drawLines(dd, preD, false);
-      if(dd.y != preD.y) {
-        this.drawCircle(dd, false);
-        this.drawCircle(preD, false);
-      }
-
-      d = data.data.max[i];
-      dd = {'x': x, 'y': d};
-      preD = dd;
-      if(i>0) {
         preD = {'x': xx, 'y':data.data.max[i-1]};
       }
       this.drawLines(dd, preD, true);
@@ -204,10 +195,24 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       dd = {'x': x, 'y': d};
       preD = dd;
       if(i>0) {
+        var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
         preD = {'x': xx, 'y':data.data.min[i-1]};
       }
       this.drawLines(dd, preD, true);
-    };
+
+      d = data.data.std[i];
+      dd = {'x': x, 'y': avgD.y + d};
+      preD = {'x': x, 'y': avgD.y - d};
+      this.drawLines(dd, preD, true);
+
+
+      preD = avgD;
+      if(i>0) {
+        var xx = localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
+        preD = {'x': xx, 'y':data.data.average[i-1]};
+      }
+      this.drawLines(avgD, preD, false);
+    }
     this.wasRendered = true;
   }
   drawLines (d, preD, isGray) {
@@ -219,16 +224,6 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.canvasContext.moveTo(preD.x, this.yScale(preD.y));
     this.canvasContext.lineTo(d.x, this.yScale(d.y));
     this.canvasContext.stroke();
-  }
-  drawCircle(d, isGray) {
-    var radius = 2;
-    this.canvasContext.beginPath();
-    this.canvasContext.arc(d.x, this.yScale(d.y), radius, 0, 2 * Math.PI, false);
-    this.canvasContext.fillStyle = 'black';
-    if(isGray) {
-      this.canvasContext.fillStyle = 'grey';
-    }
-    this.canvasContext.fill();
   }
   drawSpinner () {
     this.content.select('.small.spinner').style('display', 'none');
