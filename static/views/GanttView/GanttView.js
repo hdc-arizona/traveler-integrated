@@ -378,12 +378,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           var a = BigInt(d);
           var c = BigInt(32);
           var node = BigInt(a >> c);
-          var bZero = BigInt(0);
           var thread = (d & 0x0FFFFFFFF);
           var aggText = "";
-          if(node !== bZero){
-              aggText += node + " - "
-          }
+          aggText += node + " - T";
           aggText += thread;
           return aggText;
       });
