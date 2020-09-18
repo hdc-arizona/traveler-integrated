@@ -390,7 +390,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
     // Position the y label
     this.content.select('.yAxisLabel')
-      .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
+      .attr('transform', `translate(${-this.emSize-12},${this._bounds.height / 2}) rotate(-90)`);
   }
   drawBarsCanvas(aggBins){
       this.highlightedData = null;
