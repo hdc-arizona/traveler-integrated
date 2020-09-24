@@ -1,0 +1,42 @@
+.MenuView {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  bottom: 0px;
+
+  padding: 1em;
+
+  width: calc(var(--collapsed-menu-width) - 2em);
+  transition: width 0.5s;
+  &.expanded {
+    width: calc(var(--expanded-menu-width) - 2em);
+  }
+
+  background-color: var(--background-color-richer);
+
+  display: flex;
+  flex-direction: column;
+
+  hr {
+    width: 100%;
+    margin-top: 0.5em;
+    margin-bottom: 1em;
+  }
+
+  .datasetList {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    .dataset {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      .button {
+        flex-grow: 1;
+      }
+    }
+  }
+  &.expanded .datasetList .dataset .button {
+    flex-grow: 0;
+  }
+}

@@ -139,7 +139,7 @@ const { Model, ModelMixin } = createMixinAndDefault({
         return Model.JS_PROMISES[url];
       }
 
-      _loadCSS (url, raw, extraAttrs = {}) {
+      _loadCSS (url, raw, extraAttrs = {}, unshift = false) {
         if (url !== undefined) {
           if (document.querySelector(`link[href="${url}"]`)) {
             // We've already added this stylesheet
@@ -172,7 +172,12 @@ const { Model, ModelMixin } = createMixinAndDefault({
           } else {
             style.innerHTML = raw;
           }
-          document.getElementsByTagName('head')[0].appendChild(style);
+          const head = document.getElementsByTagName('head')[0];
+          if (unshift) {
+            head.prepend(style);
+          } else {
+            head.appendChild(style);
+          }
           Model.RAW_CSS_PROMISES[raw] = Promise.resolve(style);
           return Model.RAW_CSS_PROMISES[raw];
         } else {
@@ -180,7 +185,7 @@ const { Model, ModelMixin } = createMixinAndDefault({
         }
       }
 
-      async _loadLESS (url, raw, extraAttrs = {}, lessArgs = {}) {
+      async _loadLESS (url, raw, extraAttrs = {}, lessArgs = {}, unshift = false) {
         if (url !== undefined) {
           if (Model.LESS_PROMISES[url]) {
             return Model.LESS_PROMISES[url];
@@ -198,7 +203,7 @@ const { Model, ModelMixin } = createMixinAndDefault({
         Model.LESS_PROMISES[url || raw] = cssPromise.then(result => {
           // TODO: maybe do magic here to make LESS variables accessible under
           // this.resources?
-          return this._loadCSS(undefined, result.css, extraAttrs);
+          return this._loadCSS(undefined, result.css, extraAttrs, unshift);
         });
         return Model.LESS_PROMISES[url || raw];
       }
@@ -210,10 +215,10 @@ const { Model, ModelMixin } = createMixinAndDefault({
           return spec;
         } else if (spec.type === 'css') {
           // Load pure css directly
-          p = this._loadCSS(spec.url, spec.raw, spec.extraAttributes || {});
+          p = this._loadCSS(spec.url, spec.raw, spec.extraAttributes || {}, spec.unshift);
         } else if (spec.type === 'less') {
           // Convert LESS to CSS
-          p = this._loadLESS(spec.url, spec.raw, spec.extraAttributes || {}, spec.lessArgs || {});
+          p = this._loadLESS(spec.url, spec.raw, spec.extraAttributes || {}, spec.lessArgs || {}, spec.unshift);
         } else if (spec.type === 'fetch') {
           // Raw fetch request
           p = globalThis.fetch(spec.url, spec.init || {});
@@ -252,7 +257,7 @@ const { Model, ModelMixin } = createMixinAndDefault({
           if (!globalThis.less) {
             // Initial settings
             globalThis.less = { logLevel: 0 };
-            globalThis._ukiLessPromise = this._loadJS('https://cdnjs.cloudflare.com/ajax/libs/less.js/3.11.1/less.min.js');
+            globalThis._ukiLessPromise = this._loadJS(globalThis.uki.dynamicDependencies.less);
           }
           await globalThis._ukiLessPromise;
         }
@@ -270,10 +275,23 @@ const { Model, ModelMixin } = createMixinAndDefault({
         this.trigger('load');
       }
 
+      async updateResource (spec) {
+        await this.ready;
+        if (spec.type === 'less') {
+          await this.ensureLessIsLoaded();
+        }
+        const index = this._resourceLookup[spec.name];
+        if (index === undefined) {
+          throw new Error(`Can't update unknown resource: ${spec.name}, loading as new (late) resource...`);
+        }
+        this.resources[index] = await this._getCoreResourcePromise(spec);
+        this.trigger('load');
+      }
+
       async _loadResources (specs = []) {
         // uki itself needs d3.js; make sure it exists
         if (!globalThis.d3) {
-          await this._loadJS('https://d3js.org/d3.v5.min.js');
+          await this._loadJS(globalThis.uki.dynamicDependencies.d3);
         }
 
         // Don't need to do anything else; this makes some code cleaner below
@@ -697,21 +715,41 @@ var bugs = {
 	url: "https://github.com/ukijs/uki/issues"
 };
 var homepage = "https://github.com/ukijs/uki#readme";
+var eslintConfig = {
+	"extends": "standard",
+	rules: {
+		semi: [
+			2,
+			"always"
+		],
+		"no-extra-semi": 2,
+		"semi-spacing": [
+			2,
+			{
+				before: false,
+				after: true
+			}
+		]
+	},
+	globals: {
+		globalThis: false
+	}
+};
 var devDependencies = {
 	"@rollup/plugin-json": "^4.1.0",
-	eslint: "^7.5.0",
+	eslint: "^7.9.0",
 	"eslint-config-semistandard": "^15.0.1",
 	"eslint-config-standard": "^14.1.1",
 	"eslint-plugin-import": "^2.22.0",
 	"eslint-plugin-node": "^11.1.0",
 	"eslint-plugin-promise": "^4.2.1",
 	"eslint-plugin-standard": "^4.0.1",
-	rollup: "^2.23.0",
+	rollup: "^2.28.1",
 	"rollup-plugin-execute": "^1.1.1",
 	serve: "^11.3.2"
 };
 var peerDependencies = {
-	d3: "^5.16.0"
+	d3: "^6.1.1"
 };
 var optionalDependencies = {
 	less: "^3.12.2"
@@ -728,6 +766,7 @@ var pkg = {
 	license: license,
 	bugs: bugs,
 	homepage: homepage,
+	eslintConfig: eslintConfig,
 	devDependencies: devDependencies,
 	peerDependencies: peerDependencies,
 	optionalDependencies: optionalDependencies
@@ -742,5 +781,13 @@ globalThis.uki.View = View;
 globalThis.uki.ViewMixin = ViewMixin;
 globalThis.uki.utils = utils;
 globalThis.uki.version = version$1;
+
+const d3Version = pkg.peerDependencies.d3.match(/[\d.]+/)[0];
+const lessVersion = pkg.optionalDependencies.less.match(/[\d.]+/)[0];
+
+globalThis.uki.dynamicDependencies = {
+  d3: `https://cdnjs.cloudflare.com/ajax/libs/d3/${d3Version}/d3.min.js`,
+  less: `https://cdnjs.cloudflare.com/ajax/libs/less.js/${lessVersion}/less.min.js`
+};
 
 export { Model, View, utils, version$1 as version };

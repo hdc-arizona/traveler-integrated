@@ -1,0 +1,15 @@
+:root {
+  --collapsed-menu-width: 4.5em;
+  --expanded-menu-width: 24em;
+}
+
+.RootView {
+  position: absolute;
+  top: 0px;
+  left: var(--collapsed-menu-width);
+  right: 0px;
+  bottom: 0px;
+}
+.MenuView.expanded + .RootView {
+  left: var(--expanded-menu-width);
+}
