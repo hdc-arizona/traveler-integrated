@@ -230,6 +230,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
       minY = Math.min(minY, data.data.min[i]);
     }
     this.setYDomain({'max':maxY, 'min':minY});
+    this.drawAxes();
 
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
