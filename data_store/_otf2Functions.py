@@ -200,6 +200,8 @@ async def processOtf2(self, label, file, storeEvents=False, log=logToConsole):
                 currentInterval = createNewInterval(event, lastEvent, intervalId)
                 if len(lastEventStack) > 0:
                     lastEventStack[-1]['Timestamp'] = event['Timestamp'] + 1  # move the enter event to after 1 time unit
+                    if 'metrics' in event:
+                        lastEventStack[-1]['metrics'] = copy.deepcopy(event['metrics'])
             if currentInterval is not None:
                 # Count whether the primitive attribute differed between enter / leave
                 if 'Primitive' not in currentInterval:
