@@ -30,9 +30,47 @@
     .dataset {
       display: flex;
       flex-direction: row;
-      justify-content: space-between;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 0.5em;
+      .folderStuff {
+        display: flex;
+        .opener {
+          display: none;
+        }
+        .icon {
+          width: 1em;
+          margin-right: 0.5em;
+          filter: url(#recolorImageTo--text-color-softer);
+          cursor: grab;
+        }
+      }
+      &.isFolder {
+        justify-content: flex-start;
+
+        .folderStuff {
+          .opener {
+            display: initial;
+            margin-right: 0.5em;
+            &:after {
+              cursor: pointer;
+              content: '+';
+            }
+            &.open:after {
+              content: '-';
+            }
+          }
+        }
+      }
+      .tagStuff {
+
+      }
+      .label {
+        margin-right: 0.5em;
+      }
       .button {
         flex-grow: 1;
+        margin: 0;
       }
     }
   }
