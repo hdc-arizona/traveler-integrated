@@ -1,5 +1,7 @@
 /* globals uki */
 
+import RenameModal from '../../views/RenameModal/RenameModal.js';
+
 const VIEW_STATUS = {
   UNAVAILABLE: 'UNAVAILABLE',
   LOADING: 'LOADING',
@@ -153,7 +155,7 @@ class LinkedState extends uki.Model {
       {
         label: 'Rename / Manage Tags...',
         onclick: () => {
-          throw new Error('Unimplemented: show a dialog');
+          uki.ui.showModal(new RenameModal({ dataset: this }));
         }
       },
       {
