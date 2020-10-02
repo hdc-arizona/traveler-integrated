@@ -15,7 +15,10 @@
       <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
     </g>
     <g class="clippedStuff">
-      <!-- This foreignObject creates unusual overlapping problem in chrome. -->
+      <!-- This foreignObject creates unusual overlapping problem in chrome.
+      Have to wait for the chrome developers to fix this or
+      overhaul this design using canvas with nested svg element
+       -->
       <foreignObject class="histogram-container">
         <canvas class="histogram-plot"></canvas>
       </foreignObject>
