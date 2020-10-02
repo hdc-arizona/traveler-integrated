@@ -12,8 +12,9 @@ class MenuView extends uki.View {
     super(options);
 
     this._expanded = false;
-    this._folderMode = true;
+    this._folderMode = false;
     this.openFolders = {};
+    this.filteredTags = {};
   }
 
   get expanded () {
@@ -77,18 +78,29 @@ class MenuView extends uki.View {
     this.viewModeButton.tooltip = { content: this.folderMode ? 'Sort by tag' : 'Sort by folder' };
     this.viewModeButton.d3el.style('display', this.expanded ? null : 'none');
 
-    let tempDatasetList;
+    this.d3el.selectAll('.tagUnderlay, .tagHeader')
+      .style('display', this.expanded && !this.folderMode ? null : 'none');
+
     if (this.folderMode) {
-      tempDatasetList = this.computeFolderList();
+      this._tempDatasetList = this.computeFolderList();
       if (!this.expanded) {
-        tempDatasetList = tempDatasetList.filter(d => !d.folder);
+        this._tempDatasetList = this._tempDatasetList.filter(d => !d.folder);
       }
     } else {
-      tempDatasetList = this.computeTagList();
+      this._tempDatasetList = this.computeTagList();
+      this._tempTagList = this.getAllTags();
     }
 
+    this.drawDatasets();
+
+    if (this.expanded && !this.folderMode) {
+      this.drawTagStuff();
+    }
+  }
+
+  drawDatasets () {
     let datasets = this.d3el.select('.datasetList').selectAll('.dataset')
-      .data(tempDatasetList, d => d.id);
+      .data(this._tempDatasetList, d => d.id);
     datasets.exit().remove();
     const datasetsEnter = datasets.enter().append('div')
       .classed('dataset', true);
@@ -101,16 +113,9 @@ class MenuView extends uki.View {
       this.drawFolderStuff(datasetsEnter, datasets);
     }
 
-    datasetsEnter.append('div').classed('tagStuff', true);
-    datasets.select('.tagStuff')
-      .style('display', this.expanded && !this.folderMode ? null : 'none');
-    if (this.expanded && !this.folderMode) {
-      this.drawTagStuff(datasetsEnter, datasets);
-    }
-
     datasetsEnter.append('div').classed('label', true);
     datasets.select('.label')
-      .text(d => this.expanded ? d.label : null)
+      .text(d => this.expanded && this.folderMode ? d.label : null)
       .style('display', this.expanded ? null : 'none');
 
     datasetsEnter.append('div').classed('button', true);
@@ -132,8 +137,81 @@ class MenuView extends uki.View {
     });
   }
 
-  drawTagStuff (datasetsEnter, datasets) {
-    // TODO
+  drawTagStuff () {
+    let tagHeaders = this.d3el.select('.tagHeader')
+      .selectAll('.tag').data(this._tempTagList, d => d);
+    tagHeaders.exit().remove();
+    const tagHeadersEnter = tagHeaders.enter().append('div')
+      .classed('tag', true);
+    tagHeaders = tagHeadersEnter.merge(tagHeaders);
+
+    tagHeaders.order()
+      .classed('filtered', d => this.filteredTags[d])
+      .text(d => d)
+      .on('click', (event, d) => {
+        if (this.filteredTags[d]) {
+          delete this.filteredTags[d];
+        } else {
+          this.filteredTags[d] = true;
+        }
+        this.render();
+      });
+
+    const wrapper = this.d3el.select('.datasetWrapper').node();
+    const fullBounds = wrapper.getBoundingClientRect();
+
+    const tagAnchors = {};
+    tagHeaders.each(function (d) {
+      const bounds = this.getBoundingClientRect();
+      tagAnchors[d] = {
+        x: bounds.left - 16,
+        y: bounds.bottom - fullBounds.top
+      };
+    });
+
+    this.d3el.select('.tagUnderlay')
+      .style('top', fullBounds.top)
+      .style('left', fullBounds.left)
+      .attr('width', 352) // TODO: hard coding for now because getBoundingClientRect doesn't get the value after the CSS transition
+      .attr('height', fullBounds.height);
+
+    let tagLines = this.d3el.select('.tagUnderlay .lines').selectAll('path')
+      .data(this._tempTagList, d => d);
+    tagLines.exit().remove();
+    const tagLinesEnter = tagLines.enter().append('path');
+    tagLines = tagLines.merge(tagLinesEnter);
+
+    tagLines
+      .order()
+      .attr('d', d => {
+        return `M${tagAnchors[d].x},${tagAnchors[d].y}L${tagAnchors[d].x},${fullBounds.height - tagAnchors[d].y}`;
+      });
+
+    let datasetRows = this.d3el.select('.tagUnderlay .circles')
+      .selectAll('g').data(this._tempDatasetList, d => d.id);
+    datasetRows.exit().remove();
+    const datasetRowsEnter = datasetRows.enter().append('g');
+    datasetRows = datasetRowsEnter.merge(datasetRows);
+
+    const datasetPositions = {};
+    this.d3el.select('.datasetList').selectAll('.dataset').each(function (d) {
+      const bounds = this.getBoundingClientRect();
+      datasetPositions[d.id] = bounds.bottom - bounds.height / 2 - fullBounds.top;
+    });
+
+    datasetRows.attr('transform', d => `translate(0,${datasetPositions[d.id]})`);
+
+    let circles = datasetRows.selectAll('circle')
+      .data(d => this._tempTagList.map(tag => [tag, d]));
+    circles.exit().remove();
+    const circlesEnter = circles.enter().append('circle');
+    circles = circles.merge(circlesEnter);
+
+    circles
+      .order()
+      .classed('present', ([tag, d]) => d.linkedState.info.tags[tag])
+      .attr('r', 7)
+      .attr('cx', ([tag]) => tagAnchors[tag].x);
   }
 
   drawFolderStuff (datasetsEnter, datasets) {
@@ -172,10 +250,10 @@ class MenuView extends uki.View {
       while (labelChunks !== null) {
         const folderLabel = labelChunks[1];
         ancestorLabels.push(folderLabel);
+        const id = ancestorLabels.join('/');
+        const open = this.openFolders[id] || false;
         let folder = parentList.find(d => d.folder && d.label === folderLabel);
         if (folder === undefined) {
-          const id = ancestorLabels.join('/');
-          const open = this.openFolders[id] || false;
           folder = {
             id,
             folder: true,
@@ -185,10 +263,10 @@ class MenuView extends uki.View {
             open
           };
           parentList.push(folder);
-          if (!open) {
-            skipDataset = true;
-            break;
-          }
+        }
+        if (!open) {
+          skipDataset = true;
+          break;
         }
         depth += 1;
         label = labelChunks[2];
@@ -227,6 +305,29 @@ class MenuView extends uki.View {
         getMenu: async () => { return await d.getMenu(); }
       };
     });
+  }
+
+  getAllTags () {
+    const result = {};
+    for (const linkedState of window.controller.datasetList) {
+      for (const tag of Object.keys(linkedState.info.tags)) {
+        result[tag] = true;
+      }
+    }
+    return Object.keys(result)
+      .sort((a, b) => {
+        if (this.filteredTags[a]) {
+          if (this.filteredTags[b]) {
+            return 0;
+          } else {
+            return 1;
+          }
+        } else if (this.filteredTags[b]) {
+          return -1;
+        } else {
+          return 0;
+        }
+      });
   }
 
   showMainMenu () {

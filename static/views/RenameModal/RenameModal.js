@@ -8,13 +8,10 @@ class RenameModal extends uki.ui.ModalView {
       { type: 'less', url: 'views/RenameModal/style.less' }
     ]);
 
+    options.content = null;
     super(options);
 
     this.dataset = options.dataset;
-  }
-
-  get content () {
-    return this.getNamedResource('content');
   }
 
   async setup () {
@@ -22,7 +19,8 @@ class RenameModal extends uki.ui.ModalView {
 
     this.d3el.classed('RenameModal', true);
 
-    this.modalContentEl.select('#datasetLabel')
+    this.modalContentEl.html(this.getNamedResource('content'))
+      .select('#datasetLabel')
       .property('value', this.dataset.info.label)
       .on('change', () => { this.render(); })
       .on('keyup', () => { this.render(); });
@@ -38,6 +36,7 @@ class RenameModal extends uki.ui.ModalView {
   async confirmAction () {
     const newLabel = this.modalContentEl.select('#datasetLabel')
       .property('value');
+    // await d3.json('')
     return new Promise((resolve, reject) => {});
   }
 

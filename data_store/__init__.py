@@ -117,6 +117,9 @@ class DataStore:
         existingTags.update(tags)
         self[datasetId]['info']['tags'] = existingTags
 
+    def setTags(self, datasetId, tags):
+        self[datasetId]['info']['tags'] = tags
+
     def addTree(self, datasetId, tree, sourceType):
         self[datasetId]['trees'][sourceType] = tree
 

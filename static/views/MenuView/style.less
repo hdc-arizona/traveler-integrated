@@ -23,6 +23,82 @@
     margin-bottom: 1em;
   }
 
+  .tagUnderlay {
+    position: absolute;
+    .lines path {
+      stroke: var(--background-color-softer);
+    }
+    .circles circle {
+      fill: var(--background-color-richer);
+      stroke: var(--background-color-softer);
+      cursor: pointer;
+
+      &:hover {
+        fill: var(--text-color-softer);
+      }
+
+      &.present {
+        fill: var(--text-color);
+
+        &:hover {
+          fill: var(--background-color-softer);
+        }
+      }
+    }
+  }
+
+  .tagHeader {
+    display: flex;
+    padding-left: 1em;
+    padding-top: 1em;
+    .tag {
+      position: relative;
+      left: 0.4em;
+      bottom: 0.15em;
+      margin-left: 0.5em;
+      transform-origin: 0% 100%;
+      transform: rotate(-45deg);
+      background-color: var(--text-color);
+      color: var(--background-color);
+      padding: 0 0.3em;
+      &:before {
+        position: absolute;
+        transform: rotate(45deg);
+        left: -0.55em;
+        top: 0.22em;
+        content: ' ';
+        width: 0;
+        height: 0;
+        border-bottom: 1.15em solid var(--text-color);
+        border-right: 1.15em solid transparent;
+      }
+      cursor: pointer;
+      &:hover {
+        background-color: var(--text-color-softer);
+        color: var(--background-color-softer);
+        &:before {
+          border-bottom: 1.15em solid var(--text-color-softer);
+        }
+      }
+      &.filtered {
+        background-color: var(--background-color);
+        color: var(--disabled-color);
+        &:before {
+          border-bottom: 1.15em solid var(--background-color);
+        }
+
+        &:hover {
+          background-color: var(--background-color-softer);
+          color: var(--text-color-softer);
+          &:before {
+            border-bottom: 1.15em solid var(--background-color-softer);
+          }
+        }
+      }
+
+    }
+  }
+
   .datasetList {
     display: flex;
     flex-direction: column;
@@ -61,9 +137,6 @@
             }
           }
         }
-      }
-      .tagStuff {
-
       }
       .label {
         margin-right: 0.5em;

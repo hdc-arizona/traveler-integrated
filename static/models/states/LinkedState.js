@@ -202,7 +202,7 @@ class LinkedState extends uki.Model {
         subEntries: ['python', 'physl', 'cpp'].map(variant => {
           let label;
           switch (variant) {
-            case 'phython': label = 'Python'; break;
+            case 'python': label = 'Python'; break;
             case 'physl': label = 'PhySL'; break;
             case 'cpp': label = 'C++'; break;
           }

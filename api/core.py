@@ -2,6 +2,7 @@ from enum import Enum
 
 from fastapi import APIRouter, File, UploadFile, HTTPException
 from pydantic import BaseModel
+from typing import Optional, List
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, StreamingResponse
 
@@ -225,3 +226,12 @@ async def add_cpp(datasetId: str, file: UploadFile = File(...)):
     datasetId = validateDataset(datasetId)
     db.processCode(datasetId, file.filename, iterUploadFile(await file.read()), 'cpp')
     await db.save(datasetId)
+
+
+@router.put('/datasets/{datasetId}/info')
+async def update_info(datasetId: str, label: Optional[str] = None, tags: Optional[str] = None):
+    datasetId = validateDataset(datasetId)
+    if label is not None:
+        db.rename(datasetId, label)
+    if tags is not None:
+        db.setTags(datasetId, dict.fromkeys(tags.split(','), True))
