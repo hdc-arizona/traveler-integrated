@@ -102,6 +102,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
     // Initialize the scales / stream
     this.xScale.domain(this.linkedState.intervalWindow);
+
     this.yScale.domain(this.linkedState.metadata.locationNames);
 
     // Set up zoom / pan interactions
@@ -373,11 +374,20 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     yTicks.select('text')
       .attr('text-anchor', 'end')
       .attr('y', '0.35em')
-      .text(d => d);
+      .text(d => {
+          var a = BigInt(d);
+          var c = BigInt(32);
+          var node = BigInt(a >> c);
+          var thread = (d & 0x0FFFFFFFF);
+          var aggText = "";
+          aggText += node + " - T";
+          aggText += thread;
+          return aggText;
+      });
 
     // Position the y label
     this.content.select('.yAxisLabel')
-      .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
+      .attr('transform', `translate(${-this.emSize-12},${this._bounds.height / 2}) rotate(-90)`);
   }
   drawBarsCanvas(aggBins){
       this.highlightedData = null;
