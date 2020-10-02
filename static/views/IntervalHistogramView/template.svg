@@ -15,6 +15,7 @@
       <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
     </g>
     <g class="clippedStuff">
+      <!-- This foreignObject creates unusual overlapping problem in chrome. -->
       <foreignObject class="histogram-container">
         <canvas class="histogram-plot"></canvas>
       </foreignObject>
