@@ -12,7 +12,7 @@ class MenuView extends uki.View {
     super(options);
 
     this._expanded = false;
-    this._folderMode = false;
+    this._folderMode = true;
     this.openFolders = {};
     this.filteredTags = {};
   }
@@ -78,29 +78,45 @@ class MenuView extends uki.View {
     this.viewModeButton.tooltip = { content: this.folderMode ? 'Sort by tag' : 'Sort by folder' };
     this.viewModeButton.d3el.style('display', this.expanded ? null : 'none');
 
-    this.d3el.selectAll('.tagUnderlay, .tagHeader')
+    this.d3el.select('.underlay')
+      .style('display', this.expanded && !this.folderMode ? null : 'none');
+    this.d3el.select('.tagHeaderWrapper')
       .style('display', this.expanded && !this.folderMode ? null : 'none');
 
     if (this.folderMode) {
-      this._tempDatasetList = this.computeFolderList();
+      this._tempDatasetList = this.computeFolderedDatasetList();
       if (!this.expanded) {
         this._tempDatasetList = this._tempDatasetList.filter(d => !d.folder);
       }
     } else {
-      this._tempDatasetList = this.computeTagList();
-      this._tempTagList = this.getAllTags();
+      this._tempDatasetList = this.computeTaggedDatasetList();
+      this._tempTagList = this.computeTagList();
     }
 
     this.drawDatasets();
 
     if (this.expanded && !this.folderMode) {
-      this.drawTagStuff();
+      this.drawTagUnderlay();
     }
   }
 
   drawDatasets () {
+    const datasetList = this._tempDatasetList;
+    // To test vertical overflow, enable this code instead:
+    /*
+    const datasetList = this._tempDatasetList.concat(
+      Array.from(Array(20).keys()).map(d => {
+        return {
+          label: `dummy${d}`,
+          getMenu: () => {
+            return [{ content: `(dummy entry) ${d}` }];
+          }
+        };
+      }));
+    */
+
     let datasets = this.d3el.select('.datasetList').selectAll('.dataset')
-      .data(this._tempDatasetList, d => d.id);
+      .data(datasetList, d => d.id);
     datasets.exit().remove();
     const datasetsEnter = datasets.enter().append('div')
       .classed('dataset', true);
@@ -137,83 +153,6 @@ class MenuView extends uki.View {
     });
   }
 
-  drawTagStuff () {
-    let tagHeaders = this.d3el.select('.tagHeader')
-      .selectAll('.tag').data(this._tempTagList, d => d);
-    tagHeaders.exit().remove();
-    const tagHeadersEnter = tagHeaders.enter().append('div')
-      .classed('tag', true);
-    tagHeaders = tagHeadersEnter.merge(tagHeaders);
-
-    tagHeaders.order()
-      .classed('filtered', d => this.filteredTags[d])
-      .text(d => d)
-      .on('click', (event, d) => {
-        if (this.filteredTags[d]) {
-          delete this.filteredTags[d];
-        } else {
-          this.filteredTags[d] = true;
-        }
-        this.render();
-      });
-
-    const wrapper = this.d3el.select('.datasetWrapper').node();
-    const fullBounds = wrapper.getBoundingClientRect();
-
-    const tagAnchors = {};
-    tagHeaders.each(function (d) {
-      const bounds = this.getBoundingClientRect();
-      tagAnchors[d] = {
-        x: bounds.left - 16,
-        y: bounds.bottom - fullBounds.top
-      };
-    });
-
-    this.d3el.select('.tagUnderlay')
-      .style('top', fullBounds.top)
-      .style('left', fullBounds.left)
-      .attr('width', 352) // TODO: hard coding for now because getBoundingClientRect doesn't get the value after the CSS transition
-      .attr('height', fullBounds.height);
-
-    let tagLines = this.d3el.select('.tagUnderlay .lines').selectAll('path')
-      .data(this._tempTagList, d => d);
-    tagLines.exit().remove();
-    const tagLinesEnter = tagLines.enter().append('path');
-    tagLines = tagLines.merge(tagLinesEnter);
-
-    tagLines
-      .order()
-      .attr('d', d => {
-        return `M${tagAnchors[d].x},${tagAnchors[d].y}L${tagAnchors[d].x},${fullBounds.height - tagAnchors[d].y}`;
-      });
-
-    let datasetRows = this.d3el.select('.tagUnderlay .circles')
-      .selectAll('g').data(this._tempDatasetList, d => d.id);
-    datasetRows.exit().remove();
-    const datasetRowsEnter = datasetRows.enter().append('g');
-    datasetRows = datasetRowsEnter.merge(datasetRows);
-
-    const datasetPositions = {};
-    this.d3el.select('.datasetList').selectAll('.dataset').each(function (d) {
-      const bounds = this.getBoundingClientRect();
-      datasetPositions[d.id] = bounds.bottom - bounds.height / 2 - fullBounds.top;
-    });
-
-    datasetRows.attr('transform', d => `translate(0,${datasetPositions[d.id]})`);
-
-    let circles = datasetRows.selectAll('circle')
-      .data(d => this._tempTagList.map(tag => [tag, d]));
-    circles.exit().remove();
-    const circlesEnter = circles.enter().append('circle');
-    circles = circles.merge(circlesEnter);
-
-    circles
-      .order()
-      .classed('present', ([tag, d]) => d.linkedState.info.tags[tag])
-      .attr('r', 7)
-      .attr('cx', ([tag]) => tagAnchors[tag].x);
-  }
-
   drawFolderStuff (datasetsEnter, datasets) {
     const fsEnter = datasetsEnter.select('.folderStuff');
     const fs = datasets.select('.folderStuff');
@@ -237,7 +176,105 @@ class MenuView extends uki.View {
       .attr('src', d => d.folder ? 'img/folder.svg' : 'img/handle.svg');
   }
 
-  computeFolderList () {
+  drawTagUnderlay () {
+    // Keep the svg aligned with tagHeader's scroll position
+    const headerWrapper = this.d3el.select('.tagHeaderWrapper').node();
+    const svg = this.d3el.select('.underlay svg');
+    let headerWrapperScrollOffset = headerWrapper.scrollLeft;
+    let ticking = false;
+    headerWrapper.onscroll = event => {
+      headerWrapperScrollOffset = headerWrapper.scrollLeft;
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          svg.style('left', -headerWrapperScrollOffset);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // Draw the headers
+    let tagHeaders = this.d3el.select('.tagHeader')
+      .selectAll('.tag').data(this._tempTagList, d => d);
+    tagHeaders.exit().remove();
+    const tagHeadersEnter = tagHeaders.enter().append('div')
+      .classed('tag', true);
+    tagHeaders = tagHeadersEnter.merge(tagHeaders);
+
+    tagHeadersEnter.append('div').classed('label', true);
+    tagHeaders.select('.label').text(d => d);
+
+    tagHeaders.order()
+      .classed('filtered', d => this.filteredTags[d])
+      .on('click', (event, d) => {
+        if (this.filteredTags[d]) {
+          delete this.filteredTags[d];
+        } else {
+          this.filteredTags[d] = true;
+        }
+        this.render();
+      });
+
+    const headerBounds = this.d3el.select('.tagHeader')
+      .node().getBoundingClientRect();
+    const listBounds = this.d3el.select('.datasetList')
+      .node().getBoundingClientRect();
+
+    // Compute where each of the tag headers and datasets are
+    const tagAnchors = {};
+    tagHeaders.each(function (d) {
+      const bounds = this.getBoundingClientRect();
+      tagAnchors[d] = {
+        x: bounds.left - 32 + headerWrapperScrollOffset,
+        y: bounds.bottom - headerBounds.top
+      };
+    });
+
+    const datasetPositions = {};
+    this.d3el.select('.datasetList').selectAll('.dataset').each(function (d) {
+      const bounds = this.getBoundingClientRect();
+      datasetPositions[d.id] = bounds.bottom - bounds.height / 2 - listBounds.top;
+    });
+
+    // Resize the svg
+    svg
+      .attr('width', headerBounds.width)
+      .attr('height', listBounds.height);
+
+    let tagLines = svg.select('.lines').selectAll('path')
+      .data(this._tempTagList, d => d);
+    tagLines.exit().remove();
+    const tagLinesEnter = tagLines.enter().append('path');
+    tagLines = tagLines.merge(tagLinesEnter);
+
+    tagLines
+      .order()
+      .attr('d', d => {
+        return `M${tagAnchors[d].x},${tagAnchors[d].y}L${tagAnchors[d].x},${listBounds.height - tagAnchors[d].y}`;
+      });
+
+    let datasetRows = svg.select('.circles')
+      .selectAll('g').data(this._tempDatasetList, d => d.id);
+    datasetRows.exit().remove();
+    const datasetRowsEnter = datasetRows.enter().append('g');
+    datasetRows = datasetRowsEnter.merge(datasetRows);
+
+    datasetRows.attr('transform', d => `translate(0,${datasetPositions[d.id]})`);
+
+    let circles = datasetRows.selectAll('circle')
+      .data(d => this._tempTagList.map(tag => [tag, d]));
+    circles.exit().remove();
+    const circlesEnter = circles.enter().append('circle');
+    circles = circles.merge(circlesEnter);
+
+    circles
+      .order()
+      .classed('present', ([tag, d]) => d.linkedState.info.tags[tag])
+      .attr('r', 7)
+      .attr('cx', ([tag]) => tagAnchors[tag].x);
+  }
+
+  computeFolderedDatasetList () {
     // Build the tree
     const tree = [];
     for (const dataset of window.controller.datasetList) {
@@ -295,9 +332,16 @@ class MenuView extends uki.View {
     return Array.from(iterTree(tree));
   }
 
-  computeTagList () {
-    // TODO: enable sorting / filtering by tags
-    return window.controller.datasetList.map(d => {
+  computeTaggedDatasetList () {
+    let temp = window.controller.datasetList;
+    if (Object.keys(this.filteredTags).length > 0) {
+      // When filters are enabled, only show datasets that have at least one
+      // unfiltered tag
+      temp = temp.filter(d => {
+        return Object.keys(d.info.tags).some(tag => !this.filteredTags[tag]);
+      });
+    }
+    return temp.map(d => {
       return {
         linkedState: d,
         id: d.info.datasetId,
@@ -307,7 +351,7 @@ class MenuView extends uki.View {
     });
   }
 
-  getAllTags () {
+  computeTagList () {
     const result = {};
     for (const linkedState of window.controller.datasetList) {
       for (const tag of Object.keys(linkedState.info.tags)) {

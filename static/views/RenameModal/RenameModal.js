@@ -1,4 +1,4 @@
-/* globals uki */
+/* globals uki, d3 */
 
 class RenameModal extends uki.ui.ModalView {
   constructor (options = {}) {
@@ -12,6 +12,8 @@ class RenameModal extends uki.ui.ModalView {
     super(options);
 
     this.dataset = options.dataset;
+    this._tagsToAdd = {};
+    this._tagsToRemove = {};
   }
 
   async setup () {
@@ -22,22 +24,81 @@ class RenameModal extends uki.ui.ModalView {
     this.modalContentEl.html(this.getNamedResource('content'))
       .select('#datasetLabel')
       .property('value', this.dataset.info.label)
-      .on('change', () => { this.render(); })
-      .on('keyup', () => { this.render(); });
+      .on('change keyup', () => { this.render(); });
+
+    const tagNameInput = this.modalContentEl.select('.tagName')
+      .on('change keyup', () => { this.render(); });
+
+    this.addTagButton = new uki.ui.ButtonView({
+      d3el: this.modalContentEl.select('.addTag.button'),
+      onclick: () => {
+        const newTag = tagNameInput.node().value;
+        this._tagsToAdd[newTag] = true;
+        this.render();
+      }
+    });
   }
 
   async draw () {
     await super.draw(...arguments);
 
+    const newTag = this.modalContentEl.select('.tagName').node().value;
+    this.addTagButton.disabled = this.drawWaitingState ||
+      !newTag ||
+      this.dataset.info.tags[newTag] ||
+      this._tagsToAdd[newTag];
+
     this.modalContentEl.selectAll('input, button')
       .attr('disabled', this.drawWaitingState ? true : null);
+
+    this.drawTags();
+  }
+
+  drawTags () {
+    const tagList = Object.keys(this.dataset.info.tags)
+      .concat(Object.keys(this._tagsToAdd));
+
+    let tags = this.modalContentEl.select('.tagList')
+      .selectAll('.tag').data(tagList, d => d);
+    tags.exit().remove();
+    const tagsEnter = tags.enter().append('div')
+      .classed('tag', true);
+    tags = tags.merge(tagsEnter);
+
+    tags.text(d => d)
+      .classed('adding', d => this._tagsToAdd[d])
+      .classed('removing', d => this._tagsToRemove[d]);
+
+    tags.on('click', (event, d) => {
+      if (!this.drawWaitingState) {
+        if (this.dataset.info.tags[d]) {
+          if (this._tagsToRemove[d]) {
+            delete this._tagsToRemove[d];
+          } else {
+            this._tagsToRemove[d] = true;
+          }
+        } else {
+          delete this._tagsToAdd[d];
+        }
+        this.render();
+      }
+    });
   }
 
   async confirmAction () {
-    const newLabel = this.modalContentEl.select('#datasetLabel')
-      .property('value');
-    // await d3.json('')
-    return new Promise((resolve, reject) => {});
+    const newLabel = encodeURIComponent(
+      this.modalContentEl.select('#datasetLabel')
+        .property('value'));
+    const tagList = encodeURIComponent(
+      Object.keys(this.dataset.info.tags)
+        .filter(d => !this._tagsToRemove[d])
+        .concat(Object.keys(this._tagsToAdd))
+        .join(','));
+    const url = `/datasets/${this.dataset.info.datasetId}/info?label=${newLabel}&tags=${tagList}`;
+    await window.fetch(url, {
+      method: 'PUT'
+    });
+    await window.controller.refreshDatasets();
   }
 
   validateForm () {

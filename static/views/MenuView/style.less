@@ -23,79 +23,109 @@
     margin-bottom: 1em;
   }
 
-  .tagUnderlay {
-    position: absolute;
-    .lines path {
-      stroke: var(--background-color-softer);
-    }
-    .circles circle {
-      fill: var(--background-color-richer);
-      stroke: var(--background-color-softer);
-      cursor: pointer;
+  .main.button, .toggleExpand.button, hr, .tagHeaderWrapper, .viewMode.button {
+    flex-grow: 0;
+  }
+  .datasetWrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+    position: relative;
+  }
 
-      &:hover {
-        fill: var(--text-color-softer);
-      }
+  .tagHeaderWrapper {
+    width: 100%;
+    min-height: 3em;
+    padding-top: 3em;
+    overflow-y: hidden;
+    overflow-x: auto;
+    .tagHeader {
+      display: flex;
+      width: fit-content;
+      padding-left: 2em;
+      padding-bottom: 1em;
+      padding-right: calc(var(--collapsed-menu-width) - 3em);
+      .tag {
+        margin-left: 0.5em;
+        width: 2.5em;
+        cursor: pointer;
+        position: relative;
 
-      &.present {
-        fill: var(--text-color);
+        .label {
+          position: absolute;
+          transform-origin: 0% 100%;
+          transform: rotate(-45deg);
+          background-color: var(--text-color);
+          color: var(--background-color);
+          padding: 0 0.5em;
+          border-left: 1px solid var(--text-color);
+          &:before {
+            position: absolute;
+            transform: rotate(45deg);
+            left: -9.75px;
+            top: 3.25px;
+            content: ' ';
+            width: 0;
+            height: 0;
+            border-bottom: 18px solid var(--text-color);
+            border-right: 18px solid transparent;
+          }
+        }
 
-        &:hover {
-          fill: var(--background-color-softer);
+        &:hover .label {
+          background-color: var(--text-color-softer);
+          border-left: 1px solid var(--text-color-softer);
+          color: var(--background-color-softer);
+          &:before {
+            border-bottom: 18px solid var(--text-color-softer);
+          }
+        }
+        &.filtered .label {
+          background-color: var(--background-color);
+          border-left: 1px solid var(--background-color);
+          color: var(--disabled-color);
+          &:before {
+            border-bottom: 18px solid var(--background-color);
+          }
+        }
+        &.filtered:hover .label {
+          background-color: var(--background-color-softer);
+          border-left: 1px solid var(--background-color-softer);
+          color: var(--text-color-softer);
+          &:before {
+            border-bottom: 18px solid var(--background-color-softer);
+          }
         }
       }
     }
   }
 
-  .tagHeader {
-    display: flex;
-    padding-left: 1em;
-    padding-top: 1em;
-    .tag {
+  .underlay {
+    position: absolute;
+    max-width: calc(100% - var(--collapsed-menu-width) + 3em);
+    overflow: hidden;
+    svg {
       position: relative;
-      left: 0.4em;
-      bottom: 0.15em;
-      margin-left: 0.5em;
-      transform-origin: 0% 100%;
-      transform: rotate(-45deg);
-      background-color: var(--text-color);
-      color: var(--background-color);
-      padding: 0 0.3em;
-      &:before {
-        position: absolute;
-        transform: rotate(45deg);
-        left: -0.55em;
-        top: 0.22em;
-        content: ' ';
-        width: 0;
-        height: 0;
-        border-bottom: 1.15em solid var(--text-color);
-        border-right: 1.15em solid transparent;
+
+      .lines path {
+        stroke: var(--background-color-softer);
       }
-      cursor: pointer;
-      &:hover {
-        background-color: var(--text-color-softer);
-        color: var(--background-color-softer);
-        &:before {
-          border-bottom: 1.15em solid var(--text-color-softer);
-        }
-      }
-      &.filtered {
-        background-color: var(--background-color);
-        color: var(--disabled-color);
-        &:before {
-          border-bottom: 1.15em solid var(--background-color);
-        }
+      .circles circle {
+        fill: var(--background-color-richer);
+        stroke: var(--background-color-softer);
+        cursor: pointer;
 
         &:hover {
-          background-color: var(--background-color-softer);
-          color: var(--text-color-softer);
-          &:before {
-            border-bottom: 1.15em solid var(--background-color-softer);
+          fill: var(--text-color-softer);
+        }
+
+        &.present {
+          fill: var(--text-color);
+
+          &:hover {
+            fill: var(--background-color-softer);
           }
         }
       }
-
     }
   }
 

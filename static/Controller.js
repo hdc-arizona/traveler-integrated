@@ -57,6 +57,7 @@ class Controller extends uki.Model {
         this.menuView.expanded = true;
       }
     }
+    await this.renderAllViews();
   }
 
   get currentDataset () {
