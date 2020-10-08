@@ -12,7 +12,7 @@ class MenuView extends uki.View {
     super(options);
 
     this._expanded = false;
-    this._folderMode = false;
+    this._folderMode = true;
     this._tagSortMode = 'a-z(filtered)';
     this.openFolders = {};
     this.filteredTags = {};
