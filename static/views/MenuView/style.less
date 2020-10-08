@@ -38,12 +38,28 @@
     padding-top: 3em;
     overflow-y: hidden;
     overflow-x: auto;
+    position: relative;
+
+    .headerOptions {
+      position: absolute;
+      left: 1px;
+      top: 1px;
+      line-height: 1em;
+      height: 2.5em;
+
+      img {
+        width: 1em;
+        height: 1em;
+      }
+    }
+
     .tagHeader {
       display: flex;
       width: fit-content;
       padding-left: 2em;
       padding-bottom: 1em;
       padding-right: calc(var(--collapsed-menu-width) - 3em);
+
       .tag {
         margin-left: 0.5em;
         width: 2.5em;
@@ -58,6 +74,7 @@
           color: var(--background-color);
           padding: 0 0.5em;
           border-left: 1px solid var(--text-color);
+          white-space: nowrap;
           &:before {
             position: absolute;
             transform: rotate(45deg);
@@ -93,6 +110,22 @@
           color: var(--text-color-softer);
           &:before {
             border-bottom: 18px solid var(--background-color-softer);
+          }
+        }
+        &.tagAdder .label {
+          background-color: var(--accent-color);
+          border-left: 1px solid var(--accent-color);
+          color: var(--inverted-shadow-color);
+          &:before {
+            border-bottom: 18px solid var(--accent-color);
+          }
+        }
+        &.tagAdder:hover .label {
+          background-color: var(--accent-color-hover);
+          border-left: 1px solid var(--accent-color-hover);
+          color: var(--inverted-shadow-color);
+          &:before {
+            border-bottom: 18px solid var(--accent-color-hover);
           }
         }
       }

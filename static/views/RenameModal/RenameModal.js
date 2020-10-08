@@ -1,4 +1,4 @@
-/* globals uki, d3 */
+/* globals uki */
 
 class RenameModal extends uki.ui.ModalView {
   constructor (options = {}) {
@@ -89,16 +89,7 @@ class RenameModal extends uki.ui.ModalView {
     const newLabel = encodeURIComponent(
       this.modalContentEl.select('#datasetLabel')
         .property('value'));
-    const tagList = encodeURIComponent(
-      Object.keys(this.dataset.info.tags)
-        .filter(d => !this._tagsToRemove[d])
-        .concat(Object.keys(this._tagsToAdd))
-        .join(','));
-    const url = `/datasets/${this.dataset.info.datasetId}/info?label=${newLabel}&tags=${tagList}`;
-    await window.fetch(url, {
-      method: 'PUT'
-    });
-    await window.controller.refreshDatasets();
+    await this.dataset.updateDatasetInfo(newLabel, this._tagsToAdd, this._tagsToRemove);
   }
 
   validateForm () {

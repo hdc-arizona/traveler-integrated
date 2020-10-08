@@ -120,6 +120,14 @@ class DataStore:
     def setTags(self, datasetId, tags):
         self[datasetId]['info']['tags'] = tags
 
+    def addTagToAllDatasets(self, tag):
+        for dataset in self:
+            # Have to split this up to tell the diskcache that something has
+            # been updated
+            temp = dataset['info']['tags']
+            temp[tag] = True
+            dataset['info']['tags'] = temp
+
     def addTree(self, datasetId, tree, sourceType):
         self[datasetId]['trees'][sourceType] = tree
 

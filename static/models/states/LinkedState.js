@@ -211,6 +211,23 @@ class LinkedState extends uki.Model {
       }
     ];
   }
+
+  /**
+   * Update a dataset's label and/or tags
+   */
+  async updateDatasetInfo (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
+    newLabel = encodeURIComponent(newLabel || this.info.label);
+    const tagList = encodeURIComponent(
+      Object.keys(this.info.tags)
+        .filter(d => !tagsToRemove[d])
+        .concat(Object.keys(tagsToAdd))
+        .join(','));
+    const url = `/datasets/${this.info.datasetId}/info?label=${newLabel}&tags=${tagList}`;
+    await window.fetch(url, {
+      method: 'PUT'
+    });
+    await window.controller.refreshDatasets();
+  }
 }
 LinkedState.VIEW_STATUS = VIEW_STATUS;
 

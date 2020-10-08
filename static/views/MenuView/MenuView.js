@@ -12,7 +12,8 @@ class MenuView extends uki.View {
     super(options);
 
     this._expanded = false;
-    this._folderMode = true;
+    this._folderMode = false;
+    this._tagSortMode = 'a-z(filtered)';
     this.openFolders = {};
     this.filteredTags = {};
   }
@@ -57,6 +58,13 @@ class MenuView extends uki.View {
       d3el: this.d3el.select('.viewMode.button'),
       onclick: () => {
         this.folderMode = !this.folderMode;
+      }
+    });
+    this.headerOptionsButton = new uki.ui.ButtonView({
+      d3el: this.d3el.select('.headerOptions.button'),
+      img: '/static/img/hamburger.svg',
+      onclick: () => {
+        this.showTagHeaderOptionsMenu();
       }
     });
   }
@@ -194,20 +202,33 @@ class MenuView extends uki.View {
     };
 
     // Draw the headers
+    const tagList = this._tempTagList.concat([null]);
     let tagHeaders = this.d3el.select('.tagHeader')
-      .selectAll('.tag').data(this._tempTagList, d => d);
+      .selectAll('.tag').data(tagList, d => d);
     tagHeaders.exit().remove();
     const tagHeadersEnter = tagHeaders.enter().append('div')
       .classed('tag', true);
     tagHeaders = tagHeadersEnter.merge(tagHeaders);
 
     tagHeadersEnter.append('div').classed('label', true);
-    tagHeaders.select('.label').text(d => d);
+    tagHeaders.select('.label').text(d => d === null ? 'Add tag' : d);
 
     tagHeaders.order()
+      .classed('tagAdder', d => d === null)
       .classed('filtered', d => this.filteredTags[d])
-      .on('click', (event, d) => {
-        if (this.filteredTags[d]) {
+      .on('click', async (event, d) => {
+        if (d === null) {
+          // Add the tag to ALL datasets at first
+          const newTag = await uki.ui.prompt('New tag', undefined, value => {
+            return !!value && window.controller.datasetList.every(d => d.info.tags[value] === undefined);
+          });
+          if (newTag !== null) {
+            await window.fetch(`/tags/${encodeURIComponent(newTag)}`, {
+              method: 'POST'
+            });
+            await window.controller.refreshDatasets();
+          }
+        } else if (this.filteredTags[d]) {
           delete this.filteredTags[d];
         } else {
           this.filteredTags[d] = true;
@@ -271,7 +292,16 @@ class MenuView extends uki.View {
       .order()
       .classed('present', ([tag, d]) => d.linkedState.info.tags[tag])
       .attr('r', 7)
-      .attr('cx', ([tag]) => tagAnchors[tag].x);
+      .attr('cx', ([tag]) => tagAnchors[tag].x)
+      .on('click', (event, [tag, d]) => {
+        const addOrRemoveArg = {};
+        addOrRemoveArg[tag] = true;
+        if (d.linkedState.info.tags[tag]) {
+          d.linkedState.updateDatasetInfo(undefined, undefined, addOrRemoveArg);
+        } else {
+          d.linkedState.updateDatasetInfo(undefined, addOrRemoveArg);
+        }
+      });
   }
 
   computeFolderedDatasetList () {
@@ -359,19 +389,26 @@ class MenuView extends uki.View {
       }
     }
     return Object.keys(result)
-      .sort((a, b) => {
+      .sort(this.getTagSortFunction());
+  }
+
+  getTagSortFunction () {
+    switch (this._tagSortMode) {
+      case 'a-z': return (a, b) => String(a).localeCompare(b);
+      case 'a-z(filtered)': return (a, b) => {
         if (this.filteredTags[a]) {
           if (this.filteredTags[b]) {
-            return 0;
+            return String(a).localeCompare(b);
           } else {
             return 1;
           }
         } else if (this.filteredTags[b]) {
           return -1;
         } else {
-          return 0;
+          return String(a).localeCompare(b);
         }
-      });
+      };
+    }
   }
 
   showMainMenu () {
@@ -407,6 +444,56 @@ class MenuView extends uki.View {
 
   showUploadModal () {
     throw new Error('Not implemented yet');
+  }
+
+  showTagHeaderOptionsMenu () {
+    const tagList = this.computeTagList();
+    uki.ui.showContextMenu({
+      target: this.d3el.select('.headerOptions'),
+      menuEntries: [
+        {
+          label: 'Show all',
+          onclick: () => {
+            this.filteredTags = {};
+            this.render();
+          }
+        },
+        {
+          label: 'Hide all except',
+          subEntries: tagList.map(tag => {
+            return {
+              label: tag,
+              onclick: () => {
+                this.filteredTags = {};
+                for (const otherTag of tagList) {
+                  if (otherTag !== tag) {
+                    this.filteredTags[otherTag] = true;
+                  }
+                }
+                this.render();
+              }
+            };
+          })
+        },
+        null, // separator
+        {
+          label: 'Sort tags A-Z',
+          checked: this._tagSortMode === 'a-z',
+          onclick: () => {
+            this._tagSortMode = 'a-z';
+            this.render();
+          }
+        },
+        {
+          label: 'Sort by Visible, then A-Z',
+          checked: this._tagSortMode === 'a-z(filtered)',
+          onclick: () => {
+            this._tagSortMode = 'a-z(filtered)';
+            this.render();
+          }
+        }
+      ]
+    });
   }
 }
 

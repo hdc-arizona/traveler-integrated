@@ -234,4 +234,11 @@ async def update_info(datasetId: str, label: Optional[str] = None, tags: Optiona
     if label is not None:
         db.rename(datasetId, label)
     if tags is not None:
-        db.setTags(datasetId, dict.fromkeys(tags.split(','), True))
+        if not tags:
+            db.setTags(datasetId, {})
+        else:
+            db.setTags(datasetId, dict.fromkeys(tags.split(','), True))
+
+@router.post('/tags/{tag}')
+async def add_tag(tag: str):
+    db.addTagToAllDatasets(tag)
