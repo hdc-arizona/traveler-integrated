@@ -133,10 +133,7 @@ class SparseUtilizationList():
                                     durationBegin=None,
                                     durationEnd=None,
                                     durationBins=100):
-        primitiveCountPerBin = []
-        if primitive is None:
-            return primitiveCountPerBin
-
+        primitiveCountPerBin = np.zeros((bins, durationBins+1), dtype=np.double)
         rangePerBin = (end-begin)/bins
         rangePerDurationBin = (durationEnd-durationBegin)/durationBins
         location_struct_index = dict()
@@ -144,7 +141,6 @@ class SparseUtilizationList():
         preCriticalPts = begin
         for i in range(1, bins):
             criticalPts = (i * rangePerBin) + begin
-            utilPerDuration = dict()
 
             for location in self.locationDict:
                 if location not in location_struct_index:
@@ -155,23 +151,23 @@ class SparseUtilizationList():
                 while location_struct_index[location] < location_struct_length[location]:
                     locStruct = self.locationDict[location][location_struct_index[location]]
                     # since its sorted per location, all end indexes are from the same interval of previous enter index
-                    if locStruct['primitive'] == primitive and locStruct['counter'] == 0:
-                        startIndex = self.locationDict[location][location_struct_index[location]-1]['index']
+                    startIndex = self.locationDict[location][location_struct_index[location]-1]['index']
+                    if locStruct['primitive'] == primitive and locStruct['counter'] == 0 and startIndex < criticalPts:
                         intervalChunkStart = max(preCriticalPts, startIndex)
                         intervalChunkEnd = min(criticalPts, locStruct['index'])
                         currentUtil = intervalChunkEnd - intervalChunkStart  # it should cover left/right/full overlap cases
                         duration = locStruct['index'] - startIndex
                         durationIndex = int((duration - durationBegin) // rangePerDurationBin)
-                        if durationIndex not in utilPerDuration:
-                            utilPerDuration[durationIndex] = 0
-                        utilPerDuration[durationIndex] = utilPerDuration[durationIndex] + currentUtil
+                        primitiveCountPerBin[i, durationIndex] = primitiveCountPerBin[i, durationIndex] + float(currentUtil)
+                        if primitiveCountPerBin[i, durationIndex] < 0:
+                            print("Error: negative Util found " + str(primitiveCountPerBin[i, durationIndex]))
+                            return []
                         if locStruct['index'] > criticalPts:  # check this explicitly, you dont wanna increase the index number
                             break
                     location_struct_index[location] = location_struct_index[location] + 1
 
-            primitiveCountPerBin.append(utilPerDuration)
             preCriticalPts = criticalPts
-        return primitiveCountPerBin
+        return primitiveCountPerBin.tolist()
 
 
 # In charge of loading interval data into our integral list

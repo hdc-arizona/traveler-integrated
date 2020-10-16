@@ -16,6 +16,7 @@ class LinkedState extends Model {
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
     this.intervalWindow = this.hasTraceData ? Array.from(this.metadata.intervalDomain) : null;
+    this.primitiveHistogram = {};
     this.intervalHistogram = {};
     this.intervalHistogramWindow = {};
     this.cursorPosition = null;
@@ -317,7 +318,6 @@ class LinkedState extends Model {
   getCurrentHistogramData () {
     return {
       histogram: this.caches.histogram,
-      primitiveHistogram: this.caches.primitiveHistogram,
       domain: this.caches.histogramDomain,
       maxCount: this.caches.histogramMaxCount,
       error: this.caches.histogramError
@@ -354,8 +354,53 @@ class LinkedState extends Model {
       this.trigger('histogramsUpdated');
     }, 100);
   }
+  fetchPrimitiveHistogramData(){
+    window.clearTimeout(this._primitiveHistogramTimeout);
+    this._primitiveHistogramTimeout = window.setTimeout(async () => {
+      const currentPrimitive = this.selectedPrimitiveHistogram;
+      delete this.primitiveHistogram[currentPrimitive];
+      const durationBins = this.histogramResolution;
+      const label = encodeURIComponent(this.label);
+      const urls = [`/datasets/${label}/getUtilizationForPrimitive?bins=${this.histogramResolution}&duration_bins=${durationBins}&primitive=${currentPrimitive}`];
+      try {
+        [this.primitiveHistogram[currentPrimitive]] = await Promise.all(urls.map(url => d3.json(url)));
+      } catch (e) {
+        this.histogramError = e;
+        return;
+      }
+
+      // do the precalculation here
+      this.primitiveHistogram[currentPrimitive].aux = new Array(this.histogramResolution).fill(new Array(durationBins).fill(0));
+      for(let i=0; i<durationBins; i++){
+        this.primitiveHistogram[currentPrimitive].aux[0][i] = this.primitiveHistogram[currentPrimitive].data[0][i];
+      }
+      for(let i=0; i<this.histogramResolution; i++){
+        for(let j=1; j<durationBins; j++){
+          this.primitiveHistogram[currentPrimitive].aux[i][j] =
+              this.primitiveHistogram[currentPrimitive].aux[i][j]
+              + this.primitiveHistogram[currentPrimitive].aux[i][j-1];
+        }
+      }
+
+      this.trigger('primitiveHistogramUpdated');
+    }, 100);
+  }
+  getPrimitiveHistogramForDuration(begin, end){
+    const currentPrimitive = this.selectedPrimitiveHistogram;
+    const durationBins = this.histogramResolution;
+    const rangePerDurationBin = (this.intervalHistogramEndLimit-this.intervalHistogramBeginLimit)/durationBins;
+    const beginIndex = ((begin - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0;
+    const endIndex = (((end - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0) - 1;
+    var ret = new Array(this.histogramResolution).fill(0);
+    const rangePerBin = (this.primitiveHistogram[currentPrimitive].metadata.end - this.primitiveHistogram[currentPrimitive].metadata.begin)
+                    / this.primitiveHistogram[currentPrimitive].metadata.bins;
+    for(let i=0;i<this.histogramResolution;i++){
+      ret[i] = (this.primitiveHistogram[currentPrimitive].aux[i][endIndex] - this.primitiveHistogram[currentPrimitive].aux[i][beginIndex]) / rangePerBin;
+    }
+    return {'data': ret, 'metadata': this.primitiveHistogram[currentPrimitive].metadata} ;
+  }
   fetchIntervalHistogram(primitive){
-    var bins = 1000;
+    var bins = this.histogramResolution;
 
     //this function will replace the fetching of intervals
     window.clearTimeout(this._intervalDomainTimeout);
