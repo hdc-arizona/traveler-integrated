@@ -126,12 +126,19 @@ class SparseUtilizationList():
         return prettyHistogram
 
     # Calculates utilization for each primitive and returns util per duration
-    def calcUtilizationForPrimitive(self, bins=100, begin=None, end=None, primitive=None):
+    def calcUtilizationForPrimitive(self, bins=100,
+                                    begin=None,
+                                    end=None,
+                                    primitive=None,
+                                    durationBegin=None,
+                                    durationEnd=None,
+                                    durationBins=100):
         primitiveCountPerBin = []
         if primitive is None:
             return primitiveCountPerBin
 
         rangePerBin = (end-begin)/bins
+        rangePerDurationBin = (durationEnd-durationBegin)/durationBins
         location_struct_index = dict()
         location_struct_length = dict()
         preCriticalPts = begin
@@ -154,9 +161,10 @@ class SparseUtilizationList():
                         intervalChunkEnd = min(criticalPts, locStruct['index'])
                         currentUtil = intervalChunkEnd - intervalChunkStart  # it should cover left/right/full overlap cases
                         duration = locStruct['index'] - startIndex
-                        if duration not in utilPerDuration:
-                            utilPerDuration[duration] = 0
-                        utilPerDuration[duration] = utilPerDuration[duration] + currentUtil
+                        durationIndex = int((duration - durationBegin) // rangePerDurationBin)
+                        if durationIndex not in utilPerDuration:
+                            utilPerDuration[durationIndex] = 0
+                        utilPerDuration[durationIndex] = utilPerDuration[durationIndex] + currentUtil
                         if locStruct['index'] > criticalPts:  # check this explicitly, you dont wanna increase the index number
                             break
                     location_struct_index[location] = location_struct_index[location] + 1
