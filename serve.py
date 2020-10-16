@@ -712,12 +712,27 @@ def getIntervalDuration(label: str, bins: int = 100, begin: int = None, end: int
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 
+
 @app.get('/datasets/{label}/getPrimitiveList')
 def getPrimitiveList(label: str):
     checkDatasetExistence(label)
     ret = []
     for primitive in db[label]['sparseUtilizationList']['intervalDuration']:
         ret.append(primitive)
+    return ret
+
+
+@app.get('/datasets/{label}/getUtilizationForPrimitive')
+def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None):
+    checkDatasetExistence(label)
+    checkDatasetHasIntervals(label)
+    if begin is None:
+        begin = db[label]['meta']['intervalDomain'][0]
+    if end is None:
+        end = db[label]['meta']['intervalDomain'][1]
+
+    ret = {'data': db[label]['sparseUtilizationList']['intervals'].calcUtilizationForPrimitive(bins, begin, end, primitive),
+           'metadata': {'begin': begin, 'end': end, 'bins': bins}}
     return ret
 
 #####################
