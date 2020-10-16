@@ -723,7 +723,7 @@ def getPrimitiveList(label: str):
 
 
 @app.get('/datasets/{label}/getUtilizationForPrimitive')
-def getDrawValues(label: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None, duration_bins: int = 100):
+def getUtilizationForPrimitive(label: str, bins: int = 100, begin: int = None, end: int = None, primitive: str = None, duration_bins: int = 100):
     checkDatasetExistence(label)
     checkDatasetHasIntervals(label)
     if begin is None:
