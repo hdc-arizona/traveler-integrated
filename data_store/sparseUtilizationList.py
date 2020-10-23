@@ -151,17 +151,21 @@ class SparseUtilizationList():
                 while location_struct_index[location] < location_struct_length[location]:
                     locStruct = self.locationDict[location][location_struct_index[location]]
                     # since its sorted per location, all end indexes are from the same interval of previous enter index
-                    startIndex = self.locationDict[location][location_struct_index[location]-1]['index']
-                    if locStruct['primitive'] == primitive and locStruct['counter'] == 0 and startIndex < criticalPts:
-                        intervalChunkStart = max(preCriticalPts, startIndex)
-                        intervalChunkEnd = min(criticalPts, locStruct['index'])
-                        currentUtil = intervalChunkEnd - intervalChunkStart  # it should cover left/right/full overlap cases
-                        duration = locStruct['index'] - startIndex
-                        durationIndex = int((duration - durationBegin) // rangePerDurationBin)
-                        primitiveCountPerBin[i, durationIndex] = primitiveCountPerBin[i, durationIndex] + float(currentUtil)
-                        if primitiveCountPerBin[i, durationIndex] < 0:
-                            print("Error: negative Util found " + str(primitiveCountPerBin[i, durationIndex]))
-                            return []
+                    if location_struct_index[location] > 0:
+                        startIndex = self.locationDict[location][location_struct_index[location]-1]['index']
+                    else:
+                        startIndex = 0
+                    if locStruct['primitive'] == primitive and locStruct['counter'] == 0:
+                        if startIndex < criticalPts:
+                            intervalChunkStart = max(preCriticalPts, startIndex)
+                            intervalChunkEnd = min(criticalPts, locStruct['index'])
+                            currentUtil = intervalChunkEnd - intervalChunkStart  # it should cover left/right/full overlap cases
+                            duration = locStruct['index'] - startIndex
+                            durationIndex = int((duration - durationBegin) // rangePerDurationBin)
+                            primitiveCountPerBin[i, durationIndex] = primitiveCountPerBin[i, durationIndex] + float(currentUtil)
+                            if primitiveCountPerBin[i, durationIndex] < 0:
+                                print("Error: negative Util found " + str(primitiveCountPerBin[i, durationIndex]))
+                                return []
                         if locStruct['index'] > criticalPts:  # check this explicitly, you dont wanna increase the index number
                             break
                     location_struct_index[location] = location_struct_index[location] + 1

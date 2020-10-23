@@ -370,15 +370,18 @@ class LinkedState extends Model {
       }
 
       // do the precalculation here
-      this.primitiveHistogram[currentPrimitive].aux = new Array(this.histogramResolution).fill(new Array(durationBins).fill(0));
-      for(let i=0; i<durationBins; i++){
-        this.primitiveHistogram[currentPrimitive].aux[0][i] = this.primitiveHistogram[currentPrimitive].data[0][i];
+      this.primitiveHistogram[currentPrimitive].aux = new Array(this.histogramResolution);
+      for(let i=0; i<this.histogramResolution; i++){
+        this.primitiveHistogram[currentPrimitive].aux[i] = new Array(durationBins);
       }
       for(let i=0; i<this.histogramResolution; i++){
-        for(let j=1; j<durationBins; j++){
+        for(let j=0; j<durationBins; j++){
+          var preValue = 0;
+          if(j>0) {
+            preValue = this.primitiveHistogram[currentPrimitive].aux[i][j-1];
+          }
           this.primitiveHistogram[currentPrimitive].aux[i][j] =
-              this.primitiveHistogram[currentPrimitive].aux[i][j]
-              + this.primitiveHistogram[currentPrimitive].aux[i][j-1];
+              this.primitiveHistogram[currentPrimitive].data[i][j] + preValue;
         }
       }
 
@@ -390,7 +393,10 @@ class LinkedState extends Model {
     const durationBins = this.histogramResolution;
     const rangePerDurationBin = (this.intervalHistogramEndLimit-this.intervalHistogramBeginLimit)/durationBins;
     const beginIndex = ((begin - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0;
-    const endIndex = (((end - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0) - 1;
+    let endIndex = (((end - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0);
+    if(endIndex > 0) {
+      endIndex = endIndex - 1;
+    }
     var ret = new Array(this.histogramResolution).fill(0);
     const rangePerBin = (this.primitiveHistogram[currentPrimitive].metadata.end - this.primitiveHistogram[currentPrimitive].metadata.begin)
                     / this.primitiveHistogram[currentPrimitive].metadata.bins;
