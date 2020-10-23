@@ -126,14 +126,14 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       // Make sure we render eventually
       this.render();
     });
-    // this.linkedState.on('newIntervalHistogramWindow', () => {
-    //     window.clearTimeout(this.intervalHistogramFetchTimeout);
-    //     this.intervalHistogramFetchTimeout = window.setTimeout(async () => {
-    //         this.fetchAndDrawHighlightedBars(this.linkedState.intervalHistogramBegin,
-    //             this.linkedState.intervalHistogramEnd,
-    //             this.IntervalListMode.duration);
-    //     }, 300);
-    // });
+    this.linkedState.on('newIntervalHistogramWindow', () => {
+        window.clearTimeout(this.intervalHistogramFetchTimeout);
+        this.intervalHistogramFetchTimeout = window.setTimeout(async () => {
+            this.fetchAndDrawHighlightedBars(this.linkedState.intervalHistogramBegin,
+                this.linkedState.intervalHistogramEnd,
+                this.IntervalListMode.duration);
+        }, 300);
+    });
 
     this.currentClickState = this.ClickState.background;
     var __self = this;
