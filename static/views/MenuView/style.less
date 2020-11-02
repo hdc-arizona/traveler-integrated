@@ -183,6 +183,9 @@
           filter: url(#recolorImageTo--text-color-softer);
           cursor: grab;
         }
+        .label {
+          margin-right: 0.5em;
+        }
       }
       &.isFolder {
         justify-content: flex-start;
@@ -201,8 +204,12 @@
           }
         }
       }
-      .label {
-        margin-right: 0.5em;
+      &.dragTarget {
+        background: var(--text-color-softer);
+        color: var(--background-color-richer);
+        .icon {
+          filter: url(#recolorImageTo--background-color-richer);
+        }
       }
       .button {
         flex-grow: 1;

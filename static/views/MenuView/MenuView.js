@@ -1,4 +1,4 @@
-/* globals uki */
+/* globals uki, d3 */
 
 class MenuView extends uki.View {
   constructor (options = {}) {
@@ -24,7 +24,7 @@ class MenuView extends uki.View {
 
   set expanded (value) {
     this._expanded = value;
-    window.controller.renderAllViews();
+    window.controller.renderAllViews(); // expanding or contracting the menu affects all views
   }
 
   get folderMode () {
@@ -110,7 +110,7 @@ class MenuView extends uki.View {
 
   drawDatasets () {
     const datasetList = this._tempDatasetList;
-    // To test vertical overflow, enable this code instead:
+    // To test vertical overflow, enable this code instead of the previous line:
     /*
     const datasetList = this._tempDatasetList.concat(
       Array.from(Array(20).keys()).map(d => {
@@ -137,11 +137,6 @@ class MenuView extends uki.View {
       this.drawFolderStuff(datasetsEnter, datasets);
     }
 
-    datasetsEnter.append('div').classed('label', true);
-    datasets.select('.label')
-      .text(d => this.expanded && this.folderMode ? d.label : null)
-      .style('display', this.expanded ? null : 'none');
-
     datasetsEnter.append('div').classed('button', true);
     uki.ui.ButtonView.initForD3Selection(datasetsEnter.select('.button'), d => {
       return { img: 'img/hamburger.svg' };
@@ -163,7 +158,8 @@ class MenuView extends uki.View {
 
   drawFolderStuff (datasetsEnter, datasets) {
     const fsEnter = datasetsEnter.select('.folderStuff');
-    const fs = datasets.select('.folderStuff');
+    const fs = datasets.select('.folderStuff')
+      .classed('dragTarget', false);
 
     datasets.classed('isFolder', d => d.folder);
 
@@ -182,6 +178,82 @@ class MenuView extends uki.View {
     fsEnter.append('img').classed('icon', true);
     fs.select('.icon')
       .attr('src', d => d.folder ? 'img/folder.svg' : 'img/handle.svg');
+
+    fsEnter.append('div').classed('label', true);
+    fs.select('.label')
+      .attr('contenteditable', 'true')
+      .text(d => d.label)
+      .on('keypress', function (event) {
+        // Prevent newlines in labels
+        if (event.keyCode === 13) {
+          event.preventDefault();
+          this.blur();
+        }
+      }).on('blur', function (event, d) {
+        const newLabel = d3.select(this).text();
+        if (newLabel !== d.label) {
+          console.log('TODO: rename', d.label, 'to', newLabel);
+          // d.linkedState.updateDatasetInfo(newLabel);
+        }
+      });
+
+    const getFolderDragTarget = ({ x, y }, draggedDatum) => {
+      const folder = Array.from(document.elementsFromPoint(x, y))
+        .filter(node => d3.select(node).classed('isFolder'))[0];
+      if (folder === undefined) {
+        // Didn't drag onto a folder
+        return null;
+      }
+      const targetDatum = d3.select(folder).datum();
+      if (targetDatum === draggedDatum) {
+        // Dragged a folder onto itself
+        return null;
+      } else {
+        // Dragged (something) onto a different folder
+        return targetDatum;
+      }
+    };
+    let x0, y0;
+    datasets.classed('dragTarget', false); // Remove any leftover highlights on redraw
+    fs.call(d3.drag()
+      .filter(event => {
+        // We only want the icon handle to initiate drag events (dragging the
+        // label stops event propagation, and prevents contenteditable from
+        // working properly)... but d3 expects the drag behavior to exist on the
+        // parent node. So this adds an extra filter to d3's default filter.
+        // Even though it feels like a hack, it's technically correct
+        return !event.ctrlKey && !event.button && //    d3's default filter
+          d3.select(event.target).classed('icon'); //   our addition
+      })
+      .on('start', function (event, d) {
+        x0 = event.x;
+        y0 = event.y;
+      })
+      .on('drag', function (event, d) {
+        // Use CSS to offset the folderStuff div
+        const x = event.x - x0;
+        const y = event.y - y0;
+        d3.select(this).style('transform', `translate(${x}px,${y}px)`);
+
+        // Update each row, based on whether or not it's being targeted by the
+        // drag
+        const dragTarget = getFolderDragTarget({
+          x: event.sourceEvent.clientX,
+          y: event.sourceEvent.clientY
+        }, d);
+        datasets.classed('dragTarget', d => d === dragTarget);
+      })
+      .on('end', function (event, d) {
+        d3.select(this).style('transform', null);
+        datasets.classed('dragTarget', false);
+        const target = getFolderDragTarget({
+          x: event.sourceEvent.clientX,
+          y: event.sourceEvent.clientY
+        }, d);
+        if (target !== null) {
+          console.log('todo: move', d, 'to', target);
+        }
+      }));
   }
 
   drawTagUnderlay () {
