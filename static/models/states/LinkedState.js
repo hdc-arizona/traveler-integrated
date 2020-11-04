@@ -153,7 +153,7 @@ class LinkedState extends uki.Model {
       },
       null, // Separator
       {
-        label: 'Properties...',
+        label: 'Rename / Manage Tags...',
         onclick: () => {
           uki.ui.showModal(new RenameModal({ dataset: this }));
         }
