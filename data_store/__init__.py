@@ -110,6 +110,10 @@ class DataStore:
         self[datasetId]['info']['sourceFiles'] = sourceFiles
 
     def rename(self, datasetId, newLabel):
+        # Remove any leading or trailing slashes or spaces
+        newLabel = newLabel.strip('/ ')
+        if len(newLabel) == 0:
+            newLabel = defaultInfo['label']
         self[datasetId]['info']['label'] = newLabel
 
     def addTags(self, datasetId, tags):

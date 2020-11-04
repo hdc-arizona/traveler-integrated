@@ -87,7 +87,7 @@ class MenuView extends uki.View {
     this.viewModeButton.d3el.style('display', this.expanded ? null : 'none');
 
     this.d3el.select('.underlay')
-      .style('display', this.expanded && !this.folderMode ? null : 'none');
+      .style('display', this.expanded ? null : 'none');
     this.d3el.select('.tagHeaderWrapper')
       .style('display', this.expanded && !this.folderMode ? null : 'none');
 
@@ -101,14 +101,18 @@ class MenuView extends uki.View {
       this._tempTagList = this.computeTagList();
     }
 
-    this.drawDatasets();
+    await this.drawDatasets();
 
-    if (this.expanded && !this.folderMode) {
-      this.drawTagUnderlay();
+    if (this.expanded) {
+      if (this.folderMode) {
+        this.drawFolderUnderlay();
+      } else {
+        this.drawTagUnderlay();
+      }
     }
   }
 
-  drawDatasets () {
+  async drawDatasets () {
     const datasetList = this._tempDatasetList;
     // To test vertical overflow, enable this code instead of the previous line:
     /*
@@ -124,7 +128,7 @@ class MenuView extends uki.View {
     */
 
     let datasets = this.d3el.select('.datasetList').selectAll('.dataset')
-      .data(datasetList, d => d.id);
+      .data(datasetList, d => d.id).order();
     datasets.exit().remove();
     const datasetsEnter = datasets.enter().append('div')
       .classed('dataset', true);
@@ -138,10 +142,10 @@ class MenuView extends uki.View {
     }
 
     datasetsEnter.append('div').classed('button', true);
-    uki.ui.ButtonView.initForD3Selection(datasetsEnter.select('.button'), d => {
+    await uki.ui.ButtonView.initForD3Selection(datasetsEnter.select('.button'), d => {
       return { img: 'img/hamburger.svg' };
     });
-    uki.ui.ButtonView.iterD3Selection(datasets.select('.button'), (buttonView, d) => {
+    await uki.ui.ButtonView.iterD3Selection(datasets.select('.button'), (buttonView, d) => {
       buttonView.d3el.style('display', d.getMenu ? null : 'none');
       buttonView.tooltip = { content: d.label };
       buttonView.onclick = async event => {
@@ -157,15 +161,18 @@ class MenuView extends uki.View {
   }
 
   drawFolderStuff (datasetsEnter, datasets) {
+    const self = this;
+
     const fsEnter = datasetsEnter.select('.folderStuff');
     const fs = datasets.select('.folderStuff')
-      .classed('dragTarget', false);
+      .classed('dragTarget', false)
+      .style('margin-left', d => 0.5 + 1.5 * (d.depth || 0) + 'em');
 
     datasets.classed('isFolder', d => d.folder);
 
     fsEnter.append('div').classed('opener', true);
     fs.select('.opener').classed('open', d => d.open)
-      .style('margin-left', d => (d.depth || 0) + 'em')
+      .text(d => d.open ? '-' : '+')
       .on('click', (event, d) => {
         if (this.openFolders[d.id]) {
           delete this.openFolders[d.id];
@@ -184,35 +191,50 @@ class MenuView extends uki.View {
       .attr('contenteditable', 'true')
       .text(d => d.label)
       .on('keypress', function (event) {
-        // Prevent newlines in labels
+        // Prevent newlines in labels; hitting enter blurs instead
         if (event.keyCode === 13) {
           event.preventDefault();
           this.blur();
         }
       }).on('blur', function (event, d) {
-        const newLabel = d3.select(this).text();
-        if (newLabel !== d.label) {
-          console.log('TODO: rename', d.label, 'to', newLabel);
-          // d.linkedState.updateDatasetInfo(newLabel);
+        // User just focused away from the contenteditable, meaning they've
+        // finished renaming it
+        const rawNewLabel = d3.select(this).text();
+        let newLabel = rawNewLabel.replace(/^\/*|\/*$/g, ''); // remove leading or trailing slashes
+        if (newLabel.length === 0) {
+          // Only allow removing a folder's label (delete the folder and move
+          // its children up a level)
+          if (d.folder === true) {
+            self.dissolveFolder(d.id);
+          }
+        } else if (newLabel !== d.label) {
+          // User actually changed the label...
+          if (d.folder === true) {
+            // Need to rename all of the descendant datasets of this folder
+            const updateUrls = window.controller.datasetList.filter(linkedState => {
+              return linkedState.info.label.startsWith(d.id);
+            }).map(linkedState => {
+              const baseLabel = linkedState.info.label.substring(d.id.length + 1); // chop off the folder that we're renaming
+              const parentPath = d.id.match(/(.*)\//)?.[1] || ''; // get the folder's parent path
+              const prefix = parentPath ? parentPath + '/' + newLabel : newLabel;
+              return linkedState.getUpdateUrl(prefix + '/' + baseLabel);
+            });
+            self.bulkRename(updateUrls);
+          } else {
+            // Rename the dataset in context of its parent hierarchy (if there is any)
+            const parentPath = d.linkedState.info.label.match(/(.*)\//)?.[1];
+            if (parentPath) {
+              newLabel = parentPath + '/' + newLabel;
+            }
+            d.linkedState.updateDatasetInfo(newLabel);
+          }
+        } else if (rawNewLabel !== d.label) {
+          // User added some slashes that we auto-strip; just need to render so
+          // that they know right away that what they did was invalid
+          self.render();
         }
       });
 
-    const getFolderDragTarget = ({ x, y }, draggedDatum) => {
-      const folder = Array.from(document.elementsFromPoint(x, y))
-        .filter(node => d3.select(node).classed('isFolder'))[0];
-      if (folder === undefined) {
-        // Didn't drag onto a folder
-        return null;
-      }
-      const targetDatum = d3.select(folder).datum();
-      if (targetDatum === draggedDatum) {
-        // Dragged a folder onto itself
-        return null;
-      } else {
-        // Dragged (something) onto a different folder
-        return targetDatum;
-      }
-    };
     let x0, y0;
     datasets.classed('dragTarget', false); // Remove any leftover highlights on redraw
     fs.call(d3.drag()
@@ -237,23 +259,167 @@ class MenuView extends uki.View {
 
         // Update each row, based on whether or not it's being targeted by the
         // drag
-        const dragTarget = getFolderDragTarget({
-          x: event.sourceEvent.clientX,
-          y: event.sourceEvent.clientY
-        }, d);
+        const dragTarget = self.getFolderDragAction(event, d, false);
         datasets.classed('dragTarget', d => d === dragTarget);
       })
       .on('end', function (event, d) {
         d3.select(this).style('transform', null);
         datasets.classed('dragTarget', false);
-        const target = getFolderDragTarget({
-          x: event.sourceEvent.clientX,
-          y: event.sourceEvent.clientY
-        }, d);
-        if (target !== null) {
-          console.log('todo: move', d, 'to', target);
-        }
+        self.getFolderDragAction(event, d, true);
       }));
+  }
+
+  getFolderDragAction (event, draggedDatum, performAction) {
+    const x = event.sourceEvent.clientX;
+    const y = event.sourceEvent.clientY;
+    const target = Array.from(document.elementsFromPoint(x, y))
+      .filter(node => d3.select(node).classed('isFolder'))[0];
+    if (target === undefined) {
+      // Dragged onto nothing; do nothing
+      return null;
+    }
+    const targetDatum = d3.select(target).datum();
+    if (targetDatum === draggedDatum) {
+      // Dragged a thing onto itself; don't do anything
+      return null;
+    }
+    if (draggedDatum.folder === true) {
+      // Dragging a folder...
+      if (targetDatum.folder === false) {
+        // Dragged a folder onto a dataset; don't do anything
+        return null;
+      } else if (targetDatum.id.startsWith(draggedDatum.id)) {
+        // Dragged a folder onto one of its descendant folders; don't do anything
+        return null;
+      } else if (targetDatum.id === draggedDatum.id.match(/(.*)\//)?.[1]) {
+        // Dragged a folder onto its current parent; do nothing
+        return null;
+      } else {
+        // Dragged a folder onto another valid folder; add the targetDatum's
+        // full path (its id) to every descendant dataset of draggedDatum
+        if (performAction) {
+          const updateUrls = window.controller.datasetList.filter(linkedState => {
+            return linkedState.info.label.startsWith(draggedDatum.id);
+          }).map(linkedState => {
+            const baseLabel = linkedState.info.label.substring(draggedDatum.id.length + 1);
+            let prefix = targetDatum.id + '/' + draggedDatum.label;
+            let copyNumber = 1;
+            while (window.controller.datasetList.some(otherLinkedState => {
+              return otherLinkedState.info.label.startsWith(prefix);
+            })) {
+              prefix = targetDatum.id + `/${draggedDatum.label} (${copyNumber})`;
+              copyNumber += 1;
+            }
+            const newLabel = prefix + '/' + baseLabel;
+            return linkedState.getUpdateUrl(newLabel);
+          });
+          this.bulkRename(updateUrls);
+        }
+      }
+    } else {
+      // Dragging a dataset...
+      if (targetDatum.folder === true) {
+        // Dragged a dataset onto a folder; change its label prefix to be
+        // the folder's full path (its id)
+        if (performAction) {
+          const baseLabel = draggedDatum.label.match(/([^/]*)$/)[1];
+          const newLabel = targetDatum.id + '/' + baseLabel;
+          draggedDatum.linkedState.updateDatasetInfo(newLabel);
+        }
+      } else {
+        // Dragged a dataset onto a dataset; do nothing
+        return null;
+      }
+    }
+    if (!performAction) {
+      // For convenience, we reuse the logic in this function for flagging
+      // whether something can be dropped (during a drag), before the mouse
+      // button is released. Returning the target is needed to know which
+      // thing is being hovered
+      return targetDatum;
+    }
+  }
+
+  async wrapInFolder (linkedState) {
+    let parentPath = linkedState.info.label.match(/(.*)\//)?.[1];
+    parentPath = parentPath ? parentPath + '/' : '';
+    const baseLabel = linkedState.info.label.match(/([^/]*)$/)[1];
+    let prefix = parentPath + 'Untitled Folder';
+    let copyNumber = 1;
+    while (window.controller.datasetList.some(otherLinkedState => {
+      return otherLinkedState.info.label.startsWith(prefix);
+    })) {
+      prefix = parentPath + `Untitled Folder (${copyNumber})`;
+      copyNumber += 1;
+    }
+    const newLabel = prefix + '/' + baseLabel;
+    this.openFolders[newLabel] = true;
+    return linkedState.updateDatasetInfo(newLabel);
+  }
+
+  async dissolveFolder (folderId) {
+    const grandParentPath = folderId.match(/(.*)\//)?.[1];
+    const updateUrls = window.controller.datasetList.filter(linkedState => {
+      return linkedState.info.label.startsWith(folderId);
+    }).map(linkedState => {
+      let strippedLabel = linkedState.info.label.substring(folderId.length + 1); // chop off the folder that we're deleting
+      if (grandParentPath) {
+        // If the deleted folder was in a folder, restore the parent path
+        strippedLabel = grandParentPath + '/' + strippedLabel;
+      }
+      return linkedState.getUpdateUrl(strippedLabel);
+    });
+    await this.bulkRename(updateUrls);
+  }
+
+  async bulkRename (updateUrls) {
+    await Promise.all(updateUrls.map(url => {
+      return window.fetch(url, { method: 'PUT' });
+    }));
+    await window.controller.refreshDatasets();
+  }
+
+  drawFolderUnderlay () {
+    const svg = this.d3el.select('.underlay svg');
+    svg.select('.circles').html(''); // Don't need to draw circles for folders
+
+    const listBounds = this.d3el.select('.datasetList')
+      .node().getBoundingClientRect();
+    const allPositions = {};
+    const links = [];
+    let maxX = 0;
+    let maxY = 0;
+    this.d3el.select('.datasetList').selectAll('.dataset').each(function (d) {
+      const bounds = d3.select(this).select('.icon').node().getBoundingClientRect();
+      const childPath = d.folder ? d.id : d.linkedState.info.label;
+      const parentPath = childPath.match(/(.*)\//)?.[1];
+      allPositions[d.id] = {
+        x: bounds.right - bounds.width / 2 - listBounds.left,
+        y: bounds.bottom - bounds.height / 2 - listBounds.top
+      };
+      maxX = Math.max(maxX, allPositions[d.id].x);
+      maxY = Math.max(maxY, allPositions[d.id].y);
+      if (parentPath) {
+        links.push({ parentPath, childId: d.id });
+      }
+    });
+
+    svg.attr('width', maxX)
+      .attr('height', maxY);
+
+    let folderLines = svg.select('.lines').selectAll('path')
+      .data(links, d => d.childId);
+    folderLines.exit().remove();
+    const folderLinesEnter = folderLines.enter().append('path');
+    folderLines = folderLines.merge(folderLinesEnter);
+
+    folderLines
+      .order()
+      .attr('d', d => {
+        const parentPos = allPositions[d.parentPath];
+        const childPos = allPositions[d.childId];
+        return `M${parentPos.x},${parentPos.y}L${parentPos.x},${childPos.y}L${childPos.x},${childPos.y}`;
+      });
   }
 
   drawTagUnderlay () {
@@ -399,7 +565,15 @@ class MenuView extends uki.View {
             label: folderLabel,
             children: [],
             depth,
-            open
+            open,
+            getMenu: () => {
+              return [{
+                label: 'Dissolve Folder',
+                onclick: () => {
+                  this.dissolveFolder(id);
+                }
+              }];
+            }
           };
           parentList.push(folder);
         }
@@ -417,7 +591,19 @@ class MenuView extends uki.View {
           linkedState: dataset,
           id: dataset.info.datasetId,
           label,
-          getMenu: async () => { return await dataset.getMenu(); },
+          getMenu: async () => {
+            const menu = await dataset.getMenu();
+            if (this.expanded && this.folderMode) {
+              menu.push({
+                label: 'Wrap in Folder',
+                onclick: () => {
+                  // Wrap this dataset in a new 'Untitled Folder'
+                  this.wrapInFolder(dataset);
+                }
+              });
+            }
+            return menu;
+          },
           depth
         });
       }

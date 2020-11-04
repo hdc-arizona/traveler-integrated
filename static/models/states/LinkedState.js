@@ -153,7 +153,7 @@ class LinkedState extends uki.Model {
       },
       null, // Separator
       {
-        label: 'Rename / Manage Tags...',
+        label: 'Properties...',
         onclick: () => {
           uki.ui.showModal(new RenameModal({ dataset: this }));
         }
@@ -213,16 +213,24 @@ class LinkedState extends uki.Model {
   }
 
   /**
-   * Update a dataset's label and/or tags
+   * Construct a URL for renaming a dataset's label and/or changing its tags
    */
-  async updateDatasetInfo (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
+  getUpdateUrl (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
+    newLabel = newLabel.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
     newLabel = encodeURIComponent(newLabel || this.info.label);
     const tagList = encodeURIComponent(
       Object.keys(this.info.tags)
         .filter(d => !tagsToRemove[d])
         .concat(Object.keys(tagsToAdd))
         .join(','));
-    const url = `/datasets/${this.info.datasetId}/info?label=${newLabel}&tags=${tagList}`;
+    return `/datasets/${this.info.datasetId}/info?label=${newLabel}&tags=${tagList}`;
+  }
+
+  /**
+   * Update a dataset's label and/or tags
+   */
+  async updateDatasetInfo (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
+    const url = this.getUpdateUrl(newLabel, tagsToAdd, tagsToRemove);
     await window.fetch(url, {
       method: 'PUT'
     });

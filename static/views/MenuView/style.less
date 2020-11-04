@@ -141,6 +141,7 @@
 
       .lines path {
         stroke: var(--background-color-softer);
+        fill: none;
       }
       .circles circle {
         fill: var(--background-color-richer);
@@ -166,6 +167,7 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    position: relative;
     .dataset {
       display: flex;
       flex-direction: row;
@@ -176,6 +178,17 @@
         display: flex;
         .opener {
           display: none;
+          cursor: pointer;
+          height: 0.75em;
+          line-height: 0.75em;
+          width: 0.75em;
+          position: relative;
+          top: 0.3em;
+          padding-top: 0.1em;
+          left: -0.5em;
+          border: 1px solid var(--background-color-softer);
+          background-color: var(--background-color-richer);
+          text-align: center;
         }
         .icon {
           width: 1em;
@@ -193,14 +206,6 @@
         .folderStuff {
           .opener {
             display: initial;
-            margin-right: 0.5em;
-            &:after {
-              cursor: pointer;
-              content: '+';
-            }
-            &.open:after {
-              content: '-';
-            }
           }
         }
       }
@@ -214,6 +219,7 @@
       .button {
         flex-grow: 1;
         margin: 0;
+        background-color: var(--background-color-richer);
       }
     }
   }

@@ -677,18 +677,22 @@ const { View, ViewMixin } = createMixinAndDefault({
         return widthNoScroll - widthWithScroll;
       }
 
-      static initForD3Selection (selection, optionsAccessor = d => d) {
+      static async initForD3Selection (selection, optionsAccessor = d => d) {
         const ClassDef = this;
+        const promises = [];
         selection.each(function () {
           const view = new ClassDef(optionsAccessor(...arguments));
-          view.render(d3.select(this));
+          promises.push(view.render(d3.select(this)));
         });
+        return Promise.all(promises);
       }
 
-      static iterD3Selection (selection, func) {
+      static async iterD3Selection (selection, func) {
+        const promises = [];
         selection.each(function () {
-          func.call(this, this.__ukiView__, ...arguments);
+          promises.push(func.call(this, this.__ukiView__, ...arguments));
         });
+        return Promise.all(promises);
       }
     }
     return View;
@@ -696,7 +700,7 @@ const { View, ViewMixin } = createMixinAndDefault({
 });
 
 var name = "uki";
-var version = "0.7.2";
+var version = "0.7.4";
 var description = "Minimal, d3-based Model-View library";
 var module = "dist/uki.esm.js";
 var scripts = {
