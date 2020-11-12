@@ -44,6 +44,10 @@ parser.add_argument('-a', '--tags', dest='tags', type=str,
                     help=('Tags to be attached to the dataset (when bundling multiple '
                           'datasets, the same tags are attached to all datasets bundled '
                           'at the same time). Separate tags with commas.'))
+parser.add_argument('-f', '--folder', dest='folder', type=str,
+                    help=('Folder or path name that will be prefixed to the label of all '
+                          'data bundled by this command; usually this is a good idea when '
+                          'bundling lots of files to reduce clutter in the interface'))
 
 class FakeFile: #pylint: disable=R0903
     def __init__(self, name):
@@ -56,6 +60,8 @@ class FakeFile: #pylint: disable=R0903
 
 async def main():
     args = vars(parser.parse_args())
+    if 'folder' in args:
+        args['folder'] = args['folder'].strip('/ ')
     db = DataStore(args['dbDir'], args['debug'])
     await db.load()
 
@@ -112,6 +118,10 @@ async def main():
         try:
             # Initialize the dataset
             datasetId = db.createDataset()['info']['datasetId']
+
+            # Prefix the label with the folder if one was specified
+            if 'folder' in args:
+                label = args['folder'] + '/' + label
 
             await logToConsole('#################' + ''.join(['#' for x in range(len(label))]))
             await logToConsole('Adding data for: %s (%s)' % (datasetId, label))

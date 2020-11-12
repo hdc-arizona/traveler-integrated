@@ -21,19 +21,25 @@ const viewClassLookup = {
   IntervalHistogramView */
 };
 
+const emptyLayout = {
+  isClosable: false,
+  content: [{ type: 'stack', content: [] }]
+};
+
 class RootView extends uki.ui.GLRootView {
   constructor (options = {}) {
     options.viewClassLookup = viewClassLookup;
-    options.glSettings = {
-      isClosable: false,
-      content: [{ type: 'stack', content: [] }]
-    };
+    options.glSettings = emptyLayout;
     super(options);
   }
 
   setLayout (layout) {
     layout.isClosable = false;
     super.setLayout(layout);
+  }
+
+  clearLayout () {
+    super.setLayout(emptyLayout);
   }
 
   async setup () {

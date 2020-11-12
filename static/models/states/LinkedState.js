@@ -21,6 +21,9 @@ class LinkedState extends uki.Model {
     this.info = options.info;
     this._selection = options.priorLinkedState?.selection || null;
     this.viewLayout = options.priorLinkedState?.viewLayout || null;
+    if (options.priorLinkedState) {
+      this.takeOverEvents(options.priorLinkedState);
+    }
     if (!this.viewLayout) {
       this.ready.then(async () => {
         this.viewLayout = await this.getDefaultLayout();
@@ -130,7 +133,11 @@ class LinkedState extends uki.Model {
         }
       }
     }
-    helper(this.viewLayout);
+    if (window.controller.currentDatasetId === this.info.datasetId) {
+      // If this isn't the currently open dataset, then none of the views are
+      // actually open
+      helper(this.viewLayout);
+    }
     return openViews;
   }
 
@@ -229,7 +236,7 @@ class LinkedState extends uki.Model {
   /**
    * Update a dataset's label and/or tags
    */
-  async updateDatasetInfo (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
+  async setLabelAndTags (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
     const url = this.getUpdateUrl(newLabel, tagsToAdd, tagsToRemove);
     await window.fetch(url, {
       method: 'PUT'

@@ -1,5 +1,3 @@
-@import '../../style/colors.less';
-
 .TreeView {
   &.lm_content {
     overflow: auto;
@@ -18,10 +16,10 @@
         fill: none;
         stroke-width: 3px;
         opacity: 0.25;
-        stroke: @overviewColor;
+        stroke: var(--text-color);
       }
       .unknownValue {
-        fill: @separatorColor;
+        fill: var(--separator-color);
       }
       &:hover .outline {
         opacity: 0.75;
@@ -35,12 +33,12 @@
       .outline {
         fill: none;
         stroke-width: 1px;
-        stroke: @overviewColor;
+        stroke: var(--text-color);
       }
       .area {
         stroke: none;
         opacity: 0.1;
-        fill: @overviewColor;
+        fill: var(--text-color);
       }
       &:hover .area {
         opacity: 0.5;
@@ -50,6 +48,6 @@
   .link {
     fill: none;
     stroke-width: 1px;
-    stroke: @separatorColor;
+    stroke: var(--separator-color);
   }
 }

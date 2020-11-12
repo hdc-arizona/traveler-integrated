@@ -226,7 +226,7 @@ class MenuView extends uki.View {
             if (parentPath) {
               newLabel = parentPath + '/' + newLabel;
             }
-            d.linkedState.updateDatasetInfo(newLabel);
+            d.linkedState.setLabelAndTags(newLabel);
           }
         } else if (rawNewLabel !== d.label) {
           // User added some slashes that we auto-strip; just need to render so
@@ -324,7 +324,7 @@ class MenuView extends uki.View {
         if (performAction) {
           const baseLabel = draggedDatum.label.match(/([^/]*)$/)[1];
           const newLabel = targetDatum.id + '/' + baseLabel;
-          draggedDatum.linkedState.updateDatasetInfo(newLabel);
+          draggedDatum.linkedState.setLabelAndTags(newLabel);
         }
       } else {
         // Dragged a dataset onto a dataset; do nothing
@@ -354,7 +354,7 @@ class MenuView extends uki.View {
     }
     const newLabel = prefix + '/' + baseLabel;
     this.openFolders[newLabel] = true;
-    return linkedState.updateDatasetInfo(newLabel);
+    return linkedState.setLabelAndTags(newLabel);
   }
 
   async dissolveFolder (folderId) {
@@ -535,9 +535,9 @@ class MenuView extends uki.View {
         const addOrRemoveArg = {};
         addOrRemoveArg[tag] = true;
         if (d.linkedState.info.tags[tag]) {
-          d.linkedState.updateDatasetInfo(undefined, undefined, addOrRemoveArg);
+          d.linkedState.setLabelAndTags(undefined, undefined, addOrRemoveArg);
         } else {
-          d.linkedState.updateDatasetInfo(undefined, addOrRemoveArg);
+          d.linkedState.setLabelAndTags(undefined, addOrRemoveArg);
         }
       });
   }

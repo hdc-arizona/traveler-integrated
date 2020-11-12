@@ -1,34 +1,26 @@
-/* globals d3 */
-import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import LinkedMixin from '../common/LinkedMixin.js';
-import SvgViewMixin from '../common/SvgViewMixin.js';
+/* globals uki, d3 */
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
+import LinkedMixin from '../common/LinkedMixin.js';
 
-class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
-  constructor (argObj) {
-    argObj.resources = [
+class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
+  constructor (options) {
+    options.resources = options.resources || [];
+    options.resources.push(...[
       { type: 'less', url: 'views/TreeView/style.less' },
-      { type: 'text', url: 'views/TreeView/template.html' },
-      { type: 'text', url: 'views/TreeView/shapeKey.html' }
-    ];
-    super(argObj);
-
-    (async () => {
-      try {
-        this.tree = d3.hierarchy(await d3.json(`/datasets/${encodeURIComponent(this.layoutState.label)}/tree`));
-      } catch (err) {
-        this.tree = err;
+      { type: 'text', url: 'views/TreeView/template.html', name: 'template' },
+      { type: 'text', url: 'views/TreeView/shapeKey.html' },
+      {
+        type: 'json',
+        url: `/datasets/${options.glState.datasetId}/tree`,
+        name: 'tree',
+        then: rawTree => d3.hierarchy(rawTree)
       }
-      this.render();
-    })();
+    ]);
+    super(options);
   }
 
-  get isLoading () {
-    return super.isLoading || !this.tree;
-  }
-
-  get isEmpty () {
-    return this.tree !== undefined && this.tree instanceof Error;
+  get tree () {
+    return this.getNamedResource('tree');
   }
 
   setup () {
@@ -49,7 +41,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     this.mainGlyphRadius = this.nodeHeight / 2;
     this.expanderRadius = this.mainGlyphRadius / 2;
 
-    this.content.html(this.resources[1]);
+    this.d3el.html(this.getNamedResource('template'));
     // this.content.select('.key').html(this.resources[2]);
 
     // Redraw when a new primitive is selected
@@ -58,9 +50,9 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
 
     // Listen for ctrl+f so that all labels are visible when the user is searching
     this.showAllLabels = false;
-    d3.select('body').on('keydown', () => {
+    d3.select('body').on('keydown', event => {
       // 17, 91 are cmd+ctrl, 13 is enter, 70 is F
-      if (d3.event.keyCode === 17 || d3.event.keyCode === 91 || d3.event.keyCode === 92) { // ctrl & cmd
+      if (event.keyCode === 17 || event.keyCode === 91 || event.keyCode === 92) { // ctrl & cmd
         this.showAllLabels = true;
         this.render();
       }
@@ -278,7 +270,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     expanderGlyphEnter.append('path').classed('area', true);
     expanderGlyphEnter.append('path').classed('outline', true);
     nodes.select('.expander').selectAll('.area, .outline')
-      .on('click', d => {
+      .on('click', (event, d) => {
         // Hide / show the children
         if (d._children) {
           d.children = d._children;
@@ -313,9 +305,9 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     // Main interactions
     const self = this;
     nodes.classed('selected', d => this.linkedState.selectedPrimitive === d.data.name)
-      .on('click', d => {
+      .on('click', (event, d) => {
         this.linkedState.selectPrimitive(d.data.name);
-      }).on('mouseenter', function (d) {
+      }).on('mouseenter', function (event, d) {
         const primitive = self.linkedState.getPrimitiveDetails(d.data.name);
         if (!primitive) {
           console.warn(`Can't find primitive of name: ${d.data.name}`);
@@ -326,7 +318,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
             hideAfterMs: null
           });
           d3.selectAll('.hoveredLinks').filter(hlink => {
-            if ((d.x == hlink.x) && (d.y == hlink.y)) {
+            if ((d.x === hlink.x) && (d.y === hlink.y)) {
               return true;
             }
             return false;

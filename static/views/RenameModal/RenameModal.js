@@ -89,7 +89,7 @@ class RenameModal extends uki.ui.ModalView {
     const newLabel = this.modalContentEl
       .select('#datasetLabel').property('value');
     await this.dataset
-      .updateDatasetInfo(newLabel, this._tagsToAdd, this._tagsToRemove);
+      .setLabelAndTags(newLabel, this._tagsToAdd, this._tagsToRemove);
   }
 
   validateForm () {

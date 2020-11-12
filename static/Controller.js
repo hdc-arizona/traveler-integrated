@@ -15,22 +15,31 @@ class Controller extends uki.Model {
     this.refreshDatasets();
   }
 
-  renderAllViews () {
-    this.menuView.render();
-    this.rootView.render();
+  async renderAllViews () {
+    await Promise.all([
+      this.menuView.render(),
+      this.rootView.render()
+    ]);
   }
 
+  /**
+   * Update this.datasetList + this.datasetLookup from the server
+   */
   async refreshDatasets () {
     const newDatasetLookup = {};
     this.datasetList = (await d3.json('/datasets')).map((info, index) => {
       let linkedState;
-      const priorLinkedState = this.datasetLookup[info.datasetId];
+      // If we already had a linkedState for this dataset, pass it as an
+      // option to the new linkedState (so we can take over its event listeners,
+      // handle any of its pending event callbacks, and preserve state like its
+      // current view layout + selection)
+      const priorLinkedState = this.datasetList[this.datasetLookup[info.datasetId]];
       if (info.sourceFiles.some(d => d.fileType === 'otf2')) {
         linkedState = new TracedLinkedState({ info, priorLinkedState });
       } else {
         linkedState = new LinkedState({ info, priorLinkedState });
       }
-      newDatasetLookup[linkedState.datasetId] = index;
+      newDatasetLookup[linkedState.info.datasetId] = index;
 
       if (Object.values(linkedState.getAvailableViews()).some(d => d === 'LOADING')) {
         // If any of the datasets are still loading something, call this
@@ -42,6 +51,7 @@ class Controller extends uki.Model {
       }
       return linkedState;
     });
+    this.datasetLookup = newDatasetLookup;
     if (!this.attemptedAutoHashOpen) {
       // The first time we load the page, do a check to see if the URL is
       // telling us to navigate to a specific one, or if there's only one
@@ -75,7 +85,7 @@ class Controller extends uki.Model {
       this.rootView.setLayout(this.datasetList[index].viewLayout);
     } else {
       this._currentDatasetId = null;
-      this.rootView.clearViews();
+      this.rootView.clearLayout();
     }
     this.trigger('currentDatasetChanged');
   }
@@ -90,4 +100,4 @@ class Controller extends uki.Model {
   }
 }
 
-window.controller = new Controller();
+globalThis.controller = new Controller();

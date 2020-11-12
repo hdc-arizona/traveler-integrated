@@ -9,8 +9,9 @@ class TracedLinkedState extends LinkedState {
   async getAvailableViews () {
     const views = await super.getAvailableViews();
     const otf2Status = this.info.sourceFiles
-      .find(d => d.fileType === 'otf2')
-      .stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
+      .find(d => d.fileType === 'otf2').stillLoading
+      ? VIEW_STATUS.LOADING
+      : VIEW_STATUS.AVAILABLE;
 
     views.GanttView = { status: otf2Status };
     views.UtilizationView = { status: otf2Status };
