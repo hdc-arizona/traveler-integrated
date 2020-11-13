@@ -355,6 +355,9 @@ class LinkedState extends Model {
     }, 100);
   }
   fetchPrimitiveHistogramData(){
+    if(!this.selectedPrimitiveHistogram) {
+      return;
+    }
     window.clearTimeout(this._primitiveHistogramTimeout);
     this._primitiveHistogramTimeout = window.setTimeout(async () => {
       const currentPrimitive = this.selectedPrimitiveHistogram;
@@ -390,6 +393,9 @@ class LinkedState extends Model {
   }
   getPrimitiveHistogramForDuration(begin, end){
     const currentPrimitive = this.selectedPrimitiveHistogram;
+    if(!this.primitiveHistogram || !(currentPrimitive in this.primitiveHistogram)){
+      return;
+    }
     const durationBins = this.histogramResolution;
     const rangePerDurationBin = (this.intervalHistogramEndLimit-this.intervalHistogramBeginLimit)/durationBins;
     const beginIndex = ((begin - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0;
@@ -424,6 +430,7 @@ class LinkedState extends Model {
               this.intervalHistogram[primitive] = data;
               this.intervalHistogramWindow[primitive] = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
               this.trigger('intervalHistogramUpdated');
+              this.fetchPrimitiveHistogramData();
             })
             .catch(err => {
               err.text.then( errorMessage => {

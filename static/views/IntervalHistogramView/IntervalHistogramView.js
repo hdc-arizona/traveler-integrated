@@ -91,31 +91,6 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
     var __self = this;
     // mouse events
     this.canvasElement = this.content.select('.histogram-plot');
-        // .on('click', function() {
-        //   console.log("clicked");
-        // })
-        // .on('mouseleave', function () {
-        //   __self.isMouseInside = false;
-        //   __self.clearAllTimer();
-        // })
-        // .on('mouseenter',function () {
-        //   __self.isMouseInside = true;
-        // })
-        // .on('mousemove', function() {
-        //   __self.clearAllTimer();
-        //   if(__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
-        //     var dm = d3.mouse(__self.content.select('.histogram-container').node());
-        //     this._mouseHoverTimeout = window.setTimeout(async () => {
-        //       if(__self.isMouseInside === true) {
-        //         __self.showDetailsTooltip(dm[0], dm[1]);
-        //       }
-        //     }, 100);
-        //   }
-        // })
-        // .on('dblclick', function() {
-        //   __self.clearAllTimer();
-        //   console.log("dbl clicked");
-        // });
     this.canvasContext = this.canvasElement.node().getContext('2d');
     this.linkedState.fetchIntervalHistogram(this.curPrimitive);
     this.linkedState.on('intervalHistogramUpdated', () => {
@@ -174,7 +149,6 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
   }
   draw () {
     super.draw();
-    // console.log('draw called ' + this.curMetric);
     if (this.isHidden) {
       return;
     } else if (this.isEmpty) {

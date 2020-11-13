@@ -61,9 +61,9 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
       // Full render whenever we have new histograms
       this.render();
     });
-    this.linkedState.on('intervalHistogramUpdated', () => {
-      this.linkedState.fetchPrimitiveHistogramData();
-    });
+    // this.linkedState.on('intervalHistogramUpdated', () => {
+      // this.linkedState.fetchPrimitiveHistogramData();
+    // });
     this.linkedState.on('primitiveHistogramUpdated', () => {
       const primitiveData = this.linkedState.getPrimitiveHistogramForDuration(this.linkedState.intervalHistogramBeginLimit,
           this.linkedState.intervalHistogramEndLimit);
@@ -76,6 +76,8 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
     });
     // Grab new histograms whenever the view is resized
     this.container.on('resize', () => {
+      const selectedPrimitive = this.content.select('.selectedPrimitive');
+      selectedPrimitive.style('display', 'none');
       const nPixels = Math.floor(this.getChartBounds().width);
       this.linkedState.setHistogramResolution(nPixels);
     });
@@ -90,30 +92,14 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
     } else if (data.error) {
       this.emptyStateDiv.html('<p>Error communicating with the server</p>');
     } else {
-      // console.log(data);
       // Set / update the scales
       this.xScale.domain(data.domain);
       this.yScale.domain([0, data.maxCount]);
 
       // Update the axis
       this.drawAxes();
-
       // Update the overview paths
       this.drawPaths(this.content.select('.overview'), data.histogram);
-
-      // // Update the overview paths
-      // this.drawPrimitivePaths(this.content.select('.selectedPrimitive'), data.histogram);
-
-      // // Update the currently selected primitive paths
-      const selectedPrimitive = this.content.select('.selectedPrimitive');
-      selectedPrimitive.style('display', null);
-      // if (data.primitiveHistogram) {
-        selectedPrimitive.select('.area')
-          .style('fill', this.linkedState.selectionColor);
-        selectedPrimitive.select('.outline')
-          .style('stroke', this.linkedState.selectionColor);
-      // }
-
       // Update the brush
       this.drawBrush();
     }
@@ -157,6 +143,16 @@ class UtilizationView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenL
         .attr('d', areaPathGenerator);
   }
   drawPrimitivePaths (container, histogram) {
+    if(histogram) {
+      container.style('display', null);
+      container.select('.area')
+          .style('fill', this.linkedState.selectionColor);
+      container.select('.outline')
+          .style('stroke', this.linkedState.selectionColor);
+    } else {
+      container.style('display', 'none');
+      return;
+    }
     const rat = 1;
     const outlinePathGenerator = d3.line()
         .x((d, i) => this.xScale(this.linkedState.getTimeStampFromBin(i, histogram.metadata)))
