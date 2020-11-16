@@ -52,7 +52,7 @@ class CodeView extends LinkedMixin(uki.ui.GLView) {
 
     // CodeMirror uses some z-index magic, so we need to tell our overlay to
     // display on top of it
-    this.overlayContentEl.classed('CodeOverlay', true);
+    this.overlayShadowEl.classed('CodeOverlay', true);
 
     // TODO: linked highlighting
     /* this.codeMirror.setCursor({

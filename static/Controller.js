@@ -4,9 +4,12 @@ import RootView from './views/RootView/RootView.js';
 import LinkedState from './models/states/LinkedState.js';
 import TracedLinkedState from './models/states/TracedLinkedState.js';
 
-class Controller extends uki.Model {
+class Controller extends uki.ui.ThemeableView {
   constructor () {
-    super(...arguments);
+    super({
+      d3el: d3.select('body'),
+      theme: { type: 'css', url: 'style/theme.css', name: 'theme' }
+    });
     this.menuView = new MenuView({ d3el: d3.select('.MenuView') });
     this.rootView = new RootView({ d3el: d3.select('.RootView') });
     this.datasetList = [];
@@ -15,7 +18,8 @@ class Controller extends uki.Model {
     this.refreshDatasets();
   }
 
-  async renderAllViews () {
+  async draw () {
+    await super.draw(...arguments);
     await Promise.all([
       this.menuView.render(),
       this.rootView.render()
@@ -67,7 +71,7 @@ class Controller extends uki.Model {
         this.menuView.expanded = true;
       }
     }
-    await this.renderAllViews();
+    await this.render();
   }
 
   get currentDataset () {
@@ -82,11 +86,13 @@ class Controller extends uki.Model {
   set currentDatasetId (datasetId) {
     const index = this.datasetLookup[datasetId];
     if (index !== undefined) {
+      this._currentDatasetId = datasetId;
       this.rootView.setLayout(this.datasetList[index].viewLayout);
     } else {
       this._currentDatasetId = null;
       this.rootView.clearLayout();
     }
+    this.menuView.render();
     this.trigger('currentDatasetChanged');
   }
 

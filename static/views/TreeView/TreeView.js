@@ -2,6 +2,26 @@
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 
+const GLYPHS = {
+  CIRCLE: r => `\
+M${r},${-r}\
+A${r},${r},0,0,0,${r},${r}\
+A${r},${r},0,0,0,${r},${-r}\
+Z`,
+  COLLAPSED_TRIANGLE: r => `\
+M0,0\
+L${2 * r},${r}\
+L0,${2 * r}\
+L${r},${r}\
+Z`,
+  EXPANDED_TRIANGLE: r => `\
+M${2 * r},0\
+L0,${r}\
+L${2 * r},${2 * r}\
+L${r},${r}\
+Z`
+};
+
 class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
   constructor (options) {
     options.resources = options.resources || [];
@@ -23,8 +43,8 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     return this.getNamedResource('tree');
   }
 
-  setup () {
-    super.setup();
+  async setup () {
+    await super.setup(...arguments);
 
     this.margin = {
       top: 20,
@@ -42,7 +62,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     this.expanderRadius = this.mainGlyphRadius / 2;
 
     this.d3el.html(this.getNamedResource('template'));
-    // this.content.select('.key').html(this.resources[2]);
+    // this.d3el.select('.key').html(this.resources[2]);
 
     // Redraw when a new primitive is selected
     // TODO: auto-expand and scroll if the selected primitive is collapsed?
@@ -62,36 +82,30 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     });
   }
 
-  draw () {
-    super.draw();
+  async draw () {
+    await super.draw(...arguments);
 
-    if (this.isHidden || this.isLoading) {
-      return; // eslint-disable-line no-useless-return
-    } else if (this.histogram instanceof Error) {
-      this.emptyStateDiv.html('<p>Error communicating with the server</p>');
-    } else {
-      const transition = d3.transition()
-        .duration(1000);
+    const transition = d3.transition()
+      .duration(1000);
 
-      // Compute the new layout
-      this.updateLayout(transition);
+    // Compute the new layout
+    this.updateLayout(transition);
 
-      // Draw the legend (note: this also sets up this.currentColorTimeScale)
-      this.drawLegend();
+    // Draw the legend (note: this also sets up this.currentColorTimeScale)
+    this.drawLegend();
 
-      // Draw the nodes
-      this.drawNodes(transition);
+    // Draw the nodes
+    this.drawNodes(transition);
 
-      // Draw the links
-      this.drawLinks(transition);
+    // Draw the links
+    this.drawLinks(transition);
 
-      // Draw any hovered links
-      this.drawHoveredLinks(transition);
+    // Draw any hovered links
+    this.drawHoveredLinks(transition);
 
-      // Trash any interaction placeholders now that we've used them
-      delete this._expandedParentCoords;
-      delete this._collapsedParent;
-    }
+    // Trash any interaction placeholders now that we've used them
+    delete this._expandedParentCoords;
+    delete this._collapsedParent;
   }
 
   updateLayout (transition) {
@@ -135,7 +149,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     }
 
     // Resize our SVG element to the needed size (overrides the default behavior of SvgViewMixin)
-    this.content.transition(transition)
+    this.d3el.transition(transition)
       .attr('width', xRange[1] + this.wideNodeWidth + this.margin.right)
       .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
   }
@@ -185,7 +199,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
   }
 
   drawNodes (transition) {
-    let nodes = this.content.select('.nodeLayer').selectAll('.node')
+    let nodes = this.d3el.select('.nodeLayer').selectAll('.node')
       .data(this.tree.descendants(), d => d.data.name);
     const nodesEnter = nodes.enter().append('g').classed('node', true);
     const nodesExit = nodes.exit();
@@ -332,7 +346,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
   }
 
   drawLinks (transition) {
-    let links = this.content.select('.linkLayer').selectAll('.link')
+    let links = this.d3el.select('.linkLayer').selectAll('.link')
       .data(this.tree.links(), d => d.source.data.name + d.target.data.name);
     const linksEnter = links.enter().append('path').classed('link', true);
     const linksExit = links.exit();
@@ -426,7 +440,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     // Now any source node in allNodes has the attribute source.myMatches
     // console.log(allNodes[3].myMatches);
 
-    const hoveredLinks = this.content.select('.nodeLayer').selectAll('.node')
+    const hoveredLinks = this.d3el.select('.nodeLayer').selectAll('.node')
       .data(allNodes, d => d.myMatches);
     const hLinksEnter = hoveredLinks.enter().append('path').classed('hoveredLinks', true);
     const hLinksExit = hoveredLinks.exit();
@@ -450,29 +464,6 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       });
   }
 }
+TreeView.GLYPHS = GLYPHS;
 
-TreeView.COLOR_MAPS = {
-  INCLUSIVE: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'], // purple
-  EXCLUSIVE: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'], // green
-  DIFFERENCE: ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0'] // diverging red blue
-};
-TreeView.GLYPHS = {
-  CIRCLE: r => `\
-M${r},${-r}\
-A${r},${r},0,0,0,${r},${r}\
-A${r},${r},0,0,0,${r},${-r}\
-Z`,
-  COLLAPSED_TRIANGLE: r => `\
-M0,0\
-L${2 * r},${r}\
-L0,${2 * r}\
-L${r},${r}\
-Z`,
-  EXPANDED_TRIANGLE: r => `\
-M${2 * r},0\
-L0,${r}\
-L${2 * r},${2 * r}\
-L${r},${r}\
-Z`
-};
 export default TreeView;

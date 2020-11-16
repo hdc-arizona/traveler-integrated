@@ -219,7 +219,10 @@
       .button {
         flex-grow: 1;
         margin: 0;
-        background-color: var(--background-color-richer);
+        &:not(.button-primary):not(.button-disabled) {
+          /* force an opaque background because the button looks weird when the dataset is a drag target */
+          background-color: var(--background-color-richer);
+        }
       }
     }
   }

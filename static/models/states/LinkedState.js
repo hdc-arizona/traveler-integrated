@@ -8,6 +8,12 @@ const VIEW_STATUS = {
   AVAILABLE: 'AVAILABLE'
 };
 
+const COLOR_MODES = {
+  INCLUSIVE: 'INCLUSIVE',
+  EXCLUSIVE: 'EXCLUSIVE',
+  DIVERGING: 'DIVERGING'
+};
+
 class LinkedState extends uki.Model {
   constructor (options) {
     options.resources = options.resources || [];
@@ -20,6 +26,7 @@ class LinkedState extends uki.Model {
 
     this.info = options.info;
     this._selection = options.priorLinkedState?.selection || null;
+    this._colorMode = COLOR_MODES.INCLUSIVE;
     this.viewLayout = options.priorLinkedState?.viewLayout || null;
     if (options.priorLinkedState) {
       this.takeOverEvents(options.priorLinkedState);
@@ -243,7 +250,15 @@ class LinkedState extends uki.Model {
     });
     await window.controller.refreshDatasets();
   }
+
+  /**
+   * Look up a primitive by name
+   */
+  getPrimitiveDetails (primitiveName) {
+    return this.getNamedResource('primitives')?.[primitiveName] || null;
+  }
 }
 LinkedState.VIEW_STATUS = VIEW_STATUS;
+LinkedState.COLOR_MODES = COLOR_MODES;
 
 export default LinkedState;

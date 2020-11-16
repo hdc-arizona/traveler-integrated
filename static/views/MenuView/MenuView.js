@@ -24,7 +24,7 @@ class MenuView extends uki.View {
 
   set expanded (value) {
     this._expanded = value;
-    window.controller.renderAllViews(); // expanding or contracting the menu affects all views
+    window.controller.render(); // expanding or contracting the menu affects all views
   }
 
   get folderMode () {
@@ -148,6 +148,7 @@ class MenuView extends uki.View {
     await uki.ui.ButtonView.iterD3Selection(datasets.select('.button'), (buttonView, d) => {
       buttonView.d3el.style('display', d.getMenu ? null : 'none');
       buttonView.tooltip = { content: d.label };
+      buttonView.primary = d.id === window.controller.currentDatasetId;
       buttonView.onclick = async event => {
         if (d.getMenu) {
           uki.ui.showContextMenu({
