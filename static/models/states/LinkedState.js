@@ -9,9 +9,9 @@ const VIEW_STATUS = {
 };
 
 const COLOR_MODES = {
-  INCLUSIVE: 'INCLUSIVE',
-  EXCLUSIVE: 'EXCLUSIVE',
-  DIVERGING: 'DIVERGING'
+  INCLUSIVE: 'inclusive',
+  EXCLUSIVE: 'exclusive',
+  DIVERGING: 'diverging'
 };
 
 class LinkedState extends uki.Model {
@@ -45,6 +45,23 @@ class LinkedState extends uki.Model {
   set selection (selection) {
     this.selection = selection;
     this.trigger('selectionChanged');
+  }
+
+  /**
+   * Based on the current color mode, get the current selection color. You can
+   * change this color in style/theme.css
+   */
+  get selectionColor () {
+    return window.controller.themeColors[this._colorMode].selectionColor;
+  }
+
+  /**
+   * Based on the current color mode, get the five colors to use for
+   * inclusive / exclusive / diverging time encodings; you can change these in
+   * style/theme.css
+   */
+  get timeScaleColors () {
+    return window.controller.themeColors[this._colorMode].timeScaleColors;
   }
 
   /**

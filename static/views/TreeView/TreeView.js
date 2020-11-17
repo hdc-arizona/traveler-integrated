@@ -3,23 +3,23 @@ import prettyPrintTime from '../../utils/prettyPrintTime.js';
 import LinkedMixin from '../common/LinkedMixin.js';
 
 const GLYPHS = {
-  CIRCLE: r => `\
-M${r},${-r}\
-A${r},${r},0,0,0,${r},${r}\
-A${r},${r},0,0,0,${r},${-r}\
-Z`,
-  COLLAPSED_TRIANGLE: r => `\
-M0,0\
-L${2 * r},${r}\
-L0,${2 * r}\
-L${r},${r}\
-Z`,
-  EXPANDED_TRIANGLE: r => `\
-M${2 * r},0\
-L0,${r}\
-L${2 * r},${2 * r}\
-L${r},${r}\
-Z`
+  CIRCLE: r => `
+    M${r},${-r}
+    A${r},${r},0,0,0,${r},${r}
+    A${r},${r},0,0,0,${r},${-r}
+    Z`.replace(/\s/g, ''),
+  COLLAPSED_TRIANGLE: r => `
+    M0,0
+    L${2 * r},${r}
+    L0,${2 * r}
+    L${r / 2},${r}
+    Z`.replace(/\s/g, ''),
+  EXPANDED_TRIANGLE: r => `
+    M${2 * r},0
+    L0,${r}
+    L${2 * r},${2 * r}
+    L${3 * r / 2},${r}
+    Z`.replace(/\s/g, '')
 };
 
 class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
@@ -59,8 +59,9 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
     this.horizontalPadding = 40; // px separation between nodes
     this.mainGlyphRadius = this.nodeHeight / 2;
-    this.expanderRadius = this.mainGlyphRadius / 2;
+    this.expanderRadius = 3 * this.mainGlyphRadius / 4;
 
+    this.glEl.classed('TreeView', true);
     this.d3el.html(this.getNamedResource('template'));
     // this.d3el.select('.key').html(this.resources[2]);
 
@@ -70,15 +71,18 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
 
     // Listen for ctrl+f so that all labels are visible when the user is searching
     this.showAllLabels = false;
-    d3.select('body').on('keydown', event => {
+    const body = d3.select('body');
+    body.on('keydown.TreeViewSearchInterceptor', event => {
       // 17, 91 are cmd+ctrl, 13 is enter, 70 is F
       if (event.keyCode === 17 || event.keyCode === 91 || event.keyCode === 92) { // ctrl & cmd
         this.showAllLabels = true;
         this.render();
+        body.on('click.TreeViewSearchInterceptor', () => {
+          this.showAllLabels = false;
+          body.on('click.TreeViewSearchInterceptor', null);
+          this.render();
+        });
       }
-    }).on('click', () => {
-      this.showAllLabels = false;
-      this.render();
     });
   }
 
@@ -120,12 +124,23 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     const xDomain = d3.extent(this.tree.descendants(), d => d.x);
     const yDomain = d3.extent(this.tree.descendants(), d => d.y);
 
-    // Figure out how much space we have to work with. Here we need to deal with
-    // space for each node: we want the x coordinate to correspond to the left
+    // Before we mess with sizes, preserve the current scroll position
+    const wrapperElement = this.glEl.node();
+    const initialScrollPosition = {
+      x: wrapperElement.scrollLeft,
+      y: wrapperElement.scrollTop
+    };
+
+    // Figure out how much space we have to work with (i.e. we want to fill the
+    // space if it's more than we need). Temporarily set the SVG to size 0,0 so
+    // we can figure out how much space goldenlayout is giving us
+    this.d3el.attr('width', 0).attr('height');
+    const viewBounds = this.glEl.node().getBoundingClientRect();
+    // Now figure out the minimum space we'll need.
+    // For each node: we want the x coordinate to correspond to the left
     // coordinate of the node (text will flow right), and the y coordinate to
-    // correspond with the center of the node. Also, factor in the
-    // scroll bars + margins.
-    const viewBounds = this.getAvailableSpace();
+    // correspond with the center of the node. Also, factor in the margins and
+    // some space for scroll bars.
     const xRange = [this.margin.left, Math.max(
       // The minimum right-most coordinate (remember the original domain is rotated)
       this.margin.left + yDomain[1] - yDomain[0],
@@ -148,16 +163,30 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       node.y = xToY(temp);
     }
 
-    // Resize our SVG element to the needed size (overrides the default behavior of SvgViewMixin)
-    this.d3el.transition(transition)
-      .attr('width', xRange[1] + this.wideNodeWidth + this.margin.right)
-      .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
+    // Resize our SVG element to the needed size
+    const resultingSize = {
+      width: xRange[1] + this.wideNodeWidth + this.margin.right,
+      height: yRange[1] + this.nodeHeight / 2 + this.margin.bottom
+    };
+    this.d3el
+      .attr('width', resultingSize.width)
+      .attr('height', resultingSize.height);
+
+    // Restore the scroll position as best we can
+    if (initialScrollPosition.x + wrapperElement.clientWidth > resultingSize.width) {
+      initialScrollPosition.x = resultingSize.width - wrapperElement.clientWidth;
+    }
+    wrapperElement.scrollLeft = initialScrollPosition.x;
+    if (initialScrollPosition.y + wrapperElement.clientHeight > resultingSize.height) {
+      initialScrollPosition.y = resultingSize.height - wrapperElement.clientHeight;
+    }
+    wrapperElement.scrollTop = initialScrollPosition.y;
   }
 
   drawLegend () {
     // TODO: need to move the color scale stuff to this.linkedState so that
     // other views can use it
-    const colorMap = this.linkedState.timeScale;
+    const colorMap = this.linkedState.timeScaleColors;
     const times = this.tree.descendants()
       .map(d => this.linkedState.getPrimitiveDetails(d.data.name).time)
       .filter(d => d !== undefined);
@@ -280,7 +309,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
 
     // Collapse / expand glyph
     const expanderGlyphEnter = nodesEnter.append('g').classed('expander', true)
-      .attr('transform', `translate(${2 * this.mainGlyphRadius},${-this.mainGlyphRadius})`);
+      .attr('transform', `translate(${2 * this.mainGlyphRadius},${-2 * this.expanderRadius})`);
     expanderGlyphEnter.append('path').classed('area', true);
     expanderGlyphEnter.append('path').classed('outline', true);
     nodes.select('.expander').selectAll('.area, .outline')
@@ -301,7 +330,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
           this._collapsedParent = d;
         }
         this.render();
-        d3.event.stopPropagation();
+        event.stopPropagation();
       }).transition(transition)
       .attr('d', d => {
         if (d._children) {
@@ -318,7 +347,8 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
 
     // Main interactions
     const self = this;
-    nodes.classed('selected', d => this.linkedState.selectedPrimitive === d.data.name)
+    nodes
+      .classed('selected', d => this.linkedState.selectedPrimitive === d.data.name)
       .on('click', (event, d) => {
         this.linkedState.selectPrimitive(d.data.name);
       }).on('mouseenter', function (event, d) {
@@ -326,10 +356,12 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
         if (!primitive) {
           console.warn(`Can't find primitive of name: ${d.data.name}`);
         } else {
-          window.controller.tooltip.show({
-            content: `<pre>${d.data.name}: ${JSON.stringify(primitive, null, 2)}</pre>`,
+          uki.showTooltip({
+            content: d.data.name,
             targetBounds: this.getBoundingClientRect(),
-            hideAfterMs: null
+            interactive: false,
+            hideAfterMs: 1000,
+            anchor: { x: -1, y: -1 } // if there's space, put tooltips above and to the left
           });
           d3.selectAll('.hoveredLinks').filter(hlink => {
             if ((d.x === hlink.x) && (d.y === hlink.y)) {
@@ -340,7 +372,6 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
             .style('opacity', 0.75);
         }
       }).on('mouseleave', () => {
-        window.controller.tooltip.hide();
         d3.selectAll('.hoveredLinks').style('opacity', 0);
       });
   }

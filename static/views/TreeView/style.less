@@ -4,6 +4,7 @@
   }
   text {
     font: 9px sans-serif;
+    fill: var(--text-color);
   }
   .node {
     cursor: pointer;
@@ -19,7 +20,7 @@
         stroke: var(--text-color);
       }
       .unknownValue {
-        fill: var(--separator-color);
+        fill: var(--text-color-softer);
       }
       &:hover .outline {
         opacity: 0.75;
@@ -48,6 +49,6 @@
   .link {
     fill: none;
     stroke-width: 1px;
-    stroke: var(--separator-color);
+    stroke: var(--border-color-softer);
   }
 }

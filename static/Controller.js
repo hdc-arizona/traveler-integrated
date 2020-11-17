@@ -10,12 +10,28 @@ class Controller extends uki.ui.ThemeableView {
       d3el: d3.select('body'),
       theme: { type: 'css', url: 'style/theme.css', name: 'theme' }
     });
+    this.themeColors = {};
     this.menuView = new MenuView({ d3el: d3.select('.MenuView') });
     this.rootView = new RootView({ d3el: d3.select('.RootView') });
     this.datasetList = [];
     this.datasetLookup = {};
     this._currentDatasetId = null;
     this.refreshDatasets();
+  }
+
+  async setup () {
+    await super.draw(...arguments);
+
+    // Once the resources have loaded, create a lookup for color schemes in
+    // theme.css
+    const cssVars = this.getNamedResource('theme').cssVariables;
+    for (const mode of ['inclusive', 'exclusive', 'diverging']) {
+      this.themeColors[mode] = {
+        timeScaleColors: Array.from(Array(5).keys())
+          .map(index => cssVars[`--${mode}-color-${index}`]),
+        selectionColor: cssVars[`--${mode}-selection-color`]
+      };
+    }
   }
 
   async draw () {
@@ -106,4 +122,4 @@ class Controller extends uki.ui.ThemeableView {
   }
 }
 
-globalThis.controller = new Controller();
+window.controller = new Controller();

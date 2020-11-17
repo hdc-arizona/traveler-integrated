@@ -7,8 +7,8 @@ const LinkedMixin = function (superclass) {
     }
 
     get linkedState () {
-      const index = globalThis.controller.datasetLookup[this.datasetId];
-      return index === undefined ? null : globalThis.controller.datasetList[index];
+      const index = window.controller.datasetLookup[this.datasetId];
+      return index === undefined ? null : window.controller.datasetList[index];
     }
 
     get isLoading () {
