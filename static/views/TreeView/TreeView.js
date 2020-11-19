@@ -92,27 +92,27 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     const transition = d3.transition()
       .duration(1000);
 
-    // Compute the new layout
-    this.updateLayout(transition);
+    // Figure out how big the SVG should be, and compute node positions
+    const nodeList = this.computeLayout(transition);
 
-    // Draw the legend (note: this also sets up this.currentColorTimeScale)
-    this.drawLegend();
+    // Draw the legend (also sets up this.currentColorTimeScale)
+    this.drawLegend(nodeList);
 
     // Draw the nodes
-    this.drawNodes(transition);
+    this.drawNodes(transition, nodeList);
 
     // Draw the links
     this.drawLinks(transition);
 
-    // Draw any hovered links
-    this.drawHoveredLinks(transition);
+    // Draw the extra (shown-on-hover-only) links
+    this.drawExtraLinks(nodeList);
 
     // Trash any interaction placeholders now that we've used them
     delete this._expandedParentCoords;
     delete this._collapsedParent;
   }
 
-  updateLayout (transition) {
+  computeLayout (transition) {
     // Compute the minimum VERTICAL layout (mbostock's example / the d3 docs are
     // really confusing about this), with fixed node sizes / separation—we'll
     // rotate this later
@@ -121,8 +121,15 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       .nodeSize([this.nodeHeight, nodeWidth + this.horizontalPadding])
       .separation(() => this.nodeSeparation);
     layoutGenerator(this.tree);
-    const xDomain = d3.extent(this.tree.descendants(), d => d.x);
-    const yDomain = d3.extent(this.tree.descendants(), d => d.y);
+
+    // Get the nodes that are visible, attach details about each primitive
+    const nodeList = this.tree.descendants();
+    nodeList.forEach((d, i) => {
+      d.details = this.linkedState.getPrimitiveDetails(d.data.name);
+    });
+
+    const xDomain = d3.extent(nodeList, d => d.x);
+    const yDomain = d3.extent(nodeList, d => d.y);
 
     // Before we mess with sizes, preserve the current scroll position
     const wrapperElement = this.glEl.node();
@@ -157,7 +164,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     // Update the coordinates
     const yToX = d3.scaleLinear().domain(yDomain).range(xRange);
     const xToY = d3.scaleLinear().domain(xDomain).range(yRange);
-    for (const node of this.tree.descendants()) {
+    for (const node of nodeList) {
       const temp = node.x;
       node.x = yToX(node.y);
       node.y = xToY(temp);
@@ -181,14 +188,16 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       initialScrollPosition.y = resultingSize.height - wrapperElement.clientHeight;
     }
     wrapperElement.scrollTop = initialScrollPosition.y;
+
+    return nodeList;
   }
 
-  drawLegend () {
+  drawLegend (nodeList) {
     // TODO: need to move the color scale stuff to this.linkedState so that
     // other views can use it
     const colorMap = this.linkedState.timeScaleColors;
-    const times = this.tree.descendants()
-      .map(d => this.linkedState.getPrimitiveDetails(d.data.name).time)
+    const times = nodeList
+      .map(d => d.details.time)
       .filter(d => d !== undefined);
     if (times.length === 0) {
       return; // No time data; don't bother creating the legend
@@ -227,9 +236,9 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       .attr('fill', d => d);
   }
 
-  drawNodes (transition) {
+  drawNodes (transition, nodeList) {
     let nodes = this.d3el.select('.nodeLayer').selectAll('.node')
-      .data(this.tree.descendants(), d => d.data.name);
+      .data(nodeList, d => d.data.name);
     const nodesEnter = nodes.enter().append('g').classed('node', true);
     const nodesExit = nodes.exit();
     nodes = nodes.merge(nodesEnter);
@@ -273,23 +282,17 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     mainGlyph.selectAll('.area')
       .transition(transition)
       .attr('d', TreeView.GLYPHS.CIRCLE(this.mainGlyphRadius))
-      .attr('fill', d => {
-        const time = this.linkedState.getPrimitiveDetails(d.data.name).time;
-        if (time === undefined) {
-          return 'transparent';
-        } else {
-          return this.currentColorTimeScale(time);
-        }
-      });
+      .attr('fill', d => d.details.time === undefined
+        ? 'transparent'
+        : this.currentColorTimeScale(d.details.time));
     mainGlyph.selectAll('.outline')
       .transition(transition)
       .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
-      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`)
-      .style('stroke', d => this.linkedState.selectedPrimitive === d.data.name ? this.linkedState.selectionColor : null);
+      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`);
     mainGlyph.selectAll('.unknownValue')
       .transition(transition)
       .style('opacity', d => {
-        return this.linkedState.getPrimitiveDetails(d.data.name).time === undefined ? 1 : 0;
+        return d.details.time === undefined ? 1 : 0;
       });
 
     // Node label
@@ -298,9 +301,8 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       .attr('x', 2 * this.mainGlyphRadius)
       .attr('y', this.mainGlyphRadius)
       .text(d => {
-        const details = this.linkedState.getPrimitiveDetails(d.data.name);
         // Use display_name if available, but if not (e.g. we only have trace data), use its full name
-        return details.display_name || details.name;
+        return d.details.display_name || d.data.name;
       });
     nodes.select('.nodeLabel')
       .attr('opacity', d => {
@@ -346,33 +348,26 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       });
 
     // Main interactions
-    const self = this;
     nodes
       .classed('selected', d => this.linkedState.selectedPrimitive === d.data.name)
       .on('click', (event, d) => {
         this.linkedState.selectPrimitive(d.data.name);
       }).on('mouseenter', function (event, d) {
-        const primitive = self.linkedState.getPrimitiveDetails(d.data.name);
-        if (!primitive) {
-          console.warn(`Can't find primitive of name: ${d.data.name}`);
-        } else {
-          uki.showTooltip({
-            content: d.data.name,
-            targetBounds: this.getBoundingClientRect(),
-            interactive: false,
-            hideAfterMs: 1000,
-            anchor: { x: -1, y: -1 } // if there's space, put tooltips above and to the left
+        uki.showTooltip({
+          content: d.details.display_name || d.data.name,
+          targetBounds: this.getBoundingClientRect(),
+          interactive: false,
+          hideAfterMs: 1000,
+          anchor: { x: -1, y: -1 } // if there's space, put tooltips above and to the left
+        });
+        d3.select('.extraLinkLayer').selectAll('.link')
+          .classed('hovered', link => {
+            return link.source.data.name === d.data.name ||
+              link.target.data.name === d.data.name;
           });
-          d3.selectAll('.hoveredLinks').filter(hlink => {
-            if ((d.x === hlink.x) && (d.y === hlink.y)) {
-              return true;
-            }
-            return false;
-          }).style('stroke', '#ffd92f')
-            .style('opacity', 0.75);
-        }
       }).on('mouseleave', () => {
-        d3.selectAll('.hoveredLinks').style('opacity', 0);
+        d3.select('.extraLinkLayer').selectAll('.link')
+          .classed('hovered', false);
       });
   }
 
@@ -389,7 +384,8 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       return `\
         M${source.x + 2 * this.mainGlyphRadius},${source.y}\
         L${source.x + this.nodeWidth},${source.y}\
-        C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
+        C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`
+        .replace(/\s/g, '');
     };
     linksEnter
       .attr('opacity', 0)
@@ -420,78 +416,43 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       });
   }
 
-  drawHoveredLinks (transition) {
-    var state = this.linkedState;
-    var allNodes = this.tree.descendants();
-
-    d3.selectAll('.hoveredLinks').remove();
-
-    // Find each node's matches and add the coordinates to the list myMatches
-    var allMatches = allNodes.forEach(function (source) {
-      source.myMatches = [];
-      var startx = source.x;
-      var starty = source.y;
-      source.myMatches.push({ x: startx, y: starty });
-
-      // Helper function to get important part of the variable/function/primitive's name
-      const getImportantName = displayName => {
-        var name = '';
-        if ((displayName) && (
-          (displayName.includes('define-variable')) ||
-            (displayName.includes('variable')) ||
-            (displayName.includes('access-variable')) ||
-            (displayName.includes('access-argument')) ||
-            (displayName.includes('access-function')))) {
-          name = displayName.split('/')[1].split('(')[0];
+  drawExtraLinks (nodeList) {
+    // Create links based on common references to variables
+    const allMatches = {};
+    const linkList = [];
+    const variableNameMatcher = /(?:(?:variable)|(?:access-argument)|(?:access-function))\/([^(]*)\(/;
+    for (const node of nodeList) {
+      const referencedVariable = node.details.display_name?.match(variableNameMatcher)?.[1];
+      if (referencedVariable) {
+        allMatches[referencedVariable] = allMatches[referencedVariable] || [];
+        // Add this reference, and any links to any other references
+        for (const priorReferenceNode of allMatches[referencedVariable]) {
+          linkList.push({
+            source: node,
+            target: priorReferenceNode
+          });
         }
-        return name;
-      };
-
-      if (source.data.name) {
-        var importantName = '';
-        const displayName = state.getPrimitiveDetails(source.data.name).display_name;
-        if (displayName) importantName = getImportantName(displayName);
-
-        // Find the nodes that match my name
-        allNodes.forEach(function (dest) {
-          var otherImportantName = '';
-          const otherDisplayName = state.getPrimitiveDetails(dest.data.name).display_name;
-          if (otherDisplayName) otherImportantName = getImportantName(otherDisplayName);
-
-          if (importantName && (importantName == otherImportantName)) {
-            var edge_data = { x: dest.x, y: dest.y };
-            source.myMatches.push(edge_data);
-            source.myMatches.push({ x: startx, y: starty });
-          }
-        });
+        allMatches[referencedVariable].push(node);
       }
-      return source.myMatches;
-    });
+    }
 
-    // Now any source node in allNodes has the attribute source.myMatches
-    // console.log(allNodes[3].myMatches);
+    let links = this.d3el.select('.extraLinkLayer').selectAll('.link')
+      .data(linkList, d => d.source.data.name + d.target.data.name);
+    const linksEnter = links.enter().append('path').classed('link', true);
+    links.exit().remove();
+    links = links.merge(linksEnter);
 
-    const hoveredLinks = this.d3el.select('.nodeLayer').selectAll('.node')
-      .data(allNodes, d => d.myMatches);
-    const hLinksEnter = hoveredLinks.enter().append('path').classed('hoveredLinks', true);
-    const hLinksExit = hoveredLinks.exit();
-
-    // Helper function for computing the paths
-    const pathToMatches = listOfCoords => {
-      var path = '';
-      for (var i = 0; i < listOfCoords.length; i++) {
-        if (i % 2 == 1) path += 'L ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
-        if (i % 2 == 0) path += 'M ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
-      }
-      return path;
+    // Helper function for computing custom paths:
+    const computePath = (source, target) => {
+      return `\
+        M${source.x + this.mainGlyphRadius},${source.y}\
+        L${target.x + this.mainGlyphRadius},${target.y}`
+        .replace(/\s/g, '');
     };
-    hLinksEnter
-      .attr('class', 'hoveredLinks')
-      .style('stroke', '#ffd92f')
-      .style('stroke-width', '3px')
-      .style('opacity', 0)
+    links.classed('hovered', false)
       .attr('d', link => {
-        return pathToMatches(link.myMatches);
+        // Animate to the correct locations
+        return computePath(link.source, link.target);
       });
   }
 }
