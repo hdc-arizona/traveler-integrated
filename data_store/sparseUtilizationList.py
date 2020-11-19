@@ -79,7 +79,7 @@ class SparseUtilizationList():
     def calcIntervalHistogram(self, bins=100, begin=None, end=None):
         return self.calcUtilizationForLocation(bins, begin, end, 1, False)
 
-    # Calulates utilization for one location in a Gantt chart
+    # Calculates utilization for one location in a Gantt chart
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart
     def calcUtilizationForLocation(self, bins=100, begin=None, end=None, Location=None, isInterval=True):
         rangePerBin = (end-begin)/bins
@@ -125,6 +125,54 @@ class SparseUtilizationList():
             prettyHistogram.append(histogram[i]['integral'])
         return prettyHistogram
 
+    # Calculates utilization for each primitive and returns util per duration
+    def calcUtilizationForPrimitive(self, bins=100,
+                                    begin=None,
+                                    end=None,
+                                    primitive=None,
+                                    durationBegin=None,
+                                    durationEnd=None,
+                                    durationBins=100):
+        primitiveCountPerBin = np.zeros((bins, durationBins+1), dtype=np.double)
+        rangePerBin = (end-begin)/bins
+        rangePerDurationBin = (durationEnd-durationBegin)/durationBins
+        location_struct_index = dict()
+        location_struct_length = dict()
+        preCriticalPts = begin
+        for i in range(1, bins):
+            criticalPts = (i * rangePerBin) + begin
+
+            for location in self.locationDict:
+                if location not in location_struct_index:
+                    location_struct_index[location] = 0
+                if location not in location_struct_length:
+                    location_struct_length[location] = len(self.locationDict[location])
+
+                while location_struct_index[location] < location_struct_length[location]:
+                    locStruct = self.locationDict[location][location_struct_index[location]]
+                    # since its sorted per location, all end indexes are from the same interval of previous enter index
+                    if location_struct_index[location] > 0:
+                        startIndex = self.locationDict[location][location_struct_index[location]-1]['index']
+                    else:
+                        startIndex = 0
+                    if locStruct['primitive'] == primitive and locStruct['counter'] == 0:
+                        if startIndex < criticalPts:
+                            intervalChunkStart = max(preCriticalPts, startIndex)
+                            intervalChunkEnd = min(criticalPts, locStruct['index'])
+                            currentUtil = intervalChunkEnd - intervalChunkStart  # it should cover left/right/full overlap cases
+                            duration = locStruct['index'] - startIndex
+                            durationIndex = int((duration - durationBegin) // rangePerDurationBin)
+                            primitiveCountPerBin[i, durationIndex] = primitiveCountPerBin[i, durationIndex] + float(currentUtil)
+                            if primitiveCountPerBin[i, durationIndex] < 0:
+                                print("Error: negative Util found " + str(primitiveCountPerBin[i, durationIndex]))
+                                return []
+                        if locStruct['index'] > criticalPts:  # check this explicitly, you dont wanna increase the index number
+                            break
+                    location_struct_index[location] = location_struct_index[location] + 1
+
+            preCriticalPts = criticalPts
+        return primitiveCountPerBin.tolist()
+
 
 # In charge of loading interval data into our integral list
 # I have no idea how we want to load interval data :/
@@ -165,8 +213,9 @@ async def loadSUL(label, db, log=logToConsole):
     for loc in db[label]['intervalIndexes']['locations']:
         counter = 0
         for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
-            sul['intervals'].setIntervalAtLocation({'index': int(i.begin), 'counter': 1, 'util': 0}, loc)
-            sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0}, loc)
+            primitive_name = db[label]['intervals'][i.data]['Primitive']
+            sul['intervals'].setIntervalAtLocation({'index': int(i.begin), 'counter': 1, 'util': 0, 'primitive': primitive_name}, loc)
+            sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0, 'primitive': primitive_name}, loc)
             updateSULForInterval(db[label]['intervals'][i.data]['enter'], loc)
             updateSULForInterval(db[label]['intervals'][i.data]['leave'], loc)
             updateIntervalDuration(db[label]['intervals'][i.data])

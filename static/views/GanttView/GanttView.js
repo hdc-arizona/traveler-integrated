@@ -202,7 +202,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
               })
               .then((data) => {
                   if(data.length > 0) {
-                      data[0].metrics = undefined;
+                      data[0].enter.metrics = undefined;
+                      data[0].leave.metrics = undefined;
                       data[0].intervalId = undefined;
                       data[0].lastParentInterval = undefined;
                       var dr = __self.canvasElement.node().getBoundingClientRect();
@@ -459,6 +460,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       }
   }
   fetchAndDrawHighlightedBars(x, y, mode) {
+      if((this.linkedState.end - this.linkedState.begin) > 20000000) {
+          return;
+      }
       if(this.intervalRenderingBegins(x, y, mode) === true) return;
       this.drawHighlightedBars(this.IntervalListMode.all);
       this.fetchIntervalList(x, y, mode);
