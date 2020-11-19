@@ -1,5 +1,7 @@
 /* globals uki */
 
+import PrimitiveSelection from '../selections/PrimitiveSelection.js';
+
 import RenameModal from '../../views/RenameModal/RenameModal.js';
 
 const VIEW_STATUS = {
@@ -43,7 +45,7 @@ class LinkedState extends uki.Model {
   }
 
   set selection (selection) {
-    this.selection = selection;
+    this._selection = selection;
     this.trigger('selectionChanged');
   }
 
@@ -273,6 +275,18 @@ class LinkedState extends uki.Model {
    */
   getPrimitiveDetails (primitiveName) {
     return this.getNamedResource('primitives')?.[primitiveName] || null;
+  }
+
+  /**
+   * Change the current selection to the named primitive
+   */
+  selectPrimitive (primitiveName) {
+    const primitiveDetails = this.getPrimitiveDetails(primitiveName);
+    this.selection = new PrimitiveSelection({
+      primitiveName,
+      primitiveDetails,
+      fetchUtilization: false // overridden in TracedLinkedState
+    });
   }
 }
 LinkedState.VIEW_STATUS = VIEW_STATUS;

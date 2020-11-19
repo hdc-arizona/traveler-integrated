@@ -8,9 +8,26 @@ class Controller extends uki.ui.ThemeableView {
   constructor () {
     super({
       d3el: d3.select('body'),
-      theme: { type: 'css', url: 'style/theme.css', name: 'theme' }
+      theme: { type: 'css', url: 'style/theme.css', name: 'theme' },
+      resources: [{
+        type: 'derivation',
+        loadAfter: ['theme'],
+        name: 'themeColors',
+        derive: theme => {
+          // Derive a lookup for color schemes in theme.css
+          const themeColors = {};
+          const cssVars = theme.cssVariables;
+          for (const mode of ['inclusive', 'exclusive', 'diverging']) {
+            themeColors[mode] = {
+              timeScaleColors: Array.from(Array(5).keys())
+                .map(index => cssVars[`--${mode}-color-${index}`]),
+              selectionColor: cssVars[`--${mode}-selection-color`]
+            };
+          }
+          return themeColors;
+        }
+      }]
     });
-    this.themeColors = {};
     this.menuView = new MenuView({ d3el: d3.select('.MenuView') });
     this.rootView = new RootView({ d3el: d3.select('.RootView') });
     this.datasetList = [];
@@ -19,19 +36,8 @@ class Controller extends uki.ui.ThemeableView {
     this.refreshDatasets();
   }
 
-  async setup () {
-    await super.draw(...arguments);
-
-    // Once the resources have loaded, create a lookup for color schemes in
-    // theme.css
-    const cssVars = this.getNamedResource('theme').cssVariables;
-    for (const mode of ['inclusive', 'exclusive', 'diverging']) {
-      this.themeColors[mode] = {
-        timeScaleColors: Array.from(Array(5).keys())
-          .map(index => cssVars[`--${mode}-color-${index}`]),
-        selectionColor: cssVars[`--${mode}-selection-color`]
-      };
-    }
+  get themeColors () {
+    return this.getNamedResource('themeColors');
   }
 
   async draw () {

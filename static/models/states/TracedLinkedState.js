@@ -1,5 +1,7 @@
 import LinkedState from './LinkedState.js';
 
+import PrimitiveSelection from '../selections/PrimitiveSelection.js';
+
 const VIEW_STATUS = LinkedState.VIEW_STATUS;
 
 class TracedLinkedState extends LinkedState {
@@ -121,6 +123,17 @@ class TracedLinkedState extends LinkedState {
       }
     }
     return baseMenu;
+  }
+
+  /**
+   * When selecting a primitive, also load trace data (overrides default behavior)
+   */
+  selectPrimitive (primitiveName) {
+    const primitiveDetails = this.getPrimitiveDetails(primitiveName);
+    this.selection = new PrimitiveSelection({
+      primitiveDetails,
+      fetchTraceData: true
+    });
   }
 }
 

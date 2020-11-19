@@ -65,9 +65,9 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     this.d3el.html(this.getNamedResource('template'));
     // this.d3el.select('.key').html(this.resources[2]);
 
-    // Redraw when a new primitive is selected
+    // Redraw when the selection is changed
     // TODO: auto-expand and scroll if the selected primitive is collapsed?
-    this.linkedState.on('primitiveSelected', () => { this.render(); });
+    this.linkedState.on('selectionChanged', () => { this.render(); });
 
     // Listen for ctrl+f so that all labels are visible when the user is searching
     this.showAllLabels = false;
@@ -267,6 +267,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     nodes.transition(transition)
       .attr('transform', d => `translate(${d.x},${d.y})`)
       .attr('opacity', 1);
+    nodes.classed('selected', d => d.data.name === this.linkedState?.selection?.primitiveName);
 
     // Main glyph (just circles for now)
     const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);
@@ -288,7 +289,10 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     mainGlyph.selectAll('.outline')
       .transition(transition)
       .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
-      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`);
+      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`)
+      .style('stroke', d => d.data.name === this.linkedState?.selection?.primitiveName
+        ? this.linkedState.selectionColor
+        : null);
     mainGlyph.selectAll('.unknownValue')
       .transition(transition)
       .style('opacity', d => {
@@ -349,7 +353,6 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
 
     // Main interactions
     nodes
-      .classed('selected', d => this.linkedState.selectedPrimitive === d.data.name)
       .on('click', (event, d) => {
         this.linkedState.selectPrimitive(d.data.name);
       }).on('mouseenter', function (event, d) {
