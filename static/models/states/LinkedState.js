@@ -49,6 +49,15 @@ class LinkedState extends uki.Model {
     this.trigger('selectionChanged');
   }
 
+  get colorMode () {
+    return this._colorMode;
+  }
+
+  set colorMode (value) {
+    this._colorMode = value;
+    this.trigger('colorModeChanged');
+  }
+
   /**
    * Based on the current color mode, get the current selection color. You can
    * change this color in style/theme.css

@@ -9,8 +9,6 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
       { type: 'less', url: 'views/SelectionInfoView/style.less' }
     ]);
     super(options);
-
-    this.linkedState.on('selectionChanged', () => { this.render(); });
   }
 
   get informativeMessage () {

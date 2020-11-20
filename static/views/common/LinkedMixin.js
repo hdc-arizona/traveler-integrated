@@ -4,6 +4,9 @@ const LinkedMixin = function (superclass) {
     constructor (options) {
       super(options);
       this.datasetId = options.glState.datasetId;
+
+      this.linkedState.on('selectionChanged', () => { this.render(); });
+      this.linkedState.on('colorModeChanged', () => { this.render(); });
     }
 
     get linkedState () {

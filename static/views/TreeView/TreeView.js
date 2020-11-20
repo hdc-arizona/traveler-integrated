@@ -33,7 +33,25 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
         type: 'json',
         url: `/datasets/${options.glState.datasetId}/tree`,
         name: 'tree',
-        then: rawTree => d3.hierarchy(rawTree)
+        then: rawTree => {
+          const tree = d3.hierarchy(rawTree);
+          // Attach details about each primitive to each tree node
+          tree.each(node => {
+            node.details = this.linkedState.getPrimitiveDetails(node.data.name);
+          });
+          // Now that we have details, compute exclusive times
+          tree.each(node => {
+            if (node.details.time !== undefined) {
+              node.details.exclusiveTime = node.details.time;
+              for (const childNode of node.children || []) {
+                if (childNode.details.time !== undefined) {
+                  node.details.exclusiveTime -= childNode.details.time;
+                }
+              }
+            }
+          });
+          return tree;
+        }
       }
     ]);
     super(options);
@@ -64,10 +82,6 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     this.glEl.classed('TreeView', true);
     this.d3el.html(this.getNamedResource('template'));
     // this.d3el.select('.key').html(this.resources[2]);
-
-    // Redraw when the selection is changed
-    // TODO: auto-expand and scroll if the selected primitive is collapsed?
-    this.linkedState.on('selectionChanged', () => { this.render(); });
 
     // Listen for ctrl+f so that all labels are visible when the user is searching
     this.showAllLabels = false;
@@ -122,11 +136,9 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       .separation(() => this.nodeSeparation);
     layoutGenerator(this.tree);
 
-    // Get the nodes that are visible, attach details about each primitive
+    // Get where each node wants to be based on the minimum layout; we'll
+    // update later if we have more space
     const nodeList = this.tree.descendants();
-    nodeList.forEach((d, i) => {
-      d.details = this.linkedState.getPrimitiveDetails(d.data.name);
-    });
 
     const xDomain = d3.extent(nodeList, d => d.x);
     const yDomain = d3.extent(nodeList, d => d.y);
@@ -161,7 +173,8 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       viewBounds.height - this.scrollBarSize - this.nodeHeight / 2 - this.margin.bottom
     )];
 
-    // Update the coordinates
+    // Update the coordinates for each node now that we know how much space we
+    // can use
     const yToX = d3.scaleLinear().domain(yDomain).range(xRange);
     const xToY = d3.scaleLinear().domain(xDomain).range(yRange);
     for (const node of nodeList) {
@@ -197,7 +210,9 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     // other views can use it
     const colorMap = this.linkedState.timeScaleColors;
     const times = nodeList
-      .map(d => d.details.time)
+      .map(d => this.linkedState.colorMode === 'inclusive'
+        ? d.details.time
+        : d.details.exclusiveTime)
       .filter(d => d !== undefined);
     if (times.length === 0) {
       return; // No time data; don't bother creating the legend
@@ -234,6 +249,18 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       .attr('x', (d, i) => axisScale(windows[i][0]))
       .attr('width', (d, i) => axisScale(windows[i][1]) - axisScale(windows[i][0]))
       .attr('fill', d => d);
+
+    // Update the radio buttons below the legend
+    const self = this;
+    this.d3el.select('.colorModeToggle')
+      .attr('x', this.margin.left)
+      .attr('width', this.legendWidth)
+      .selectAll('input')
+      .on('change.colorModeToggle', function () {
+        self.linkedState.colorMode = this.dataset.mode;
+      }).each(function () {
+        this.checked = this.dataset.mode === self.linkedState.colorMode;
+      });
   }
 
   drawNodes (transition, nodeList) {
@@ -285,7 +312,9 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       .attr('d', TreeView.GLYPHS.CIRCLE(this.mainGlyphRadius))
       .attr('fill', d => d.details.time === undefined
         ? 'transparent'
-        : this.currentColorTimeScale(d.details.time));
+        : this.currentColorTimeScale(this.linkedState.colorMode === 'inclusive'
+          ? d.details.time
+          : d.details.exclusiveTime));
     mainGlyph.selectAll('.outline')
       .transition(transition)
       .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
