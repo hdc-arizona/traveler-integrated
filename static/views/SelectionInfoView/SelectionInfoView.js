@@ -35,8 +35,7 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
       .text(typeLabel);
 
     this.d3el.select('.selectionLabel')
-      .text(this.linkedState?.selection?.label || null)
-      .style('color', this.linkedState?.selectionColor);
+      .text(this.linkedState?.selection?.label || null);
 
     const selectionDetails = this.linkedState?.selection?.details;
     this.d3el.select('pre')

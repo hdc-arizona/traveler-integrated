@@ -318,10 +318,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     mainGlyph.selectAll('.outline')
       .transition(transition)
       .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
-      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`)
-      .style('stroke', d => d.data.name === this.linkedState?.selection?.primitiveName
-        ? this.linkedState.selectionColor
-        : null);
+      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`);
     mainGlyph.selectAll('.unknownValue')
       .transition(transition)
       .style('opacity', d => {

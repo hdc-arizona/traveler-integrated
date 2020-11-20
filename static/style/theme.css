@@ -44,25 +44,23 @@
   --corner-radius: 4px;
 
   /* Traveler-specific color schemes; TODO: do we need to tweak for dark mode? */
+	--selection-color: #e6ab02; /* yellow */
 
-  /* Inclusive mode color scheme: yellow selection + purples scale */
-  --inclusive-selection-color: #e6ab02; /* yellow */
+  /* Inclusive mode color scheme: purples scale */
   --inclusive-color-0: #f2f0f7; /* lighest purple */
   --inclusive-color-1: #cbc9e2;
   --inclusive-color-2: #9e9ac8;
   --inclusive-color-3: #756bb1;
   --inclusive-color-4: #54278f; /* darkest purple */
 
-  /* Exclusive mode color scheme: purple selection + greens scale */
-  --exclusive-selection-color: #7570b3; /* purple */
+  /* Exclusive mode color scheme: greens scale */
   --exclusive-color-0: #edf8fb; /* lighest green */
   --exclusive-color-1: #b2e2e2;
   --exclusive-color-2: #66c2a4;
   --exclusive-color-3: #2ca25f;
   --exclusive-color-4: #006d2c; /* darkest green */
 
-  /* Difference mode color scheme: green selection + diverging red-blue scale */
-  --diverging-selection-color: #4daf4a; /* purple */
+  /* Difference mode color scheme: diverging red-blue scale */
   --diverging-color-0: #ca0020; /* saturated red */
   --diverging-color-1: #f4a582;
   --diverging-color-2: #f7f7f7; /* near-white */

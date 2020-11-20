@@ -59,20 +59,12 @@ class LinkedState extends uki.Model {
   }
 
   /**
-   * Based on the current color mode, get the current selection color. You can
-   * change this color in style/theme.css
-   */
-  get selectionColor () {
-    return window.controller.themeColors[this._colorMode].selectionColor;
-  }
-
-  /**
    * Based on the current color mode, get the five colors to use for
    * inclusive / exclusive / diverging time encodings; you can change these in
    * style/theme.css
    */
   get timeScaleColors () {
-    return window.controller.themeColors[this._colorMode].timeScaleColors;
+    return window.controller.themeColors[this._colorMode];
   }
 
   /**

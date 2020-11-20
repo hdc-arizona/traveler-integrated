@@ -18,11 +18,8 @@ class Controller extends uki.ui.ThemeableView {
           const themeColors = {};
           const cssVars = theme.cssVariables;
           for (const mode of ['inclusive', 'exclusive', 'diverging']) {
-            themeColors[mode] = {
-              timeScaleColors: Array.from(Array(5).keys())
-                .map(index => cssVars[`--${mode}-color-${index}`]),
-              selectionColor: cssVars[`--${mode}-selection-color`]
-            };
+            themeColors[mode] = Array.from(Array(5).keys())
+              .map(index => cssVars[`--${mode}-color-${index}`]);
           }
           return themeColors;
         }
