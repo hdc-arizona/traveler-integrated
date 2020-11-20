@@ -1,11 +1,18 @@
 /* globals uki */
 
-class Selection extends uki.Model {
+class Selection extends uki.utils.IntrospectableMixin(uki.Model) {
   /**
-   * Create a string representation of the current selection
+   * A simple string that identifies the selection
    */
-  toString () {
-    throw new Error('Selection class has not implemented a required toString() function');
+  get label () {
+    throw new Error(`Selection class ${this.type} has not implemented the required label getter`);
+  }
+
+  /**
+   * A string representation of the details of the current selection
+   */
+  get details () {
+    throw new Error(`Selection class ${this.type} has not implemented the required details getter`);
   }
 }
 

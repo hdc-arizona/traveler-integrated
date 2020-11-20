@@ -354,7 +354,13 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     // Main interactions
     nodes
       .on('click', (event, d) => {
-        this.linkedState.selectPrimitive(d.data.name);
+        if (this.linkedState.selection?.primitiveName === d.data.name) {
+          // Deselect
+          this.linkedState.selection = null;
+        } else {
+          // Select the clicked primitive
+          this.linkedState.selectPrimitive(d.data.name);
+        }
       }).on('mouseenter', function (event, d) {
         uki.showTooltip({
           content: d.details.display_name || d.data.name,

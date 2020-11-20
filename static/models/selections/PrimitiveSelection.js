@@ -14,7 +14,11 @@ class PrimitiveSelection extends Selection {
     this.primitiveDetails = options.primitiveDetails;
   }
 
-  toString () {
+  get label () {
+    return this.primitiveName;
+  }
+
+  get details () {
     return JSON.stringify(this.primitiveDetails, null, 2);
   }
 }
