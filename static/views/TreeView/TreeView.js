@@ -8,6 +8,28 @@ const GLYPHS = {
     A${r},${r},0,0,0,${r},${r}
     A${r},${r},0,0,0,${r},${-r}
     Z`.replace(/\s/g, ''),
+  DIAMOND: r => {
+    // Keep diamond area the same as the circle,
+    // but center on the original radius
+    const r2 = r * Math.sqrt(Math.PI / 2);
+    return `
+      M${r - r2},0
+      L${r},${-r2}
+      L${r + r2},0
+      L${r},${r2}
+      Z`.replace(/\s/g, '');
+  },
+  SQUARE: r => {
+    // Keep square area the same as the circle,
+    // but center on the original radius
+    const r2 = r * Math.sqrt(Math.PI) / 2;
+    return `
+      M${r - r2},${-r2}
+      L${r + r2},${-r2}
+      L${r + r2},${r2}
+      L${r - r2},${r2}
+      Z`.replace(/\s/g, '');
+  },
   COLLAPSED_TRIANGLE: r => `
     M0,0
     L${2 * r},${r}
@@ -21,6 +43,19 @@ const GLYPHS = {
     L${3 * r / 2},${r}
     Z`.replace(/\s/g, '')
 };
+
+function evalTypeGlyph (evalCode, radius) {
+  switch (evalCode) {
+    // Undecided
+    case -1: return GLYPHS.CIRCLE(radius);
+    // Asynchronous
+    case 0: return GLYPHS.DIAMOND(radius);
+    // Synchronous
+    case 1: return GLYPHS.SQUARE(radius);
+    // Missing data; still use the circle for the outline
+    default: return GLYPHS.CIRCLE(radius);
+  }
+}
 
 class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
   constructor (options) {
@@ -81,7 +116,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
 
     this.glEl.classed('TreeView', true);
     this.d3el.html(this.getNamedResource('template'));
-    // this.d3el.select('.key').html(this.resources[2]);
+    this.initKey();
 
     // Listen for ctrl+f so that all labels are visible when the user is searching
     this.showAllLabels = false;
@@ -97,6 +132,19 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
           this.render();
         });
       }
+    });
+  }
+
+  initKey () {
+    const self = this;
+    const r = 0.75 * self.mainGlyphRadius;
+    this.d3el.selectAll('[data-eval-type]').each(function () {
+      d3.select(this.parentNode)
+        .attr('height', 3 * r)
+        .attr('width', 3 * r);
+      d3.select(this)
+        .attr('d', evalTypeGlyph(parseInt(this.dataset.evalType), r))
+        .attr('transform', `translate(${0.5 * r},${1.5 * r})`);
     });
   }
 
@@ -252,7 +300,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
 
     // Update the radio buttons below the legend
     const self = this;
-    this.d3el.select('.colorModeToggle')
+    this.d3el.select('.key')
       .attr('x', this.margin.left)
       .attr('width', this.legendWidth)
       .selectAll('input')
@@ -296,7 +344,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       .attr('opacity', 1);
     nodes.classed('selected', d => d.data.name === this.linkedState?.selection?.primitiveName);
 
-    // Main glyph (just circles for now)
+    // Main glyph
     const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);
     mainGlyphEnter.append('path').classed('area', true);
     mainGlyphEnter.append('path').classed('outline', true);
@@ -309,7 +357,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     const mainGlyph = nodes.select('.mainGlyph');
     mainGlyph.selectAll('.area')
       .transition(transition)
-      .attr('d', TreeView.GLYPHS.CIRCLE(this.mainGlyphRadius))
+      .attr('d', d => evalTypeGlyph(d.details.eval_direct, this.mainGlyphRadius))
       .attr('fill', d => d.details.time === undefined
         ? 'transparent'
         : this.currentColorTimeScale(this.linkedState.colorMode === 'inclusive'
@@ -317,7 +365,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
           : d.details.exclusiveTime));
     mainGlyph.selectAll('.outline')
       .transition(transition)
-      .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
+      .attr('d', d => evalTypeGlyph(d.details.eval_direct, 1.25 * this.mainGlyphRadius))
       .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`);
     mainGlyph.selectAll('.unknownValue')
       .transition(transition)
@@ -378,6 +426,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       });
 
     // Main interactions
+    const self = this;
     nodes
       .on('click', (event, d) => {
         if (this.linkedState.selection?.primitiveName === d.data.name) {
@@ -388,8 +437,17 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
           this.linkedState.selectPrimitive(d.data.name);
         }
       }).on('mouseenter', function (event, d) {
+        const label = d.details.display_name || d.data.name;
+        let time = self.linkedState.colorMode === 'inclusive'
+          ? d.details?.time
+          : d.details?.exclusiveTime;
+        if (time === undefined) {
+          time = '(no time data)';
+        } else {
+          time = prettyPrintTime(time);
+        }
         uki.showTooltip({
-          content: d.details.display_name || d.data.name,
+          content: `${label}: ${time}`,
           targetBounds: this.getBoundingClientRect(),
           interactive: false,
           hideAfterMs: 1000,

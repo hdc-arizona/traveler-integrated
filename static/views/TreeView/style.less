@@ -3,7 +3,7 @@
     overflow: auto;
   }
   text {
-    font: 9px sans-serif;
+    font-size: 0.5em;
     fill: var(--text-color);
   }
   .node {
@@ -61,17 +61,27 @@
     }
   }
 
-  .colorModeToggle {
+  .key {
+    font-size: 0.75em;
     .wrapper1 {
       text-align: center;
     }
     .wrapper2 {
       display: inline-block;
-      margin-right: 1em;
+      margin-left: 0.5em;
     }
     label {
       display: inline-block;
       white-space: nowrap;
+      margin-bottom: 0;
+    }
+    input {
+      margin-bottom: 0;
+    }
+    svg {
+      margin-right: 0.1em;
+      vertical-align: bottom;
+      fill: var(--text-color-softer);
     }
   }
 }
