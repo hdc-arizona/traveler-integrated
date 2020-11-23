@@ -287,8 +287,9 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     await log('Building SparseUtilizationList index of intervals (.=2500 intervals)')
     for intervalObj in self[datasetId]['intervals'].values():
         loc = intervalObj['Location']
-        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['enter']['Timestamp']), 'counter': 1, 'util': 0}, loc)
-        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['leave']['Timestamp']), 'counter': -1, 'util': 0}, loc)
+        primitive_name = intervalObj['Primitive']
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['enter']['Timestamp']), 'counter': 1, 'util': 0, 'primitive': primitive_name}, loc)
+        sul['intervals'].setIntervalAtLocation({'index': int(intervalObj['leave']['Timestamp']), 'counter': -1, 'util': 0, 'primitive': primitive_name}, loc)
         updateSULForInterval(intervalObj['enter'], loc)
         updateSULForInterval(intervalObj['leave'], loc)
         updateIntervalDuration(intervalObj)

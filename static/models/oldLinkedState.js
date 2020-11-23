@@ -16,6 +16,7 @@ class LinkedState extends Model {
     // Don't bother retrieving intervals if there are more than 7000 in this.intervalWindow
     this.intervalCutoff = 7000;
     this.intervalWindow = this.hasTraceData ? Array.from(this.metadata.intervalDomain) : null;
+    this.primitiveHistogram = {};
     this.intervalHistogram = {};
     this.intervalHistogramWindow = {};
     this.cursorPosition = null;
@@ -37,8 +38,6 @@ class LinkedState extends Model {
       this.caches.metricAggBins = {};
       this._metricAggTimeout = {};
       this.fetchMetricBins();
-      // this.startIntervalStream();
-      this.startTracebackStream();
       this.updateHistogram();
     }
   }
@@ -115,8 +114,6 @@ class LinkedState extends Model {
     this.updateHistogram();
     this.fetchGanttAggBins();
     this.fetchMetricBins();
-    // this.startIntervalStream();
-    this.startTracebackStream();
     if (oldBegin !== begin || oldEnd !== end) {
       this.stickyTrigger('newIntervalWindow', { begin, end });
     }
@@ -160,7 +157,6 @@ class LinkedState extends Model {
   selectIntervalId (intervalId) {
     if (intervalId !== this.selectedIntervalId) {
       this.selectedIntervalId = intervalId;
-      this.startTracebackStream();
       this.trigger('intervalIdSelected', { intervalId });
     }
   }
@@ -282,70 +278,7 @@ class LinkedState extends Model {
     const metricAggBins = this.caches.metricAggBins[metric] || {};
     return Object.assign({}, metricAggBins);
   }
-
-  getCurrentTraceback () {
-    // Returns a right-to-left list of intervals
-    let traceback = this.caches.traceback ||
-      this.caches.newTraceback;
-
-    if (traceback === undefined) {
-      return [];
-    }
-
-    // Make a copy of the traceback so we don't mutate the cache
-    traceback = Object.assign({}, traceback);
-
-    // Derive a list of intervals from the streamed list of IDs
-    const intervals = this.getCurrentIntervals();
-    const linkData = [];
-    for (const intervalId of traceback.visibleIds) {
-      if (intervals[intervalId]) {
-        linkData.push(intervals[intervalId]);
-      } else {
-        // The list of IDs came back faster than the intervals themselves, we
-        // should cut off the line at this point (should only happen during
-        // incremental rendering)
-        delete traceback.leftEndpoint;
-        break;
-      }
-    }
-
-    if (linkData.length > 0) {
-      if (traceback.rightEndpoint) {
-        // Construct a fake "interval" for the right endpoint, because we draw
-        // lines to the left (linkData is right-to-left)
-        const parent = linkData[0];
-        linkData.unshift({
-          intervalId: traceback.rightEndpoint.id,
-          Location: traceback.rightEndpoint.location,
-          enter: { Timestamp: traceback.rightEndpoint.beginTimestamp },
-          lastParentInterval: {
-            id: parent.intervalId,
-            endTimestamp: parent.leave.Timestamp,
-            location: parent.Location
-          }
-        });
-      }
-      if (traceback.leftEndpoint) {
-        // Copy the important parts of the leftmost interval object, overriding
-        // lastParentInterval (linkData is right-to-left)
-        const firstInterval = linkData[linkData.length - 1];
-        linkData[linkData.length - 1] = {
-          intervalId: firstInterval.intervalId,
-          Location: firstInterval.Location,
-          enter: { Timestamp: firstInterval.enter.Timestamp },
-          lastParentInterval: traceback.leftEndpoint
-        };
-      } else if (!linkData[linkData.length - 1].lastParentInterval) {
-        // In cases where an interval with no parent is at the beginning of the
-        // traceback, there's no line to draw to the left; we can just omit it
-        linkData.splice(-1);
-      }
-    }
-    return linkData;
-  }
-
-  // we query intervals as a set of pre-aggregrated pixel-wide bins
+  //we query intervals as a set of pre-aggregrated pixel-wide bins
   // the drawing process is significantly simplified and sped up from this
   fetchGanttAggBins () {
     var bins = this.ganttXResolution;
@@ -383,9 +316,9 @@ class LinkedState extends Model {
     }, 50);
   }
 
-  fetchMetricBins () {
+  fetchMetricBins() {
     if (this.selectedProcMetric.startsWith('PAPI') === true && !(this.selectedProcMetric in this.caches.metricAggBins)) {
-      this.caches.metricAggBins[this.selectedProcMetric] = {};
+      this.caches.metricAggBins[this.selectedProcMetric] = {}
     }
 
     for (const curMetric in this.caches.metricAggBins) {
@@ -400,21 +333,22 @@ class LinkedState extends Model {
       // this function will replace the fetching of intervals
       window.clearTimeout(this._metricAggTimeout[curMetric]);
       this._metricAggTimeout[curMetric] = window.setTimeout(async () => {
-        //* ****NetworkError on reload is here somewhere******//
+        //*****NetworkError on reload is here somewhere******//
         if (bins) {
           const label = encodeURIComponent(this.label);
-          var endpt = `/datasets/${label}/newMetricData?bins=${bins}&metric_type=${curMetric}&location=1&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
+          var endpt = `/datasets/${label}/newMetricData?bins=${bins}&metric_type=${curMetric}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
           fetch(endpt)
-            .then((response) => {
-              return response.json();
-            })
-            .then((data) => {
-              this.caches.metricAggBins[curMetric] = data;
-              this.trigger('metricsUpdated');
-            })
-            .catch(err => {
-              err.text.then(errorMessage => {
-                console.warn(errorMessage);
+              .then((response) => {
+                return response.json();
+              })
+              .then((data) => {
+                this.caches.metricAggBins[curMetric] = data;
+                this.trigger('metricsUpdated');
+              })
+              .catch(err => {
+                err.text.then(errorMessage => {
+                  console.warn(errorMessage)
+                });
               });
             });
         }
@@ -422,119 +356,9 @@ class LinkedState extends Model {
     }
   }
 
-  startIntervalStream () {
-    // Debounce the start of this expensive process...
-    window.clearTimeout(this._intervalTimeout);
-    this._intervalTimeout = window.setTimeout(async () => {
-      const label = encodeURIComponent(this.label);
-      // First check whether we're asking for too much data by getting a
-      // histogram with a single bin (TODO: draw per-location histograms instead
-      // of just saying "Too much data; scroll to zoom in?")
-      let bailEarly = this.intervalWindow === null;
-      if (!bailEarly) {
-        const histogram = await d3.json(`/datasets/${label}/histogram?bins=1&mode=count&begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`);
-        const intervalCount = histogram[0][2];
-        bailEarly = intervalCount === 0 || intervalCount > this.intervalCutoff;
-        this.caches.intervalOverflow = intervalCount > this.intervalCutoff;
-      }
-
-      if (bailEarly) {
-        // Empty out whatever we were looking at before and bail immediately
-        delete this.caches.intervals;
-        delete this.caches.newIntervals;
-        delete this.caches.intervalStream;
-        delete this.caches.intervalError;
-        this.trigger('intervalStreamFinished');
-        return;
-      }
-
-      // Start the interval stream, and collect it in a separate cache to avoid
-      // old intervals from disappearing from incremental refreshes
-      this.trigger('intervalStreamStarted');
-      this.caches.newIntervals = {};
-      this.caches.intervalOverflow = false;
-      const self = this;
-      const intervalStreamUrl = `/datasets/${label}/intervals?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
-      const currentIntervalStream = this.caches.intervalStream = oboe(intervalStreamUrl)
-        .fail(error => {
-          this.caches.intervalError = error;
-          console.warn(error);
-        })
-        .node('!.*', function (interval) {
-          delete self.caches.intervalError;
-          if (currentIntervalStream !== self.caches.intervalStream) {
-            // A different stream has been started; abort this one
-            this.abort();
-          } else {
-            // Store the interval
-            self.caches.newIntervals[interval.intervalId] = interval;
-            self.trigger('intervalsUpdated');
-          }
-        })
-        .done(() => {
-          delete this.caches.intervalStream;
-          this.caches.intervals = this.caches.newIntervals;
-          delete this.caches.newIntervals;
-          this.trigger('intervalStreamFinished');
-        });
-    }, 100);
-  }
-
-  startTracebackStream () {
-    // Debounce the start of this expensive process...
-    window.clearTimeout(this._tracebackTimeout);
-    this._tracebackTimeout = window.setTimeout(async () => {
-      // Is there even anything to stream?
-      if (!this.selectedIntervalId || this.intervalWindow === null) {
-        delete this.caches.traceback;
-        delete this.caches.newTraceback;
-        delete this.caches.tracebackStream;
-        delete this.caches.tracebackError;
-        this.trigger('tracebackStreamFinished');
-        return;
-      }
-
-      this.trigger('tracebackStreamStarted');
-      this.caches.newTraceback = {
-        visibleIds: [],
-        rightEndpoint: null,
-        leftEndpoint: null
-      };
-      const self = this;
-      const label = encodeURIComponent(this.label);
-      const tracebackStreamUrl = `/datasets/${label}/intervals/${this.selectedIntervalId}/trace?begin=${this.intervalWindow[0]}&end=${this.intervalWindow[1]}`;
-      const currentTracebackStream = this.caches.tracebackStream = oboe(tracebackStreamUrl)
-        .fail(error => {
-          this.caches.tracebackError = error;
-          console.warn(error);
-        })
-        .node('!.*', function (idOrMetadata) {
-          delete self.caches.tracebackError;
-          if (currentTracebackStream !== self.caches.tracebackStream) {
-            this.abort();
-            return;
-          } else if (typeof idOrMetadata === 'string') {
-            self.caches.newTraceback.visibleIds.push(idOrMetadata);
-          } else if (idOrMetadata.beginTimestamp !== undefined) {
-            self.caches.newTraceback.rightEndpoint = idOrMetadata;
-          } else if (idOrMetadata.endTimestamp !== undefined) {
-            self.caches.newTraceback.leftEndpoint = idOrMetadata;
-          }
-          self.trigger('tracebackUpdated');
-        })
-        .done(() => {
-          delete this.caches.tracebackStream;
-          this.caches.traceback = this.caches.newTraceback;
-          delete this.caches.newTraceback;
-          this.trigger('tracebackStreamFinished');
-        });
-    }, 100);
-  }
-
   getCurrentHistogramData () {
     return {
       histogram: this.caches.histogram,
-      primitiveHistogram: this.caches.primitiveHistogram,
       domain: this.caches.histogramDomain,
       maxCount: this.caches.histogramMaxCount,
       error: this.caches.histogramError
@@ -572,9 +396,65 @@ class LinkedState extends Model {
       this.trigger('histogramsUpdated');
     }, 100);
   }
+  fetchPrimitiveHistogramData(){
+    if(!this.selectedPrimitiveHistogram) {
+      return;
+    }
+    window.clearTimeout(this._primitiveHistogramTimeout);
+    this._primitiveHistogramTimeout = window.setTimeout(async () => {
+      const currentPrimitive = this.selectedPrimitiveHistogram;
+      delete this.primitiveHistogram[currentPrimitive];
+      const durationBins = this.histogramResolution;
+      const label = encodeURIComponent(this.label);
+      const urls = [`/datasets/${label}/getUtilizationForPrimitive?bins=${this.histogramResolution}&duration_bins=${durationBins}&primitive=${currentPrimitive}`];
+      try {
+        [this.primitiveHistogram[currentPrimitive]] = await Promise.all(urls.map(url => d3.json(url)));
+      } catch (e) {
+        this.histogramError = e;
+        return;
+      }
 
-  fetchIntervalHistogram (primitive) {
-    var bins = 1000;
+      // do the precalculation here
+      this.primitiveHistogram[currentPrimitive].aux = new Array(this.histogramResolution);
+      for(let i=0; i<this.histogramResolution; i++){
+        this.primitiveHistogram[currentPrimitive].aux[i] = new Array(durationBins);
+      }
+      for(let i=0; i<this.histogramResolution; i++){
+        for(let j=0; j<durationBins; j++){
+          var preValue = 0;
+          if(j>0) {
+            preValue = this.primitiveHistogram[currentPrimitive].aux[i][j-1];
+          }
+          this.primitiveHistogram[currentPrimitive].aux[i][j] =
+              this.primitiveHistogram[currentPrimitive].data[i][j] + preValue;
+        }
+      }
+
+      this.trigger('primitiveHistogramUpdated');
+    }, 100);
+  }
+  getPrimitiveHistogramForDuration(begin, end){
+    const currentPrimitive = this.selectedPrimitiveHistogram;
+    if(!this.primitiveHistogram || !(currentPrimitive in this.primitiveHistogram)){
+      return;
+    }
+    const durationBins = this.histogramResolution;
+    const rangePerDurationBin = (this.intervalHistogramEndLimit-this.intervalHistogramBeginLimit)/durationBins;
+    const beginIndex = ((begin - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0;
+    let endIndex = (((end - this.intervalHistogramBeginLimit) / rangePerDurationBin) | 0);
+    if(endIndex > 0) {
+      endIndex = endIndex - 1;
+    }
+    var ret = new Array(this.histogramResolution).fill(0);
+    const rangePerBin = (this.primitiveHistogram[currentPrimitive].metadata.end - this.primitiveHistogram[currentPrimitive].metadata.begin)
+                    / this.primitiveHistogram[currentPrimitive].metadata.bins;
+    for(let i=0;i<this.histogramResolution;i++){
+      ret[i] = (this.primitiveHistogram[currentPrimitive].aux[i][endIndex] - this.primitiveHistogram[currentPrimitive].aux[i][beginIndex]) / rangePerBin;
+    }
+    return {'data': ret, 'metadata': this.primitiveHistogram[currentPrimitive].metadata} ;
+  }
+  fetchIntervalHistogram(primitive){
+    var bins = this.histogramResolution;
 
     // this function will replace the fetching of intervals
     window.clearTimeout(this._intervalDomainTimeout);
@@ -584,18 +464,20 @@ class LinkedState extends Model {
         const label = encodeURIComponent(this.label);
         var endpt = `/datasets/${label}/getIntervalDuration?bins=${bins}&primitive=${primitive}`;
         fetch(endpt)
-          .then((response) => {
-            return response.json();
-          })
-          .then((data) => {
-            this.selectedPrimitiveHistogram = primitive;
-            this.intervalHistogram[primitive] = data;
-            this.intervalHistogramWindow[primitive] = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
-            this.trigger('intervalHistogramUpdated');
-          })
-          .catch(err => {
-            err.text.then(errorMessage => {
-              console.warn(errorMessage);
+            .then((response) => {
+              return response.json();
+            })
+            .then((data) => {
+              this.selectedPrimitiveHistogram = primitive;
+              this.intervalHistogram[primitive] = data;
+              this.intervalHistogramWindow[primitive] = [this.intervalHistogramBeginLimit, this.intervalHistogramEndLimit];
+              this.trigger('intervalHistogramUpdated');
+              this.fetchPrimitiveHistogramData();
+            })
+            .catch(err => {
+              err.text.then( errorMessage => {
+                console.warn(errorMessage);
+              });
             });
           });
       }

@@ -35,6 +35,9 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.isMouseInside = false;
     this.pendingHighlightRequest = null;
     this.renderingInProgress = false;
+    this.traceBackLines = null;
+    this.selectedTimestamp = null;
+    this.selectedLocation = null;
   }
 
   get isLoading () {
@@ -101,6 +104,7 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
 
     // Initialize the scales / stream
     this.xScale.domain(this.linkedState.intervalWindow);
+
     this.yScale.domain(this.linkedState.metadata.locationNames);
 
     // Set up zoom / pan interactions
@@ -132,46 +136,39 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
           this.IntervalListMode.duration);
       }, 300);
     });
-    // this.linkedState.on('tracebackUpdated', () => {
-    //   // This is an incremental update; we don't need to do a full render()...
-    //   // (but still debounce this, as we don't want to call drawLinks() for
-    //   // every new interval)
-    //   window.clearTimeout(this._incrementalTracebackTimeout);
-    //   this._incrementalTracebackTimeout = window.setTimeout(() => {
-    //     this.drawLinks(this.linkedState.getCurrentTraceback());
-    //   });
-    // });
-    // const justFullRender = () => { this.render(); };
-    // this.linkedState.on('primitiveSelected', justFullRender);
-    // this.linkedState.on('intervalStreamFinished', justFullRender);
-    // this.linkedState.on('tracebackStreamFinished', justFullRender);
 
     this.currentClickState = this.ClickState.background;
     var __self = this;
     // mouse events
 
     this.canvasElement = this.content.select('.gantt-canvas')
-      .on('click', function () {
-        __self.clearAllTimer();
-        var dm = d3.mouse(__self.content.select('.canvas-container').node());
-        __self._mouseClickTimeout = window.setTimeout(async () => {
-          __self.fetchAndDrawHighlightedBars(dm[0], dm[1], __self.IntervalListMode.primitive);
-        }, 300);
-      })
-      .on('mouseleave', function () {
-        __self.isMouseInside = false;
-        __self.clearAllTimer();
-      })
-      .on('mouseenter', function () {
-        __self.isMouseInside = true;
-      })
-      .on('mousemove', function () {
-        __self.clearAllTimer();
-        if (__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
-          var dm = d3.mouse(__self.content.select('.canvas-container').node());
-          this._mouseHoverTimeout = window.setTimeout(async () => {
-            if (__self.isMouseInside === true) {
-              __self.fetchAndDrawHighlightedBars(dm[0], dm[1], __self.IntervalListMode.guid);
+        .on('click', function() {
+            __self.clearAllTimer();
+            var dm = d3.mouse(__self.content.select('.canvas-container').node());
+            __self._mouseClickTimeout = window.setTimeout(async () => {
+                __self.selectedTimestamp = __self.localXScale.invert(dm[0]);
+                __self.selectedLocation = __self.yScale.invert(dm[1]);
+                __self.fetchIntervalTraceList();
+            }, 300);
+        })
+        .on('mouseleave', function () {
+            __self.isMouseInside = false;
+            __self.clearAllTimer();
+        })
+        .on('mouseenter',function () {
+            __self.isMouseInside = true;
+        })
+        .on('mousemove', function() {
+            __self.clearAllTimer();
+            if(__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
+                var dm = d3.mouse(__self.content.select('.canvas-container').node());
+                this._mouseHoverTimeout = window.setTimeout(async () => {
+                    if(__self.isMouseInside === true) {
+                        var tm = __self.localXScale.invert(dm[0]);
+                        var loc = __self.yScale.invert(dm[1]);
+                        __self.fetchAndDrawHighlightedBars(tm, loc, __self.IntervalListMode.guid);
+                    }
+                }, 100);
             }
           }, 100);
         }
@@ -194,84 +191,63 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     }
   }
 
-  fetchIntervalInfoAndShowTooltip (xx, yy) {
-    var __self = this;
-    var tm = __self.localXScale.invert(xx);
-    var loc = __self.yScale.invert(yy);
-    // this function will replace the fetching of intervals
-    window.clearTimeout(this.intervalFetchTimeout);
-    this.intervalFetchTimeout = window.setTimeout(async () => {
-      //* ****NetworkError on reload is here somewhere******//
-      const label = encodeURIComponent(this.linkedState.label);
-      var endpt = `/datasets/${label}/getIntervalInfo?timestamp=${Math.floor(tm)}&location=${loc}`;
-      fetch(endpt)
-        .then((response) => {
-          return response.json();
-        })
-        .then((data) => {
-          if (data.length > 0) {
-            data[0].metrics = undefined;
-            data[0].intervalId = undefined;
-            data[0].lastParentInterval = undefined;
-            var dr = __self.canvasElement.node().getBoundingClientRect();
-            dr.x = xx - __self._bounds.width + 100;
-            dr.y = yy;
+  fetchIntervalInfoAndShowTooltip(xx, yy){
+      var __self = this;
+      var tm = __self.localXScale.invert(xx);
+      var loc = __self.yScale.invert(yy);
+      //this function will replace the fetching of intervals
+      window.clearTimeout(this.intervalFetchTimeout);
+      this.intervalFetchTimeout = window.setTimeout(async () => {
+          //*****NetworkError on reload is here somewhere******//
+          const label = encodeURIComponent(this.linkedState.label);
+          var endpt = `/datasets/${label}/getIntervalInfo?timestamp=${Math.floor(tm)}&location=${loc}`;
+          fetch(endpt)
+              .then((response) => {
+                  return response.json();
+              })
+              .then((data) => {
+                  if(data.length > 0) {
+                      data[0].enter.metrics = undefined;
+                      data[0].leave.metrics = undefined;
+                      data[0].intervalId = undefined;
+                      data[0].lastParentInterval = undefined;
+                      var dr = __self.canvasElement.node().getBoundingClientRect();
+                      dr.x = xx - __self._bounds.width + 100;
+                      dr.y = yy;
 
-            window.controller.tooltip.show({
-              content: `<pre>${JSON.stringify(data[0], null, 2)}</pre>`,
-              targetBounds: dr,
-              hideAfterMs: null
-            });
-            __self.currentClickState = __self.ClickState.doubleClick;
-          } else {
-            __self.currentClickState = __self.ClickState.background;
-            window.controller.tooltip.hide();
-          }
-        })
-        .catch(err => {
-          err.text.then(errorMessage => {
-            console.warn(errorMessage);
-          });
-        });
-    }, 100);
+                      window.controller.tooltip.show({
+                          content: `<pre>${JSON.stringify(data[0], null, 2)}</pre>`,
+                          targetBounds: dr,
+                          hideAfterMs: null
+                      });
+                      __self.currentClickState = __self.ClickState.doubleClick;
+                  } else {
+                      __self.currentClickState = __self.ClickState.background;
+                      window.controller.tooltip.hide();
+                  }
+              })
+              .catch(err => {
+                  err.text.then( errorMessage => {
+                      console.warn(errorMessage);
+                  });
+              });
+      }, 100);
   }
-
-  fetchIntervalList (xx, yy, mode) {
-    var __self = this;
-    var tm = 0;
-    var loc = 0;
-    if (mode === this.IntervalListMode.guid || mode === this.IntervalListMode.primitive) {
-      tm = __self.localXScale.invert(xx);
-      loc = __self.yScale.invert(yy);
-    } else if (mode === this.IntervalListMode.duration) {
-      tm = xx;
-      loc = yy;
-    }
-    // this function will replace the fetching of intervals
-    // window.clearTimeout(this.primitiveFetchTimeout); dont clear time out here,
-    // we need to call rendering ends in the finally block
-    this.primitiveFetchTimeout = window.setTimeout(async () => {
-      const label = encodeURIComponent(this.linkedState.label);
-      var begin = this.linkedState.intervalWindow[0];
-      var end = this.linkedState.intervalWindow[1];
-      var endpt = `/datasets/${label}/getIntervalList?`;
-      endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&mode=${mode}`;
-      endpt += `&primitive=${this.linkedState.selectedPrimitiveHistogram}`;
-      if (mode === this.IntervalListMode.duration) {
-        endpt += `&leave=${Math.ceil(loc)}`;// loc in location isnt used if mode is duration
-      }
-      fetch(endpt)
-        .then((response) => {
-          return response.json();
-        })
-        .then((data) => {
-          __self.highlightedData = data;
-          if (mode === __self.IntervalListMode.primitive) {
-            __self.currentClickState = __self.ClickState.singleClick;
-          } else if (mode === __self.IntervalListMode.guid) {
-            __self.currentClickState = __self.ClickState.hover;
-          } else {
-            __self.currentClickState = __self.ClickState.background;
+  fetchIntervalList(xx, yy, mode){
+      var __self = this;
+      var tm = xx;
+      var loc = yy;
+      // window.clearTimeout(this.primitiveFetchTimeout); dont clear time out here,
+      // we need to call rendering ends in the finally block
+      this.primitiveFetchTimeout = window.setTimeout(async () => {
+          const label = encodeURIComponent(this.linkedState.label);
+          var begin = this.linkedState.intervalWindow[0];
+          var end = this.linkedState.intervalWindow[1];
+          var endpt = `/datasets/${label}/getIntervalList?`;
+          endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&mode=${mode}`;
+          endpt += `&primitive=${this.linkedState.selectedPrimitiveHistogram}`;
+          if(mode === this.IntervalListMode.duration) {
+              endpt += `&leave=${Math.ceil(loc)}`;// loc in location isnt used if mode is duration
           }
           __self.drawHighlightedBars(mode);
         })
@@ -284,7 +260,38 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         });
     }, 100);
   }
-
+  fetchIntervalTraceList(){
+      var __self = this;
+      if(__self.selectedTimestamp === null || __self.selectedLocation === null)return;
+      var tm = __self.selectedTimestamp;
+      var loc = __self.selectedLocation;
+      window.clearTimeout(this.intervalTraceListTimeout);
+      // we need to call rendering ends in the finally block
+      this.intervalTraceListTimeout = window.setTimeout(async () => {
+          const label = encodeURIComponent(this.linkedState.label);
+          var begin = this.linkedState.intervalWindow[0];
+          var end = this.linkedState.intervalWindow[1];
+          var endpt = `/datasets/${label}/getIntervalTraceList?`;
+          endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
+          fetch(endpt)
+              .then((response) => {
+                  return response.json();
+              })
+              .then((data) => {
+                  __self.traceBackLines = data;
+                  __self.initialDragState = null;
+                  __self.render();
+                  __self.fetchAndDrawHighlightedBars(__self.selectedTimestamp, __self.selectedLocation, __self.IntervalListMode.primitive);
+              })
+              .catch(err => {
+                  err.text.then( errorMessage => {
+                      console.warn(errorMessage);
+                  });
+              }).finally(() => {
+                  // __self.intervalRenderingEnds();
+          });
+      }, 100);
+  }
   draw () {
     super.draw();
 
@@ -315,10 +322,8 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.drawAxes();
 
     // Update the bars
-    // this.drawBars(this.linkedState.getCurrentIntervals());
     this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
-    // Update the links
-    this.drawLinks(this.linkedState.getCurrentTraceback());
+    this.drawTraceLines();
   }
 
   drawSpinner () {
@@ -365,11 +370,20 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     yTicks.select('text')
       .attr('text-anchor', 'end')
       .attr('y', '0.35em')
-      .text(d => d);
+      .text(d => {
+          var a = BigInt(d);
+          var c = BigInt(32);
+          var node = BigInt(a >> c);
+          var thread = (d & 0x0FFFFFFFF);
+          var aggText = "";
+          aggText += node + " - T";
+          aggText += thread;
+          return aggText;
+      });
 
     // Position the y label
     this.content.select('.yAxisLabel')
-      .attr('transform', `translate(${-this.emSize},${this._bounds.height / 2}) rotate(-90)`);
+      .attr('transform', `translate(${-this.emSize-12},${this._bounds.height / 2}) rotate(-90)`);
   }
 
   drawBarsCanvas (aggBins) {
@@ -424,31 +438,10 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
     this.wasRerendered = true;
   }
 
-  intervalRenderingBegins (x, y, mode) {
-    if (this.renderingInProgress === true) {
-      this.pendingHighlightRequest = { x: x, y: y, mode: mode };
-      return true;
-    }
-    this.renderingInProgress = true;
-    return false;
-  }
-
-  intervalRenderingEnds () {
-    this.renderingInProgress = false;
-    if (this.pendingHighlightRequest) {
-      const x = this.pendingHighlightRequest.x;
-      const y = this.pendingHighlightRequest.y;
-      const mode = this.pendingHighlightRequest.mode;
-      this.pendingHighlightRequest = null;
-      this.fetchAndDrawHighlightedBars(x, y, mode);
-    }
-  }
-
-  fetchAndDrawHighlightedBars (x, y, mode) {
-    if (this.intervalRenderingBegins(x, y, mode) === true) return;
-    this.drawHighlightedBars(this.IntervalListMode.all);
-    this.fetchIntervalList(x, y, mode);
-  }
+        ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
+        for (var location in aggBins.data){
+          var loc_offset = this.yScale(parseInt(aggBins.data[location].location));
+          for (var bucket in aggBins.data[location].histogram){
 
   drawHighlightedBars (mode) {
     if (this.highlightedData) {
@@ -491,130 +484,82 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
       if (notDrawn) {
         this.currentClickState = this.ClickState.background;
       }
-      if (mode === this.IntervalListMode.all) {
-        this.highlightedData = null;
+  }
+  fetchAndDrawHighlightedBars(x, y, mode) {
+      if((this.linkedState.end - this.linkedState.begin) > 20000000) {
+          return;
+      }
+      if(this.intervalRenderingBegins(x, y, mode) === true) return;
+      this.drawHighlightedBars(this.IntervalListMode.all);
+      this.fetchIntervalList(x, y, mode);
+  }
+  drawHighlightedBars(mode) {
+      if(this.highlightedData) {
+          var border = 1;
+          var fillColor = this.linkedState.contentFillColor;
+          var borderColor = this.linkedState.contentBorderColor;
+          if (mode === this.IntervalListMode.guid) {
+              fillColor = this.linkedState.mouseHoverSelectionColor;
+          } else if (mode === this.IntervalListMode.primitive) {
+              fillColor = this.linkedState.selectionColor;
+          } else if (mode === this.IntervalListMode.duration) {
+              fillColor = this.linkedState.selectionColor;
+          }
+          var ctx = this.canvasElement.node().getContext("2d");
+          var bins = this.getSpilloverWidth(this._bounds.width);
+          var notDrawn = true;
+          for (var loc in this.highlightedData) {
+              var loc_offset = this.yScale(parseInt(loc));
+              if (this.highlightedData[loc].length === 0) continue;
+              notDrawn = false;
+              for (var i = 0; i < bins; i++) {
+                  var thisTime = this.linkedState.getTimeStampFromBin(i, this.visibleAggBinsMetadata);
+                  var bucket_pix_offset = this.localXScale(thisTime);
+                  for (var elm in this.highlightedData[loc]) {
+                      if (thisTime >= this.highlightedData[loc][elm]['enter'] && thisTime <= this.highlightedData[loc][elm]['leave']) {
+                          ctx.fillStyle = borderColor;
+                          ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
+                          ctx.fillRect(bucket_pix_offset, (loc_offset - border) + this.yScale.bandwidth(), 1, border);
+
+                          ctx.fillStyle = fillColor;
+                          ctx.fillRect(bucket_pix_offset, loc_offset + border, 1, this.yScale.bandwidth() - (2 * border));
+                          break;
+                      }
+                      if (thisTime < this.highlightedData[loc][elm]['enter']) {
+                          break;
+                      }
+                  }
+              }
+          }
+          if (notDrawn) {
+              this.currentClickState = this.ClickState.background;
+          }
+          if(mode === this.IntervalListMode.all) {
+              this.highlightedData = null;
+          }
       }
     }
   }
-
-  drawBars (intervals) {
-    if (!this.initialDragState) {
-      // Remove temporarily patched transformations
-      this.content.select('.bars').attr('transform', null);
-    }
-
-    let bars = this.content.select('.bars')
-      .selectAll('.bar').data(d3.entries(intervals), d => d.key);
-    bars.exit().remove();
-    const barsEnter = bars.enter().append('g')
-      .classed('bar', true);
-    bars = bars.merge(barsEnter);
-
-    bars.attr('transform', d => `translate(${this.xScale(d.value.enter.Timestamp)},${this.yScale(d.value.Location)})`);
-
-    barsEnter.append('rect')
-      .classed('area', true);
-    barsEnter.append('rect')
-      .classed('outline', true);
-    bars.selectAll('rect')
-      .attr('height', this.yScale.bandwidth())
-      .attr('width', d => this.xScale(d.value.leave.Timestamp) - this.xScale(d.value.enter.Timestamp));
-
-    bars.select('.area')
-      .style('fill', d => {
-        if (d.value.GUID === this.linkedState.selectedGUID) {
-          return this.linkedState.mouseHoverSelectionColor;
-        } else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
-          return this.linkedState.selectionColor;
-        } else {
-          return null;
-        }
-      });
-
-    bars.select('.outline')
-    // TODO: make this like the area fill
-      .style('stroke', d => {
-        if (d.value.hasOwnProperty('inTraceBack') && d.value.inTraceBack) {
-          return this.linkedState.traceBackColor;
-        } else if (d.value.Primitive === this.linkedState.selectedPrimitive) {
-          return this.linkedState.selectionColor;
-        } else {
-          return null;
-        }
-      });
-    bars
-      .classed('selected', d => d.value.Primitive === this.linkedState.selectedPrimitive)
-      .on('click', d => {
-        if (!d.value.Primitive) {
-          console.warn(`No (consistent) primitive for interval: ${JSON.stringify(d.value, null, 2)}`);
-          if (d.value.enter.Primitive) {
-            if (this.linkedState.selectedPrimitive !== d.value.enter.Primitive) {
-              this.linkedState.selectPrimitive(d.value.enter.Primitive);
-            } else {
-              this.linkedState.selectPrimitive(null);
-            }
-          }
-        } else {
-          if (this.linkedState.selectedPrimitive !== d.value.Primitive) {
-            this.linkedState.selectPrimitive(d.value.Primitive);
-          } else {
-            this.linkedState.selectPrimitive(null);
-          }
-        }
-
-        if (!d.value.intervalId) {
-          this.linkedState.selectIntervalId(null);
-        } else if (d.value.intervalId === this.linkedState.selectedIntervalId) {
-          this.linkedState.selectIntervalId(null);
-        } else {
-          this.linkedState.selectIntervalId(d.value.intervalId);
-        }
-        this.render();
-      }).on('dblclick', function (d) {
-        window.controller.tooltip.show({
-          content: `<pre>${JSON.stringify(d.value, null, 2)}</pre>`,
-          targetBounds: this.getBoundingClientRect(),
-          hideAfterMs: null
-        });
-      }).on('mouseenter', d => {
-        if (!d.value.GUID) {
-          console.warn(`No (consistent) GUID for interval: ${JSON.stringify(d.value, null, 2)}`);
-          if (d.value.enter.GUID) {
-            this.linkedState.selectGUID(d.value.enter.GUID);
-          }
-        } else {
-          this.linkedState.selectGUID(d.value.GUID);
-        }
-        this.render();
-      }).on('mouseleave', () => {
-        window.controller.tooltip.hide();
-        this.linkedState.selectGUID(null);
-        this.render();
-      });
+  getMiddlePointInYScale(point){
+      var p = (this.yScale(point) + this.yScale(point+1)) / 2.0;
+      return Math.floor(p);
   }
-
-  drawLinks (linkData) {
-    if (!this.initialDragState) {
-      // Remove temporarily patched transformations
-      this.content.select('.links').attr('transform', null);
-    }
-
-    let links = this.content.select('.links')
-      .selectAll('.link').data(linkData, d => d.intervalId);
-    links.exit().remove();
-    const linksEnter = links.enter().append('g')
-      .classed('link', true);
-    links = links.merge(linksEnter);
-
-    const halfwayOffset = this.yScale.bandwidth() / 2;
-
-    linksEnter.append('line')
-      .classed('line', true);
-    links.selectAll('line')
-      .attr('x1', d => this.xScale(d.lastParentInterval.endTimestamp))
-      .attr('x2', d => this.xScale(d.enter.Timestamp))
-      .attr('y1', d => this.yScale(d.lastParentInterval.location) + halfwayOffset)
-      .attr('y2', d => this.yScale(d.Location) + halfwayOffset);
+  drawTraceLines(){
+      var ctx = this.canvasElement.node().getContext("2d");
+      if(this.traceBackLines === null || !this.traceBackLines.length){
+          this.traceBackLines = null;
+      } else {
+          this.traceBackLines.forEach((line) => {
+              if(line.type === "middle") {
+                  ctx.beginPath();
+                  ctx.moveTo(this.localXScale(line.left_timestamp), this.getMiddlePointInYScale(parseInt(line.left_location)));
+                  ctx.lineTo(this.localXScale(line.right_timestamp), this.getMiddlePointInYScale(parseInt(line.right_location)));
+                  ctx.lineWidth = 1;
+                  // ctx.strokeStyle = '#ff0000';
+                  ctx.stroke();
+              }
+          });
+      }
   }
 
   setupZoomAndPan () {
@@ -764,14 +709,15 @@ class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutV
         })
         .on('end', () => {
           const dx = this.initialDragState.x - this.initialDragState.scale.invert(d3.event.x);
-          if (dx !== 0) {
-            const begin = this.initialDragState.begin + dx;
-            const end = this.initialDragState.end + dx;
-            this.initialDragState = null;
-            this.buff = null;
+          if(dx !== 0) {
+              const begin = this.initialDragState.begin + dx;
+              const end = this.initialDragState.end + dx;
+              this.initialDragState = null;
+              this.buff = null;
 
-            this.linkedState.setIntervalWindow(clampWindow(begin, end));
-            this.currentClickState = this.ClickState.background;
+              this.linkedState.setIntervalWindow(clampWindow(begin, end));
+              this.currentClickState = this.ClickState.background;
+              this.fetchIntervalTraceList();
           }
         }));
   }

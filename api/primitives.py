@@ -13,3 +13,29 @@ def get_primitives(datasetId: str):
 def get_primitive(datasetId: str, primitive: str):
     datasetId = validateDataset(datasetId)
     return db[datasetId]['primitives'][primitive]
+
+@router.get('/datasets/{datasetId}/primitives/{primitive}/utilization')
+def getUtilizationForPrimitive(datasetId: str,
+                               primitive: str,
+                               bins: int = 100,
+                               begin: int = None,
+                               end: int = None,
+                               duration_bins: int = 100):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+
+    if begin is None:
+        begin = db[datasetId]['info']['intervalDomain'][0]
+    if end is None:
+        end = db[datasetId]['info']['intervalDomain'][1]
+
+    durationBegin = int(db[datasetId]['info']['intervalDurationDomain'][primitive][0])
+    durationEnd = int(db[datasetId]['info']['intervalDurationDomain'][primitive][1])
+    ret = {'data': db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForPrimitive(bins,
+                                                                                               begin,
+                                                                                               end,
+                                                                                               primitive,
+                                                                                               durationBegin,
+                                                                                               durationEnd,
+                                                                                               duration_bins),
+           'metadata': {'begin': begin, 'end': end, 'bins': bins}}
+    return ret

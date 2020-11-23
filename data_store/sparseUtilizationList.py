@@ -62,24 +62,23 @@ class SparseUtilizationList():
     # Calculates metric histogram
     def calcMetricHistogram(self, bins=100, begin=None, end=None, location=None):
         array = []
-        isFirst = True
         if location is not None:
             return self.calcUtilizationForLocation(bins, begin, end, location, False)
         for location in self.locationDict:
             temp = self.calcUtilizationForLocation(bins, begin, end, location, False)
-            if isFirst is True:
-                isFirst = False
-                array = temp
-            for i in range(bins):
-                array = array + temp
-
-        return array
+            array.append(temp)
+        array = np.asarray(array)
+        avgArray = np.mean(array, axis=0)
+        minArray = np.amin(array, axis=0)
+        maxArray = np.amax(array, axis=0)
+        stdArray = np.std(array, axis=0)
+        return {"min": minArray.tolist(), "max": maxArray.tolist(), "average": avgArray.tolist(), "std": stdArray.tolist()}
 
     # Calculates histogram for interval duration
     def calcIntervalHistogram(self, bins=100, begin=None, end=None):
         return self.calcUtilizationForLocation(bins, begin, end, 1, False)
 
-    # Calulates utilization for one location in a Gantt chart
+    # Calculates utilization for one location in a Gantt chart
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart
     def calcUtilizationForLocation(self, bins=100, begin=None, end=None, Location=None, isInterval=True):
         rangePerBin = (end-begin)/bins
@@ -124,3 +123,51 @@ class SparseUtilizationList():
             prev = current
             prettyHistogram.append(histogram[i]['integral'])
         return prettyHistogram
+
+    # Calculates utilization for each primitive and returns util per duration
+    def calcUtilizationForPrimitive(self, bins=100,
+                                    begin=None,
+                                    end=None,
+                                    primitive=None,
+                                    durationBegin=None,
+                                    durationEnd=None,
+                                    durationBins=100):
+        primitiveCountPerBin = np.zeros((bins, durationBins+1), dtype=np.double)
+        rangePerBin = (end-begin)/bins
+        rangePerDurationBin = (durationEnd-durationBegin)/durationBins
+        location_struct_index = dict()
+        location_struct_length = dict()
+        preCriticalPts = begin
+        for i in range(1, bins):
+            criticalPts = (i * rangePerBin) + begin
+
+            for location in self.locationDict:
+                if location not in location_struct_index:
+                    location_struct_index[location] = 0
+                if location not in location_struct_length:
+                    location_struct_length[location] = len(self.locationDict[location])
+
+                while location_struct_index[location] < location_struct_length[location]:
+                    locStruct = self.locationDict[location][location_struct_index[location]]
+                    # since its sorted per location, all end indexes are from the same interval of previous enter index
+                    if location_struct_index[location] > 0:
+                        startIndex = self.locationDict[location][location_struct_index[location]-1]['index']
+                    else:
+                        startIndex = 0
+                    if locStruct['primitive'] == primitive and locStruct['counter'] == 0:
+                        if startIndex < criticalPts:
+                            intervalChunkStart = max(preCriticalPts, startIndex)
+                            intervalChunkEnd = min(criticalPts, locStruct['index'])
+                            currentUtil = intervalChunkEnd - intervalChunkStart  # it should cover left/right/full overlap cases
+                            duration = locStruct['index'] - startIndex
+                            durationIndex = int((duration - durationBegin) // rangePerDurationBin)
+                            primitiveCountPerBin[i, durationIndex] = primitiveCountPerBin[i, durationIndex] + float(currentUtil)
+                            if primitiveCountPerBin[i, durationIndex] < 0:
+                                print("Error: negative Util found " + str(primitiveCountPerBin[i, durationIndex]))
+                                return []
+                        if locStruct['index'] > criticalPts:  # check this explicitly, you dont wanna increase the index number
+                            break
+                    location_struct_index[location] = location_struct_index[location] + 1
+
+            preCriticalPts = criticalPts
+        return primitiveCountPerBin.tolist()

@@ -29,6 +29,7 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     }
     this.selectedLocation = '1';
     this.baseOpacity = 0.3;
+    this.isMouseInside = false;
     this.wasRendered = false;
     this.initialDragState = null;
 
@@ -114,6 +115,61 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     // this.linkedState.on('primitiveSelected', justFullRender);
     // this.linkedState.on('intervalStreamFinished', justFullRender);
     // this.linkedState.on('tracebackStreamFinished', justFullRender);
+
+
+    this.canvasElement = this.content.select('.canvas-plot')
+        .on('mouseleave', function () {
+          __self.isMouseInside = false;
+          window.controller.tooltip.hide();
+          __self.clearAllTimer();
+        })
+        .on('mouseenter',function () {
+          __self.isMouseInside = true;
+        })
+        .on('mousemove', function() {
+          __self.clearAllTimer();
+          var dm = d3.mouse(__self.content.select('.canvas-container').node());
+          this._mouseHoverTimeout = window.setTimeout(async () => {
+            if(__self.isMouseInside === true) {
+              // console.log(dm[0], dm[1]);
+              __self.showAggretedInfoTooltip(dm[0], dm[1]);
+            }
+          }, 100);
+        });
+  }
+  clearAllTimer() {
+    if(this._mouseHoverTimeout) {
+      window.clearTimeout(this._mouseHoverTimeout);
+      this._mouseHoverTimeout = null;
+    }
+  }
+  findBinNumber(t){
+    const data = this.linkedState.getCurrentMetricBins(this.curMetric);
+    var offset = (data.metadata.end - data.metadata.begin) / data.metadata.bins;
+    var bin = (t - data.metadata.begin) / offset;
+    var fBin = Math.floor(bin);
+    return {max: data.data.max[fBin].toFixed(3),
+      avg: data.data.average[fBin].toFixed(3),
+      std: data.data.std[fBin].toFixed(3),
+      min: data.data.min[fBin].toFixed(3)};
+  }
+
+  showAggretedInfoTooltip(xx, yy){
+    var __self = this;
+    var tm = __self.localXScale.invert(xx);
+    var yValue = __self.yScale.invert(yy);
+    var dr = __self.canvasElement.node().getBoundingClientRect();
+    dr.x = xx - __self._bounds.width + 100;
+    var tValue = __self.findBinNumber(tm);
+    // console.log(tValue);
+
+    // dr.y = 0;//yy + vBounds.top;
+    window.controller.tooltip.hide();
+    window.controller.tooltip.show({
+      content: `<pre>${JSON.stringify(tValue, null, 2)}</pre>`,
+      targetBounds: dr,
+      hideAfterMs: null
+    });
   }
 
   updateTheView () {
@@ -162,64 +218,78 @@ class LineChartView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLay
     this.drawAxes();
     this.drawWrapper();
   }
-
-  drawWrapper () {
-    if (this.initialDragState) return;
-    var localXScale = d3.scaleLinear();
-    localXScale.domain(this.xScale.domain());
-    localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width) - this._bounds.width]);
+  drawWrapper() {
+    if(this.initialDragState)return;
+    this.localXScale = d3.scaleLinear();
+    this.localXScale.domain(this.xScale.domain());
+    this.localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
     this._bounds = this.getChartBounds();
     const data = this.linkedState.getCurrentMetricBins(this.curMetric);
-
+    if(data.data === undefined)return;
     var maxY = Number.MIN_VALUE;
     var minY = Number.MAX_VALUE;
 
-    for (var i = 0; i < data.data.length; i++) {
-      var t = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
-      if (t < this._bounds.width) continue;
-      if (t > (2 * this._bounds.width)) break;
-      var d = data.data[i];
-      maxY = Math.max(maxY, d);
-      minY = Math.min(minY, d);
+    for (var i = 0; i < data.metadata.bins; i++) {
+      var t = this.localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
+      if(t < this._bounds.width) continue;
+      if(t > (2*this._bounds.width)) break;
+      maxY = Math.max(maxY, data.data.max[i]);
+      minY = Math.min(minY, data.data.min[i]);
     }
-    this.setYDomain({ max: maxY, min: minY });
+    this.setYDomain({'max':maxY, 'min':minY});
+    this.drawAxes();
 
     // Update the lines
     this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
-    data.data.forEach((d, i) => {
-      var x = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
-      var dd = { x: x, y: d };
+    for (var i = 0; i < data.metadata.bins; i++) {
+      var x = this.localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
+
+      var d = data.data.average[i];
+      var avgD = {'x': x, 'y': d};
+      d = data.data.max[i];
+      var dd = {'x': x, 'y': d};
       var preD = dd;
-      if (i > 0) {
-        var xx = localXScale(this.linkedState.getTimeStampFromBin(i - 1, data.metadata));
-        preD = { x: xx, y: data.data[i - 1] };
+      if(i>0) {
+        var xx = this.localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
+        preD = {'x': xx, 'y':data.data.max[i-1]};
       }
-      this.drawLines(dd, preD);
-      if (dd.y != preD.y) {
-        this.drawCircle(dd);
-        this.drawCircle(preD);
+      this.drawLines(dd, preD, true);
+
+      d = data.data.min[i];
+      dd = {'x': x, 'y': d};
+      preD = dd;
+      if(i>0) {
+        var xx = this.localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
+        preD = {'x': xx, 'y':data.data.min[i-1]};
       }
-    });
+      this.drawLines(dd, preD, true);
+
+      d = data.data.std[i];
+      dd = {'x': x, 'y': avgD.y + d};
+      preD = {'x': x, 'y': avgD.y - d};
+      this.drawLines(dd, preD, true);
+
+
+      preD = avgD;
+      if(i>0) {
+        var xx = this.localXScale(this.linkedState.getTimeStampFromBin(i-1, data.metadata));
+        preD = {'x': xx, 'y':data.data.average[i-1]};
+      }
+      this.drawLines(avgD, preD, false);
+    }
     this.wasRendered = true;
   }
-
-  drawLines (d, preD) {
+  drawLines (d, preD, isGray) {
     this.canvasContext.beginPath();
     this.canvasContext.strokeStyle = 'black';
+    if(isGray) {
+      this.canvasContext.strokeStyle = 'grey';
+    }
     this.canvasContext.moveTo(preD.x, this.yScale(preD.y));
     this.canvasContext.lineTo(d.x, this.yScale(d.y));
     this.canvasContext.stroke();
   }
-
-  drawCircle (d) {
-    var radius = 2;
-    this.canvasContext.beginPath();
-    this.canvasContext.arc(d.x, this.yScale(d.y), radius, 0, 2 * Math.PI, false);
-    this.canvasContext.fillStyle = 'black';
-    this.canvasContext.fill();
-  }
-
   drawSpinner () {
     this.content.select('.small.spinner').style('display', 'none');
   }
