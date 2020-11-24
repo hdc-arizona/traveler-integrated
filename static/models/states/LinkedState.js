@@ -29,14 +29,10 @@ class LinkedState extends uki.Model {
     this.info = options.info;
     this._selection = options.priorLinkedState?.selection || null;
     this._colorMode = COLOR_MODES.INCLUSIVE;
-    this.viewLayout = options.priorLinkedState?.viewLayout || null;
+    this._viewLayoutPromise = options.priorLinkedState?._viewLayoutPromise ||
+      this.ready.then(() => this.getDefaultLayout());
     if (options.priorLinkedState) {
       this.takeOverEvents(options.priorLinkedState);
-    }
-    if (!this.viewLayout) {
-      this.ready.then(async () => {
-        this.viewLayout = await this.getDefaultLayout();
-      });
     }
   }
 
@@ -56,6 +52,10 @@ class LinkedState extends uki.Model {
   set colorMode (value) {
     this._colorMode = value;
     this.trigger('colorModeChanged');
+  }
+
+  async getViewLayout () {
+    return this._viewLayoutPromise;
   }
 
   /**
@@ -145,25 +145,25 @@ class LinkedState extends uki.Model {
    * Return a dict that indicates whether specific views (and which variants)
    * are currently open
    */
-  getOpenViews () {
+  async getOpenViews () {
     const openViews = {};
-    function helper (layout) {
-      if (layout.type === 'component') {
-        openViews[layout.componentName] = { open: true };
-        if (layout.componentState.variant) {
-          openViews[layout.componentName].variants = openViews[layout.componentName].variants || [];
-          openViews[layout.componentName].variants.push(layout.componentState.variant);
+    function helper (glLayer) {
+      if (glLayer.type === 'component') {
+        openViews[glLayer.componentName] = { open: true };
+        if (glLayer.componentState.variant) {
+          openViews[glLayer.componentName].variants = openViews[glLayer.componentName].variants || [];
+          openViews[glLayer.componentName].variants.push(glLayer.componentState.variant);
         }
       } else {
-        for (const nestedLayout of layout.content || []) {
-          helper(nestedLayout);
+        for (const nestedLayer of glLayer.content || []) {
+          helper(nestedLayer);
         }
       }
     }
     if (window.controller.currentDatasetId === this.info.datasetId) {
       // If this isn't the currently open dataset, then none of the views are
       // actually open
-      helper(this.viewLayout);
+      helper(await this.getViewLayout());
     }
     return openViews;
   }
@@ -225,7 +225,7 @@ class LinkedState extends uki.Model {
    */
   async getViewMenu () {
     const availableViews = await this.getAvailableViews();
-    const openViews = this.getOpenViews();
+    const openViews = await this.getOpenViews();
 
     return [
       this.createViewMenuEntry('Selection Info', 'SelectionInfoView', null, availableViews, openViews),

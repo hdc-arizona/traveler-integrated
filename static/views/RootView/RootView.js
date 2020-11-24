@@ -21,25 +21,18 @@ const viewClassLookup = {
   IntervalHistogramView */
 };
 
-const emptyLayout = {
-  isClosable: false,
-  content: [{ type: 'stack', content: [] }]
-};
-
 class RootView extends uki.ui.GLRootView {
   constructor (options = {}) {
     options.viewClassLookup = viewClassLookup;
-    options.glSettings = emptyLayout;
     super(options);
   }
 
-  setLayout (layout) {
-    layout.isClosable = false;
-    super.setLayout(layout);
-  }
-
-  clearLayout () {
-    super.setLayout(emptyLayout);
+  getDefaultGLSettings () {
+    const glSettings = super.getDefaultGLSettings();
+    glSettings.settings = Object.assign(glSettings.settings || {}, {
+      showPopoutIcon: false
+    });
+    return glSettings;
   }
 
   async setup () {
@@ -47,7 +40,7 @@ class RootView extends uki.ui.GLRootView {
 
     this.goldenLayout.on('stateChanged', () => {
       if (window.controller.currentDataset) {
-        window.controller.currentDataset.viewLayout = this.getLayout();
+        window.controller.currentDataset.viewLayout = this.glLayout;
       }
     });
   }

@@ -60,7 +60,7 @@ class FakeFile: #pylint: disable=R0903
 
 async def main():
     args = vars(parser.parse_args())
-    if 'folder' in args:
+    if 'folder' in args and args['folder'] is not None:
         args['folder'] = args['folder'].strip('/ ')
     db = DataStore(args['dbDir'], args['debug'])
     await db.load()
@@ -120,7 +120,7 @@ async def main():
             datasetId = db.createDataset()['info']['datasetId']
 
             # Prefix the label with the folder if one was specified
-            if 'folder' in args:
+            if 'folder' in args and args['folder'] is not None:
                 label = args['folder'] + '/' + label
 
             await logToConsole('#################' + ''.join(['#' for x in range(len(label))]))

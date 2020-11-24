@@ -137,9 +137,7 @@ class MenuView extends uki.View {
     datasetsEnter.append('div').classed('folderStuff', true);
     datasets.select('.folderStuff')
       .style('display', this.expanded && this.folderMode ? null : 'none');
-    if (this.expanded && this.folderMode) {
-      this.drawFolderStuff(datasetsEnter, datasets);
-    }
+    this.drawFolderStuff(datasetsEnter, datasets);
 
     datasetsEnter.append('div').classed('button', true);
     await uki.ui.ButtonView.initForD3Selection(datasetsEnter.select('.button'), d => {

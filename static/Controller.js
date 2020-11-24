@@ -106,7 +106,9 @@ class Controller extends uki.ui.ThemeableView {
     const index = this.datasetLookup[datasetId];
     if (index !== undefined) {
       this._currentDatasetId = datasetId;
-      this.rootView.setLayout(this.datasetList[index].viewLayout);
+      this.datasetList[index].getViewLayout().then(layout => {
+        this.rootView.glLayout = layout;
+      });
     } else {
       this._currentDatasetId = null;
       this.rootView.clearLayout();
