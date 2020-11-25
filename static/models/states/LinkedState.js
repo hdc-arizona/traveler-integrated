@@ -195,7 +195,19 @@ class LinkedState extends uki.Model {
       {
         label: 'Delete',
         onclick: () => {
-          throw new Error('Unimplemented: delete after confirmation');
+          uki.ui.showModal({
+            content: `<img src="img/ex.svg" style="
+              width:2em;
+              margin:0 0.5em;
+              vertical-align:middle;
+              filter:url(#recolorImageTo--text-color-softer)"/>
+              Permanently delete ${this.info.label}?`,
+            buttonSpecs: 'default',
+            confirmAction: async () => {
+              await window.fetch(`/datasets/${this.info.datasetId}`, { method: 'DELETE' });
+              await window.controller.refreshDatasets();
+            }
+          });
         }
       }
     ];

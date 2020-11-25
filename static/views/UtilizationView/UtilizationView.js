@@ -38,7 +38,7 @@ class UtilizationView extends
     };
     this.xScale.range([0, this.chartBounds.width]);
     this.yScale.range([this.chartBounds.height, 0]);
-    const bins = this.chartBounds.width; // we want one bin per pixel
+    const bins = Math.max(this.chartBounds.width, 1); // we want one bin per pixel, and clamp to one to prevent zero-bin / negative queries
 
     // Fetch the total utilization
     const totalPromise = this.updateResource({

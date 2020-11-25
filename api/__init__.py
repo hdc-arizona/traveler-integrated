@@ -34,7 +34,7 @@ def validateDataset(datasetId, requiredFiles=None, filesMustBeReady=None, allFil
     allFilesReady = True
     for sourceFile in db[datasetId]['info']['sourceFiles']:
         requiredFiles.discard(sourceFile['fileType'])
-        if not sourceFile['stillLoading']:
+        if sourceFile['stillLoading']:
             allFilesReady = False
             filesMustBeReady.discard(sourceFile['fileType'])
     if len(requiredFiles) > 0:
