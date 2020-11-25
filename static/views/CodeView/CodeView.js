@@ -63,6 +63,13 @@ class CodeView extends LinkedMixin(uki.ui.GLView) {
 
   async draw () {
     await super.draw(...arguments);
+
+    if (this.isLoading) {
+      // Don't draw anything if we're still waiting on something; super.draw
+      // will show a spinner
+      return;
+    }
+
     // Update color mode and size based on the goldenlayout element (using
     // this.d3el would just calculate the CodeMirror's existing size)
     const darkMode = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
@@ -70,6 +77,9 @@ class CodeView extends LinkedMixin(uki.ui.GLView) {
     this.codeMirror.setOption('theme', darkMode ? 'base16-dark' : 'base16-light');
     this.codeMirror.setSize(bounds.width, bounds.height);
     this.codeMirror.refresh();
+
+    // TODO: highlight chunks of code based on linkedState.colorMode, and/or
+    // the currently selected primitive
   }
 }
 export default CodeView;

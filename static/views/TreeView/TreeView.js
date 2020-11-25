@@ -57,7 +57,8 @@ function evalTypeGlyph (evalCode, radius) {
   }
 }
 
-class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
+class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
+  uki.ui.SvgGLView) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
   constructor (options) {
     options.resources = options.resources || [];
     options.resources.push(...[
@@ -90,6 +91,10 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
       }
     ]);
     super(options);
+
+    // In addition to the listeners that LinkedMixin provides, TreeView should
+    // also redraw itself when the colorMode changes
+    this.linkedState.on('colorModeChanged', () => { this.render(); });
   }
 
   get tree () {
@@ -150,6 +155,12 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
 
   async draw () {
     await super.draw(...arguments);
+
+    if (this.isLoading) {
+      // Don't draw anything if we're still waiting on something; super.draw
+      // will show a spinner
+      return;
+    }
 
     const transition = d3.transition()
       .duration(1000);
@@ -342,7 +353,7 @@ class TreeView extends LinkedMixin(uki.ui.SvgGLView) {
     nodes.transition(transition)
       .attr('transform', d => `translate(${d.x},${d.y})`)
       .attr('opacity', 1);
-    nodes.classed('selected', d => d.data.name === this.linkedState?.selection?.primitiveName);
+    nodes.classed('selected', d => d.data.name === this.linkedState.selection?.primitiveName);
 
     // Main glyph
     const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);

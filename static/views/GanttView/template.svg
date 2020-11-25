@@ -1,12 +1,11 @@
 <defs>
-  <clipPath id="dummy">
+  <clipPath>
     <rect></rect>
   </clipPath>
 </defs>
 <g class="chart">
   <g class="background">
     <rect></rect>
-    <image class="small spinner" style="display:none" x="-30" y="-10" width="20" height="20" xlink:href="img/spinner.gif"></image>
     <line class="cursor" style="display:none"></line>
     <g class="yAxis"></g>
     <text class="yAxisLabel" text-anchor="middle">Location</text>

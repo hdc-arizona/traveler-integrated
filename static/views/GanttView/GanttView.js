@@ -1,12 +1,8 @@
 /* globals d3 */
-import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import LinkedMixin from '../common/LinkedMixin.js';
-import SvgViewMixin from '../common/SvgViewMixin.js';
-import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
-class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
+class GanttView extends uki.ui.GLView {
   constructor (argObj) {
     argObj.resources = [
       { type: 'less', url: 'views/GanttView/style.less' },

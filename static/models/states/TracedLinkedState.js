@@ -4,7 +4,65 @@ import PrimitiveSelection from '../selections/PrimitiveSelection.js';
 
 const VIEW_STATUS = LinkedState.VIEW_STATUS;
 
+// detailDomain must be at least 1 ns
+const MIN_BRUSH_SIZE = 1;
+
 class TracedLinkedState extends LinkedState {
+  constructor (options) {
+    super(options);
+
+    // Start the detail domain at the same level as the overview
+    this._detailDomain = Array.from(this.overviewDomain);
+  }
+
+  /**
+   * Detail views should all use the same domain
+   */
+  get detailDomain () {
+    return this._detailDomain;
+  }
+
+  /**
+   * Constrain that detailDomain makes sense, and notify views when the it changes
+   */
+  set detailDomain (inputDomain) {
+    // Allow views to only set one of the values (e.g. dragging one brush
+    // handle)
+    const newDomain = [
+      inputDomain[0] === undefined ? this._detailDomain[0] : inputDomain[0],
+      inputDomain[1] === undefined ? this._detailDomain[1] : inputDomain[1]
+    ];
+    // Ensure begin < end
+    if (newDomain[1] < newDomain[0]) {
+      const temp = newDomain[1];
+      newDomain[1] = newDomain[0];
+      newDomain[0] = temp;
+    }
+    // Clamp to the lowest / highest possible values
+    newDomain[0] = Math.max(newDomain[0], this.overviewDomain[0]);
+    newDomain[1] = Math.min(newDomain[1], this.overviewDomain[1]);
+    // Ensure the brush is at least MIN_BRUSH_SIZE
+    if (newDomain[1] - newDomain[0] < MIN_BRUSH_SIZE) {
+      if (inputDomain[0] === undefined || newDomain[1] + MIN_BRUSH_SIZE <= this.overviewDomain[1]) {
+        // The left boundary isn't changing, or there's space to the right, so
+        // constrain the right boundary
+        newDomain[1] = newDomain[0] + MIN_BRUSH_SIZE;
+      } else {
+        // Constrain the left boundary
+        newDomain[0] = newDomain[1] - MIN_BRUSH_SIZE;
+      }
+    }
+    this._detailDomain = newDomain;
+    this.trigger('detailDomainChanged');
+  }
+
+  /**
+   * Overviews should always show the full range of the data
+   */
+  get overviewDomain () {
+    return this.info.intervalDomain;
+  }
+
   /**
    * Overrides super to add views that can only be shown when trace data is present
    */
@@ -41,8 +99,8 @@ class TracedLinkedState extends LinkedState {
   async getDefaultLayout () {
     const availableViews = await this.getAvailableViews();
 
-    // Starting views are only GanttView and UtilizationView
-    const traceColumnLayout = ['GanttView', 'UtilizationView']
+    // Starting views are only UtilizationView and GanttView; for now I'm only working on UtilizationView
+    const traceColumnLayout = ['UtilizationView'] //, 'GanttView']
       .filter(componentName => {
         return availableViews?.[componentName]?.status !== VIEW_STATUS.UNAVAILABLE;
       })
@@ -136,5 +194,6 @@ class TracedLinkedState extends LinkedState {
     });
   }
 }
+TracedLinkedState.MIN_BRUSH_SIZE = MIN_BRUSH_SIZE;
 
 export default TracedLinkedState;
