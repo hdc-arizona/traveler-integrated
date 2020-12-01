@@ -22,6 +22,7 @@ class UtilizationView extends
       left: 40
     };
 
+    this.xBinScale = d3.scaleLinear().clamp(true);
     this.xScale = d3.scaleLinear().clamp(true);
     this.yScale = d3.scaleLinear();
   }
@@ -39,6 +40,7 @@ class UtilizationView extends
     this.xScale.range([0, this.chartBounds.width]);
     this.yScale.range([this.chartBounds.height, 0]);
     const bins = Math.max(this.chartBounds.width, 1); // we want one bin per pixel, and clamp to one to prevent zero-bin / negative queries
+    this.xBinScale.range([0, bins]);
 
     // Fetch the total utilization
     const totalPromise = this.updateResource({
@@ -94,6 +96,14 @@ class UtilizationView extends
     this.linkedState.on('selectionChanged', () => { this.refreshData(); });
   }
 
+  get isLoading () {
+    // Display the spinner + skip most of the draw call if we're still waiting
+    // on totalUtilization (primitiveUtilization can still be null if there
+    // isn't a current selection)
+    return super.isLoading ||
+      this.getNamedResource('totalUtilization') === null;
+  }
+
   async draw () {
     await super.draw(...arguments);
 
@@ -106,15 +116,25 @@ class UtilizationView extends
     const totalUtilization = this.getNamedResource('totalUtilization');
     const primitiveUtilization = this.getNamedResource('primitiveUtilization');
 
-    // Set / update the scales
-    // since we have 1 bin per pixel, technically xScale is always an identity
-    // mapping from array index to screen coordinates. If we someday decide to
-    // support zooming in the utilization view, then we'll want to change this
-    this.xScale.domain([0, totalUtilization.metadata.bins]);
+    // Set / update the scale domains based on the data we last saw from refreshData()
+
+    // Since we have 1 bin per pixel, xBinScale is always an identity mapping
+    // from array index to screen coordinates. If we someday decide to support
+    // zooming in the utilization view, then we might want to change this to
+    // animate the zoom while we're waiting for new data
+    this.xBinScale.domain([0, totalUtilization.metadata.bins]);
+    // this.xScale is responsible for mapping timestamps to screen coordinates
+    this.xScale.domain([totalUtilization.metadata.begin, totalUtilization.metadata.end]);
     // totalUtilization will always be more than primitiveUtilization, so use
-    // total for the y axis
+    // its max for the y axis
     this.yScale.domain([0, d3.max(totalUtilization.data)]);
 
+    // Update the (transparent) background rect that captures drag events
+    this.d3el.select('.background rect')
+      .attr('x', this.margin.left)
+      .attr('y', this.margin.top)
+      .attr('width', this.xScale.range()[1] - this.xScale.range()[0])
+      .attr('height', this.yScale.range()[0] - this.yScale.range()[1]);
     // Update the axis
     this.drawAxes();
     // Update the overview paths
@@ -131,36 +151,36 @@ class UtilizationView extends
 
   drawAxes () {
     // Update the x axis
-    const xAxis = this.content.select('.xAxis')
+    const xAxis = this.d3el.select('.xAxis')
       .attr('transform', `translate(0, ${this.chartBounds.height})`)
       .call(d3.axisBottom(this.xScale));
 
     cleanupAxis(xAxis);
 
     // Position the x label
-    this.content.select('.xAxisLabel')
+    this.d3el.select('.xAxisLabel')
       .attr('x', this.chartBounds.width / 2)
       .attr('y', this.chartBounds.height + this.margin.bottom - this.emSize / 2);
 
     // Update the y axis
-    this.content.select('.yAxis')
+    this.d3el.select('.yAxis')
       .call(d3.axisLeft(this.yScale));
 
     // Position the y label
-    this.content.select('.yAxisLabel')
+    this.d3el.select('.yAxisLabel')
       .attr('transform', `translate(${-1.5 * this.emSize},${this.chartBounds.height / 2}) rotate(-90)`);
   }
 
   drawPaths (container, histogram) {
     const outlinePathGenerator = d3.line()
-      .x((d, i) => this.xScale(i))
+      .x((d, i) => this.xBinScale(i))
       .y(d => this.yScale(d));
     container.select('.outline')
       .datum(histogram.data)
       .attr('d', outlinePathGenerator);
 
     const areaPathGenerator = d3.area()
-      .x((d, i) => this.xScale(i))
+      .x((d, i) => this.xBinScale(i))
       .y1(d => this.yScale(d))
       .y0(this.yScale(0));
     container.select('.area')
@@ -258,7 +278,7 @@ class UtilizationView extends
       x2Offset = handleWidth / 2;
     }
 
-    const brush = this.content.select('.brush');
+    const brush = this.d3el.select('.brush');
     brush.select('.area')
       .attr('x', x1)
       .attr('y', 0)
