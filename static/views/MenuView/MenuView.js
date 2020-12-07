@@ -12,7 +12,7 @@ class MenuView extends uki.View {
     super(options);
 
     this._expanded = false;
-    this._folderMode = true;
+    this._folderMode = false;
     this._tagSortMode = 'a-z(filtered)';
     this.openFolders = {};
     this.filteredTags = {};
@@ -90,6 +90,8 @@ class MenuView extends uki.View {
       .style('display', this.expanded ? null : 'none');
     this.d3el.select('.tagHeaderWrapper')
       .style('display', this.expanded && !this.folderMode ? null : 'none');
+    this.d3el.select('.datasetList')
+      .classed('enableClickThrough', !this.folderMode); // prevent datasetList from stealing pointer events in tag mode
 
     if (this.folderMode) {
       this._tempDatasetList = this.computeFolderedDatasetList();
@@ -356,16 +358,36 @@ class MenuView extends uki.View {
     return linkedState.setLabelAndTags(newLabel);
   }
 
-  async dissolveFolder (folderId) {
-    const grandParentPath = folderId.match(/(.*)\//)?.[1];
+  async deleteFolder (folderPath) {
+    const urls = window.controller.datasetList.filter(linkedState => {
+      return linkedState.info.label.startsWith(folderPath);
+    }).map(linkedState => `/datasets/${linkedState.info.datasetId}`);
+    await Promise.all(urls.map(url => window.fetch(url, { method: 'DELETE' })));
+    await window.controller.refreshDatasets();
+  }
+
+  async dissolveFolder (folderPath) {
+    const grandParentPath = folderPath.match(/(.*)\//)?.[1];
     const updateUrls = window.controller.datasetList.filter(linkedState => {
-      return linkedState.info.label.startsWith(folderId);
+      return linkedState.info.label.startsWith(folderPath);
     }).map(linkedState => {
-      let strippedLabel = linkedState.info.label.substring(folderId.length + 1); // chop off the folder that we're deleting
+      let strippedLabel = linkedState.info.label.substring(folderPath.length + 1); // chop off the folder that we're deleting
       if (grandParentPath) {
         // If the deleted folder was in a folder, restore the parent path
         strippedLabel = grandParentPath + '/' + strippedLabel;
       }
+      return linkedState.getUpdateUrl(strippedLabel);
+    });
+    await this.bulkRename(updateUrls);
+  }
+
+  async renameFolder (folderPath, newFolderPath) {
+    newFolderPath = newFolderPath.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
+    const updateUrls = window.controller.datasetList.filter(linkedState => {
+      return linkedState.info.label.startsWith(folderPath);
+    }).map(linkedState => {
+      let strippedLabel = linkedState.info.label.substring(folderPath.length + 1); // chop off the path that we're renaming
+      strippedLabel = newFolderPath + '/' + strippedLabel; // add the new one
       return linkedState.getUpdateUrl(strippedLabel);
     });
     await this.bulkRename(updateUrls);
@@ -566,12 +588,32 @@ class MenuView extends uki.View {
             depth,
             open,
             getMenu: () => {
-              return [{
-                label: 'Dissolve Folder',
-                onclick: () => {
-                  this.dissolveFolder(id);
+              return [
+                {
+                  label: 'Delete Folder',
+                  onclick: () => {
+                    uki.ui.confirm(`Delete all datasets and folders in ${folderLabel}?`, {
+                      confirmAction: async () => await this.deleteFolder(id)
+                    });
+                  }
+                },
+                {
+                  label: 'Dissolve Folder',
+                  onclick: () => { this.dissolveFolder(id); }
+                },
+                {
+                  label: 'Rename folder',
+                  onclick: () => {
+                    uki.ui.prompt('New Folder Path', id, {
+                      validate: newPath => {
+                        newPath = newPath.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
+                        return newPath && newPath !== id;
+                      },
+                      confirmAction: async newPath => await this.renameFolder(id, newPath)
+                    });
+                  }
                 }
-              }];
+              ];
             }
           };
           parentList.push(folder);

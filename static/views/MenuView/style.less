@@ -168,6 +168,9 @@
     flex-direction: column;
     align-items: stretch;
     position: relative;
+    &.enableClickThrough {
+      pointer-events: none;
+    }
     .dataset {
       display: flex;
       flex-direction: row;
@@ -176,6 +179,7 @@
       margin-bottom: 0.5em;
       .folderStuff {
         display: flex;
+        pointer-events: all;
         .opener {
           display: none;
           cursor: pointer;
@@ -219,6 +223,7 @@
       .button {
         flex-grow: 1;
         margin: 0;
+        pointer-events: all;
         &:not(.button-primary):not(.button-disabled) {
           /* force an opaque background because the button looks weird when the dataset is a drag target */
           background-color: var(--background-color-richer);

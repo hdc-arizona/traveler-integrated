@@ -195,14 +195,13 @@ class LinkedState extends uki.Model {
       {
         label: 'Delete',
         onclick: () => {
-          uki.ui.showModal({
+          uki.ui.confirm({
             content: `<img src="img/ex.svg" style="
               width:2em;
               margin:0 0.5em;
               vertical-align:middle;
               filter:url(#recolorImageTo--text-color-softer)"/>
               Permanently delete ${this.info.label}?`,
-            buttonSpecs: 'default',
             confirmAction: async () => {
               await window.fetch(`/datasets/${this.info.datasetId}`, { method: 'DELETE' });
               await window.controller.refreshDatasets();
@@ -261,8 +260,8 @@ class LinkedState extends uki.Model {
   /**
    * Construct a URL for renaming a dataset's label and/or changing its tags
    */
-  getUpdateUrl (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
-    newLabel = newLabel.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
+  getUpdateUrl (newLabel = null, tagsToAdd = {}, tagsToRemove = {}) {
+    newLabel = newLabel?.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
     newLabel = encodeURIComponent(newLabel || this.info.label);
     const tagList = encodeURIComponent(
       Object.keys(this.info.tags)
@@ -275,7 +274,7 @@ class LinkedState extends uki.Model {
   /**
    * Update a dataset's label and/or tags
    */
-  async setLabelAndTags (newLabel, tagsToAdd = {}, tagsToRemove = {}) {
+  async setLabelAndTags (newLabel = null, tagsToAdd = {}, tagsToRemove = {}) {
     const url = this.getUpdateUrl(newLabel, tagsToAdd, tagsToRemove);
     await window.fetch(url, {
       method: 'PUT'
