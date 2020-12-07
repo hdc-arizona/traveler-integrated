@@ -128,7 +128,7 @@ async def processRawTrace(self, datasetId, file, log):
             attrList = addAttrSplitter.split(addAttrLineMatch.group(1))
             for attrStr in attrList:
                 attr = addAttrParser.match(attrStr)
-                assert attr is not None
+                assert attr is not None # TODO: Steve is hitting this with distributed runs (are MPI attributes formatted differently?); docker pull stevenrbrandt/trav:alpha-11192020 to replicate
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
     # The last event will never have had a chance to be processed:
     if currentEvent is not None:

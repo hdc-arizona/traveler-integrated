@@ -11,10 +11,6 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
     super(options);
   }
 
-  get informativeMessage () {
-    return this.linkedState?.selection ? null : '(no current selection)';
-  }
-
   async setup () {
     await super.setup(...arguments);
 
@@ -29,7 +25,7 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
     if (typeLabel) {
       typeLabel += ':';
     } else {
-      typeLabel = 'No selection';
+      typeLabel = 'No current selection';
     }
     this.d3el.select('.selectionType')
       .text(typeLabel);

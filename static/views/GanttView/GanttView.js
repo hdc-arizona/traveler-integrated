@@ -1,14 +1,17 @@
-/* globals d3 */
+/* globals uki, d3 */
+import LinkedMixin from '../common/LinkedMixin.js';
 import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
-class GanttView extends uki.ui.GLView {
-  constructor (argObj) {
-    argObj.resources = [
+class GanttView extends LinkedMixin(uki.ui.SvgGLView) {
+  constructor (options) {
+    options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/GanttView/style.less' },
-      { type: 'text', url: 'views/GanttView/template.svg' }
-    ];
-    super(argObj);
+      { type: 'text', url: 'views/GanttView/template.svg', name: 'template' }
+    ]);
+    super(options);
+
+    /*
     this.localXScale = d3.scaleLinear();
     this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleBand()
@@ -34,39 +37,17 @@ class GanttView extends uki.ui.GLView {
     this.traceBackLines = null;
     this.selectedTimestamp = null;
     this.selectedLocation = null;
-  }
-
-  get isLoading () {
-    return super.isLoading || this.linkedState.isLoadingIntervals || this.linkedState.isLoadingTraceback;
-  }
-
-  get isEmpty () {
-    return this.error || !this.linkedState.isAggBinsLoaded;
-  }
-
-  getChartBounds () {
-    const bounds = this.getAvailableSpace();
-    const result = {
-      width: bounds.width - this.margin.left - this.margin.right,
-      height: bounds.height - this.margin.top - this.margin.bottom,
-      left: bounds.left + this.margin.left,
-      top: bounds.top + this.margin.top,
-      right: bounds.right - this.margin.right,
-      bottom: bounds.bottom - this.margin.bottom
-    };
-    this.xScale.range([0, result.width]);
-    this.yScale.range([0, result.height]);
-    return result;
+    */
   }
 
   getSpilloverWidth (width) {
     return width * 3;
   }
 
-  setup () {
-    super.setup();
+  async setup () {
+    await super.setup(...arguments);
 
-    this.content.html(this.resources[1]);
+    this.d3el.html(this.resources[1]);
 
     this.margin = {
       top: 20,
@@ -74,7 +55,6 @@ class GanttView extends uki.ui.GLView {
       bottom: 40,
       left: 40
     };
-    this._bounds = this.getChartBounds();
     this.content.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
@@ -138,37 +118,35 @@ class GanttView extends uki.ui.GLView {
     // mouse events
 
     this.canvasElement = this.content.select('.gantt-canvas')
-        .on('click', function() {
-            __self.clearAllTimer();
-            var dm = d3.mouse(__self.content.select('.canvas-container').node());
-            __self._mouseClickTimeout = window.setTimeout(async () => {
-                __self.selectedTimestamp = __self.localXScale.invert(dm[0]);
-                __self.selectedLocation = __self.yScale.invert(dm[1]);
-                __self.fetchIntervalTraceList();
-            }, 300);
-        })
-        .on('mouseleave', function () {
-            __self.isMouseInside = false;
-            __self.clearAllTimer();
-        })
-        .on('mouseenter',function () {
-            __self.isMouseInside = true;
-        })
-        .on('mousemove', function() {
-            __self.clearAllTimer();
-            if(__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
-                var dm = d3.mouse(__self.content.select('.canvas-container').node());
-                this._mouseHoverTimeout = window.setTimeout(async () => {
-                    if(__self.isMouseInside === true) {
-                        var tm = __self.localXScale.invert(dm[0]);
-                        var loc = __self.yScale.invert(dm[1]);
-                        __self.fetchAndDrawHighlightedBars(tm, loc, __self.IntervalListMode.guid);
-                    }
-                }, 100);
-            }
-          }, 100);
-        }
+      .on('click', function() {
+          __self.clearAllTimer();
+          var dm = d3.mouse(__self.content.select('.canvas-container').node());
+          __self._mouseClickTimeout = window.setTimeout(async () => {
+              __self.selectedTimestamp = __self.localXScale.invert(dm[0]);
+              __self.selectedLocation = __self.yScale.invert(dm[1]);
+              __self.fetchIntervalTraceList();
+          }, 300);
       })
+      .on('mouseleave', function () {
+          __self.isMouseInside = false;
+          __self.clearAllTimer();
+      })
+      .on('mouseenter',function () {
+          __self.isMouseInside = true;
+      })
+      .on('mousemove', function() {
+          __self.clearAllTimer();
+          if(__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
+              var dm = d3.mouse(__self.content.select('.canvas-container').node());
+              this._mouseHoverTimeout = window.setTimeout(async () => {
+                  if(__self.isMouseInside === true) {
+                      var tm = __self.localXScale.invert(dm[0]);
+                      var loc = __self.yScale.invert(dm[1]);
+                      __self.fetchAndDrawHighlightedBars(tm, loc, __self.IntervalListMode.guid);
+                  }
+              }, 100);
+          }
+        }, 100)
       .on('dblclick', function () {
         __self.clearAllTimer();
         var dm = d3.mouse(__self.content.select('.canvas-container').node());
@@ -235,6 +213,8 @@ class GanttView extends uki.ui.GLView {
       var loc = yy;
       // window.clearTimeout(this.primitiveFetchTimeout); dont clear time out here,
       // we need to call rendering ends in the finally block
+
+      /*
       this.primitiveFetchTimeout = window.setTimeout(async () => {
           const label = encodeURIComponent(this.linkedState.label);
           var begin = this.linkedState.intervalWindow[0];
@@ -255,6 +235,7 @@ class GanttView extends uki.ui.GLView {
           __self.intervalRenderingEnds();
         });
     }, 100);
+      */
   }
   fetchIntervalTraceList(){
       var __self = this;
@@ -288,8 +269,8 @@ class GanttView extends uki.ui.GLView {
           });
       }, 100);
   }
-  draw () {
-    super.draw();
+  async draw () {
+    await super.draw(...arguments);
 
     if (this.isHidden) {
       return;
@@ -433,12 +414,12 @@ class GanttView extends uki.ui.GLView {
     this.ctx = ctx;
     this.wasRerendered = true;
   }
-
+/*
         ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
         for (var location in aggBins.data){
           var loc_offset = this.yScale(parseInt(aggBins.data[location].location));
           for (var bucket in aggBins.data[location].histogram){
-
+*/
   drawHighlightedBars (mode) {
     if (this.highlightedData) {
       var border = 1;
@@ -480,6 +461,7 @@ class GanttView extends uki.ui.GLView {
       if (notDrawn) {
         this.currentClickState = this.ClickState.background;
       }
+    }
   }
   fetchAndDrawHighlightedBars(x, y, mode) {
       if((this.linkedState.end - this.linkedState.begin) > 20000000) {
@@ -534,9 +516,8 @@ class GanttView extends uki.ui.GLView {
               this.highlightedData = null;
           }
       }
-    }
   }
-  getMiddlePointInYScale(point){
+  getMiddlePointInYScale(point) {
       var p = (this.yScale(point) + this.yScale(point+1)) / 2.0;
       return Math.floor(p);
   }

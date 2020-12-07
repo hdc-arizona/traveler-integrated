@@ -3,8 +3,8 @@ import SelectionInfoView from '../SelectionInfoView/SelectionInfoView.js';
 import TreeView from '../TreeView/TreeView.js';
 import CodeView from '../CodeView/CodeView.js';
 import UtilizationView from '../UtilizationView/UtilizationView.js';
-/*
 import GanttView from '../GanttView/GanttView.js';
+/*
 import LineChartView from '../LineChartView/LineChartView.js';
 import ContourBoxPlotView from '../ContourBoxPlotView/ContourBoxPlotView.js';
 import IntervalHistogramView from '../IntervalHistogramView/IntervalHistogramView.js';
@@ -14,8 +14,8 @@ const viewClassLookup = {
   SelectionInfoView,
   TreeView,
   CodeView,
-  UtilizationView /* ,
-  GanttView,
+  UtilizationView,
+  GanttView /* ,
   LineChartView,
   ContourBoxPlotView,
   IntervalHistogramView */

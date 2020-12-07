@@ -99,8 +99,8 @@ class TracedLinkedState extends LinkedState {
   async getDefaultLayout () {
     const availableViews = await this.getAvailableViews();
 
-    // Starting views are only UtilizationView and GanttView; for now I'm only working on UtilizationView
-    const traceColumnLayout = ['UtilizationView'] //, 'GanttView']
+    // Starting views are only UtilizationView and GanttView
+    const traceColumnLayout = ['UtilizationView', 'GanttView']
       .filter(componentName => {
         return availableViews?.[componentName]?.status !== VIEW_STATUS.UNAVAILABLE;
       })
