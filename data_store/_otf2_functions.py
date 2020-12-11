@@ -9,7 +9,7 @@ from .sparseUtilizationList import SparseUtilizationList
 from . import logToConsole
 
 # Tools for handling OTF2 traces
-eventLineParser = re.compile(r'^(\S+)\s+(\d+)\s+(\d+)\s+(.*)$')
+eventLineParser = re.compile(r'^((?:ENTER)|(?:LEAVE))\s+(\d+)\s+(\d+)\s+(.*)$')
 attrParsers = {
     'ENTER': r'(Region): "([^"]*)"',
     'LEAVE': r'(Region): "([^"]*)"'
@@ -68,6 +68,7 @@ async def processRawTrace(self, datasetId, file, log):
     includedMetrics = 0
     skippedMetricsForMissingPrior = 0
     skippedMetricsForMismatch = 0
+    unsupportedSkippedLines = 0
 
     async for line in file:
         eventLineMatch = eventLineParser.match(line)
@@ -122,14 +123,16 @@ async def processRawTrace(self, datasetId, file, log):
             attrs = eventLineMatch.group(4)
             for attrMatch in re.finditer(attrParsers[currentEvent['Event']], attrs):
                 currentEvent[attrMatch.group(1)] = attrMatch.group(2)
-        else:
+        elif currentEvent is not None and addAttrLineMatch is not None:
             # This line contains additional event attributes
-            assert currentEvent is not None and addAttrLineMatch is not None
             attrList = addAttrSplitter.split(addAttrLineMatch.group(1))
             for attrStr in attrList:
                 attr = addAttrParser.match(attrStr)
-                assert attr is not None # TODO: Steve is hitting this with distributed runs (are MPI attributes formatted differently?); docker pull stevenrbrandt/trav:alpha-11192020 to replicate
+                assert attr is not None
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
+        else:
+            # This is a line that we aren't capturing (yet), e.g. MPI_SEND
+            unsupportedSkippedLines += 1
     # The last event will never have had a chance to be processed:
     if currentEvent is not None:
         counts = self.processEvent(datasetId, currentEvent)
@@ -138,7 +141,8 @@ async def processRawTrace(self, datasetId, file, log):
     await log('')
     await log('Finished processing %i events' % numEvents)
     await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
-    await log('Metrics included: %d; skpped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
+    await log('Metrics included: %d; skipped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
+    await log('Lines skipped because they are not yet supported: %d' % unsupportedSkippedLines)
 
     # Now that we've seen all the locations, store that list in our info
     self[datasetId]['info']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
