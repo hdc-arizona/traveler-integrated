@@ -11,6 +11,7 @@ router = APIRouter()
 def get_intervals(datasetId: str, \
                   begin: int = None, \
                   end: int = None, \
+                  includeDetails: bool = False, \
                   minDuration: int = None, \
                   maxDuration: int = None, \
                   location: str = None, \
@@ -52,7 +53,18 @@ def get_intervals(datasetId: str, \
             # This interval has passed all filters; yield it
             if not firstItem:
                 yield ','
-            yield json.dumps(intervalObj)
+
+            if includeDetails:
+                # Send back everything we know about the interval
+                yield json.dumps(intervalObj)
+            else:
+                # To reduce the size of large queries, only return the
+                # enter/leave timestamps and the intervalId
+                yield json.dumps({
+                    'enter': i.begin,
+                    'leave': i.end,
+                    'intervalId': i.data
+                })
             firstItem = False
         yield ']'
 

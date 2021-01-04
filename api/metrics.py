@@ -44,16 +44,19 @@ def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
+    ret = {}
+
     if location is not None and primitive is not None:
         raise HTTPException(status_code=501, detail='Utilization histograms for both locations and primitives not yet supported.')
-
-    ret = {}
-    if location is None:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
-    elif primitive is None:
+    elif primitive is not None:
+        if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
+            raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcIntervalHistogram(bins, begin, end)
+    elif location is not None:
         ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
     else:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcIntervalHistogram(bins, begin, end)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
+
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 

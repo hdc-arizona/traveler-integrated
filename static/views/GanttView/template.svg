@@ -16,7 +16,5 @@
     <foreignObject class="canvas-container">
       <canvas class="gantt-canvas"></canvas>
     </foreignObject>
-    <g class="bars"></g>
-    <g class="links"></g>
   </g>
 </g>

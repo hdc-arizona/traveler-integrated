@@ -10,8 +10,6 @@ class UtilizationView extends
     options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/UtilizationView/style.less' },
       { type: 'text', url: 'views/UtilizationView/template.svg', name: 'template' }
-      // Two resources (totalUtilization and primitiveUtilization) are also
-      // added later in refreshData()
     ]);
     super(options);
 
@@ -25,6 +23,10 @@ class UtilizationView extends
     this.xBinScale = d3.scaleLinear().clamp(true);
     this.xScale = d3.scaleLinear().clamp(true);
     this.yScale = d3.scaleLinear();
+
+    // Render whenever there's a change to utilization state
+    this.linkedState.on('utilizationUnloaded', () => { this.render(); });
+    this.linkedState.on('utilizationLoaded', () => { this.render(); });
   }
 
   /**
@@ -42,38 +44,16 @@ class UtilizationView extends
     const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to one to prevent zero-bin / negative queries
     this.xBinScale.range([0, bins]);
 
-    // Fetch the total utilization
-    const totalPromise = this.updateResource({
-      name: 'totalUtilization',
-      type: 'json',
-      url: `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}`
-    });
+    await this.linkedState.refreshUtilization(bins);
 
-    // If a primitive is selected, fetch its utilization
-    const primitiveResourceSpec = {
-      name: 'primitiveUtilization'
-    };
-    let selectedPrimitive = this.linkedState?.selection?.primitiveName;
-    if (selectedPrimitive) {
-      selectedPrimitive = encodeURIComponent(selectedPrimitive);
-      primitiveResourceSpec.type = 'json';
-      primitiveResourceSpec.url = `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}&primitive=${selectedPrimitive}`;
-    } else {
-      // Store null in the resource and skip the server call when
-      // there isn't a selected primitive
-      primitiveResourceSpec.type = 'derivation';
-      primitiveResourceSpec.derive = () => null;
-    }
-    const primitivePromise = this.updateResource(primitiveResourceSpec);
-
-    return Promise.all([totalPromise, primitivePromise]);
+    this.render();
   }
 
   async setup () {
     await super.setup(...arguments);
 
-    // setup() is only called once this.d3el is ready; at this point, we know
-    // how many bins to ask for
+    // setup() is only called once this.d3el is ready; only at this point do we
+    // know how many bins to ask for
     this.refreshData();
 
     // Apply the template + our margin
@@ -98,10 +78,27 @@ class UtilizationView extends
 
   get isLoading () {
     // Display the spinner + skip most of the draw call if we're still waiting
-    // on totalUtilization (primitiveUtilization can still be null if there
-    // isn't a current selection)
+    // on utilization data
     return super.isLoading ||
-      this.getNamedResource('totalUtilization') === null;
+      this.linkedState.getNamedResource('utilization') === null ||
+      (this.linkedState.selection?.type === 'PrimitiveSelection' &&
+       this.linkedState.selection.getNamedResource('utilization') === null);
+  }
+
+  get error () {
+    if (super.error) {
+      return super.error;
+    }
+    // In addition to any errors that happen during setup() or draw calls(),
+    // display any errors that occurred trying to retrieve utilization data
+    if (this.linkedState.getNamedResource('utilization') instanceof Error) {
+      return this.linkedState.getNamedResource('utilization');
+    }
+    if (this.linkedState.selection?.type === 'PrimitiveSelection' &&
+        this.linkedState.selection.getNamedResource('utilization') instanceof Error) {
+      return this.linkedState.selection.getNamedResource('utilization');
+    }
+    return null;
   }
 
   async draw () {
@@ -109,12 +106,19 @@ class UtilizationView extends
 
     if (this.isLoading) {
       // Don't draw anything if we're still waiting on something; super.draw
-      // will show a spinner
+      // will show a spinner. Instead, ensure that another render() call is
+      // fired when we're finally ready
+      this.ready.then(() => { this.render(); });
+      return;
+    } else if (this.error) {
+      // If there's an upstream error, super.draw will already display an error
+      // message. Don't attempt to draw anything (or we'll probably just add to
+      // the noise of whatever is really wrong)
       return;
     }
 
-    const totalUtilization = this.getNamedResource('totalUtilization');
-    const primitiveUtilization = this.getNamedResource('primitiveUtilization');
+    const totalUtilization = this.linkedState.getNamedResource('utilization');
+    const primitiveUtilization = this.linkedState.selection?.getNamedResource('utilization') || null;
 
     // Set / update the scale domains based on the data we last saw from refreshData()
 

@@ -9,10 +9,67 @@ const MIN_BRUSH_SIZE = 1;
 
 class TracedLinkedState extends LinkedState {
   constructor (options) {
+    options.resources = options.resources || [];
+    options.resources.push(...[
+      // Each of these resources are added / updated later; 'deferred'
+      // resources don't actually do anything other than serve as
+      // documentation / placeholders that we expect these resources to exist.
+
+      // utilization is lazily loaded when UtilizationView asks for it with
+      // refreshUtilization() calls
+      { type: 'deferred', initialValue: null, name: 'utilization' },
+
+      // intervals are lazily loaded by GanttView when it asks for them with
+      // refreshIntervals() calls
+      { type: 'deferred', initialValue: null, name: 'intervals' }
+    ]);
     super(options);
 
     // Start the detail domain at the same level as the overview
     this._detailDomain = Array.from(this.overviewDomain);
+
+    // Privately track of how many utilization bins to request from the server;
+    // this will be overridden regularly by refreshUtilization() calls
+    this._utilizationBins = undefined;
+  }
+
+  /**
+   * Update our intervals resource based on the current window
+   */
+  async refreshIntervals () {
+    this.trigger('intervalsUnloaded');
+    await this.updateResource({
+      name: 'intervals',
+      type: 'json',
+      url: `/datasets/${this.info.datasetId}/intervals?begin=${this.detailDomain[0]}&end=${this.detailDomain[1]}`
+    });
+    this.trigger('intervalsLoaded');
+  }
+
+  /**
+   * Add or update view-specific utilization data from the server
+   */
+  async refreshUtilization (bins) {
+    this.trigger('utilizationUnloaded');
+
+    // Update how many bins we should show
+    this._utilizationBins = bins;
+
+    // Fetch the total utilization
+    const totalPromise = this.updateResource({
+      name: 'utilization',
+      type: 'json',
+      url: `/datasets/${this.info.datasetId}/utilizationHistogram?bins=${bins}`
+    });
+
+    // If a primitive is selected, update its utilization
+    let selectionPromise = Promise.resolve();
+    if (this.selection instanceof PrimitiveSelection) {
+      selectionPromise = this.selection.refreshUtilization(bins);
+    }
+
+    await Promise.all([totalPromise, selectionPromise]);
+    this.trigger('utilizationLoaded');
   }
 
   /**
@@ -184,13 +241,17 @@ class TracedLinkedState extends LinkedState {
   }
 
   /**
-   * When selecting a primitive, also load trace data (overrides default behavior)
+   * When selecting a primitive, tell the selection how to load trace data
+   * (by default, the selection won't attempt to load trace data, because, for
+   * non-TracedLinkedState contexts, it won't exist)
    */
   selectPrimitive (primitiveName) {
     const primitiveDetails = this.getPrimitiveDetails(primitiveName);
     this.selection = new PrimitiveSelection({
+      datasetId: this.info.datasetId,
+      primitiveName,
       primitiveDetails,
-      fetchTraceData: true
+      utilizationBins: this._utilizationBins
     });
   }
 }

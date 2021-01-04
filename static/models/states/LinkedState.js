@@ -295,9 +295,10 @@ class LinkedState extends uki.Model {
   selectPrimitive (primitiveName) {
     const primitiveDetails = this.getPrimitiveDetails(primitiveName);
     this.selection = new PrimitiveSelection({
+      datasetId: this.info.datasetId,
       primitiveName,
       primitiveDetails,
-      fetchUtilization: false // overridden in TracedLinkedState
+      utilizationBins: undefined // overridden in TracedLinkedState
     });
   }
 }

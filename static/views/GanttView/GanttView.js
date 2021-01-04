@@ -11,33 +11,31 @@ class GanttView extends LinkedMixin(uki.ui.SvgGLView) {
     ]);
     super(options);
 
-    /*
     this.localXScale = d3.scaleLinear();
     this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleBand()
       .paddingInner(0.2)
       .paddingOuter(0.1);
     this.yScale.invert = function (x) { // think about the padding later
-      var domain = this.domain();
-      var range = this.range();
-      var scale = d3.scaleQuantize().domain(range).range(domain);
+      const domain = this.domain();
+      const range = this.range();
+      const scale = d3.scaleQuantize().domain(range).range(domain);
       return scale(x);
     };
 
     // Some things like SVG clipPaths require ids instead of classes...
     this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
     GanttView.DOM_COUNT++;
-    this.wasRerendered = false;
-    this.highlightedData = null;
-    this.ClickState = { background: 0, hover: 1, singleClick: 2, doubleClick: 3 };
-    this.IntervalListMode = { all: 'all', primitive: 'primitive', guid: 'guid', duration: 'duration' };
-    this.isMouseInside = false;
-    this.pendingHighlightRequest = null;
-    this.renderingInProgress = false;
-    this.traceBackLines = null;
-    this.selectedTimestamp = null;
-    this.selectedLocation = null;
-    */
+
+    // Render whenever there's a change to the intervals state
+    this.linkedState.on('intervalsUnloaded', () => { this.render(); });
+    this.linkedState.on('intervalsLoaded', () => { this.render(); });
+  }
+
+// TODO: resume here
+
+  async refreshTrace () {
+
   }
 
   getSpilloverWidth (width) {
@@ -55,12 +53,8 @@ class GanttView extends LinkedMixin(uki.ui.SvgGLView) {
       bottom: 40,
       left: 40
     };
-    this.content.select('.chart')
+    this.d3el.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
-
-    // add width of gantt chart to model
-    // for leightweight querying and aggregating
-    this.linkedState.setGanttXResolution(this.getSpilloverWidth(this._bounds.width));
 
     // Create a view-specific clipPath id, as there can be more than one
     // GanttView in the app
@@ -71,98 +65,25 @@ class GanttView extends LinkedMixin(uki.ui.SvgGLView) {
       .attr('clip-path', `url(#${clipId})`);
     this.drawClip();
 
-    // Deselect the primitive / interval selections when the user clicks the background
-    this.content.select('.background')
+    // Clear the selection when the user clicks the background
+    this.d3el.select('.background')
       .on('click', () => {
-        this.linkedState.selectPrimitive(null);
-        this.linkedState.selectIntervalId(null);
+        this.linkedState.selection = null;
       });
 
-    // Initialize the scales / stream
-    this.xScale.domain(this.linkedState.intervalWindow);
+    // Initialize the scales
+    this.localXScale.domain(this.linkedState.detailDomain);
+    this.xScale.domain(this.linkedState.detailDomain);
+    this.yScale.domain(this.linkedState.info.locationNames);
 
-    this.yScale.domain(this.linkedState.metadata.locationNames);
+    // Set up zoom, pan, hover, and click interactions
+    this.setupInteractions();
 
-    // Set up zoom / pan interactions
-    this.setupZoomAndPan();
+    // Set up listener on the model for domain changes
+    this.linkedState.on('detailDomainChanged', () => { this.quickDraw(); });
 
-    // // Set up listeners on the model
-    this.linkedState.on('newIntervalWindow', () => {
-      // Update scales whenever something changes the brush
-      this.xScale.domain(this.linkedState.intervalWindow);
-      // Update the axes immediately for smooth dragging responsiveness
-      this.drawAxes();
-      // no need to render here, it will get rendered on update
-    });
-    // const showSpinner = () => { this.drawSpinner(); };
-    // this.linkedState.on('intervalStreamStarted', showSpinner);
-    // this.linkedState.on('tracebackStreamStarted', showSpinner);
-    this.linkedState.on('intervalsUpdated', () => {
-      this.xScale.domain(this.linkedState.intervalWindow);
-      // Update the axes immediately for smooth dragging responsiveness
-      this.drawAxes();
-      // Make sure we render eventually
-      this.render();
-    });
-    this.linkedState.on('newIntervalHistogramWindow', () => {
-      window.clearTimeout(this.intervalHistogramFetchTimeout);
-      this.intervalHistogramFetchTimeout = window.setTimeout(async () => {
-        this.fetchAndDrawHighlightedBars(this.linkedState.intervalHistogramBegin,
-          this.linkedState.intervalHistogramEnd,
-          this.IntervalListMode.duration);
-      }, 300);
-    });
-
-    this.currentClickState = this.ClickState.background;
-    var __self = this;
-    // mouse events
-
-    this.canvasElement = this.content.select('.gantt-canvas')
-      .on('click', function() {
-          __self.clearAllTimer();
-          var dm = d3.mouse(__self.content.select('.canvas-container').node());
-          __self._mouseClickTimeout = window.setTimeout(async () => {
-              __self.selectedTimestamp = __self.localXScale.invert(dm[0]);
-              __self.selectedLocation = __self.yScale.invert(dm[1]);
-              __self.fetchIntervalTraceList();
-          }, 300);
-      })
-      .on('mouseleave', function () {
-          __self.isMouseInside = false;
-          __self.clearAllTimer();
-      })
-      .on('mouseenter',function () {
-          __self.isMouseInside = true;
-      })
-      .on('mousemove', function() {
-          __self.clearAllTimer();
-          if(__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
-              var dm = d3.mouse(__self.content.select('.canvas-container').node());
-              this._mouseHoverTimeout = window.setTimeout(async () => {
-                  if(__self.isMouseInside === true) {
-                      var tm = __self.localXScale.invert(dm[0]);
-                      var loc = __self.yScale.invert(dm[1]);
-                      __self.fetchAndDrawHighlightedBars(tm, loc, __self.IntervalListMode.guid);
-                  }
-              }, 100);
-          }
-        }, 100)
-      .on('dblclick', function () {
-        __self.clearAllTimer();
-        var dm = d3.mouse(__self.content.select('.canvas-container').node());
-        __self.fetchIntervalInfoAndShowTooltip(dm[0], dm[1]);
-      });
-  }
-
-  clearAllTimer () {
-    if (this._mouseHoverTimeout) {
-      window.clearTimeout(this._mouseHoverTimeout);
-      this._mouseHoverTimeout = null;
-    }
-    if (this._mouseClickTimeout) {
-      window.clearTimeout(this._mouseClickTimeout);
-      this._mouseClickTimeout = null;
-    }
+    // Set up listener on the model for selection changes
+    this.linkedState.on('selectionChanged', () => { this.render(); });
   }
 
   fetchIntervalInfoAndShowTooltip(xx, yy){
@@ -269,6 +190,20 @@ class GanttView extends LinkedMixin(uki.ui.SvgGLView) {
           });
       }, 100);
   }
+
+
+  /**
+   * Function that is called immediately to update GanttView in response to
+   * interactions like zooming and panning; only fast drawing operations
+   * should happen here
+   */
+  quickDraw () {
+    // Update the x scales
+    this.xScale.domain(this.linkedState.detailDomain);
+    // Update the axes
+    this.drawAxes();
+  }
+
   async draw () {
     await super.draw(...arguments);
 
@@ -539,7 +474,7 @@ class GanttView extends LinkedMixin(uki.ui.SvgGLView) {
       }
   }
 
-  setupZoomAndPan () {
+  setupInteractions () {
     this.initialDragState = null;
     let latentWidth = null;
     const clampWindow = (begin, end) => {

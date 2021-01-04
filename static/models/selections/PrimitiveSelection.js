@@ -3,15 +3,29 @@ import Selection from './Selection.js';
 class PrimitiveSelection extends Selection {
   constructor (options) {
     options.resources = options.resources || [];
-    if (options.fetchTraceData) {
-      // TODO: add primitive-specific API calls to options.resources
-      // that are needed for trace data visualizations, and add mechanisms
-      // for views to update resources based on zooming, panning, etc
+    if (options.utilizationBins !== undefined) {
+      const urlFriendlyPrimitive = encodeURIComponent(options.primitiveName);
+      options.resources.push({
+        type: 'json',
+        name: 'utilization',
+        url: `/datasets/${options.datasetId}/utilizationHistogram?bins=${options.utilizationBins}&primitive=${urlFriendlyPrimitive}`
+      });
     }
+
     super(options);
 
+    this.datasetId = options.datasetId;
     this.primitiveName = options.primitiveName;
     this.primitiveDetails = options.primitiveDetails;
+  }
+
+  refreshUtilization (bins) {
+    const urlFriendlyPrimitive = encodeURIComponent(this.primitiveName);
+    this.updateResource({
+      type: 'json',
+      name: 'utilization',
+      url: `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}&primitive=${urlFriendlyPrimitive}`
+    });
   }
 
   get label () {
