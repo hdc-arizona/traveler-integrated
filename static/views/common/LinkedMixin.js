@@ -23,10 +23,6 @@ const LinkedMixin = function (superclass) {
       const index = window.controller.datasetLookup[this.datasetId];
       return index === undefined ? null : window.controller.datasetList[index];
     }
-
-    get isLoading () {
-      return super.isLoading || !this.linkedState?._resourcesLoaded;
-    }
   };
   LinkedView.prototype._instanceOfLinkedMixin = true;
   return LinkedView;

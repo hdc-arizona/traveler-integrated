@@ -6,6 +6,7 @@
   }
   text {
     font: 9px sans-serif;
+    fill: var(--text-color);
   }
   .background rect {
     fill: transparent;
@@ -18,34 +19,14 @@
     stroke-weight: 1px;
     stroke: var(--border-color);
   }
-
-  .bar {
-    cursor: pointer;
-    .outline {
-      fill: none;
-      stroke-width: 1px;
-      stroke: var(--text-color);
-      vector-effect: non-scaling-stroke;
-    }
-    .area {
-      stroke: none;
-      opacity: 0.25;
-      fill: var(--text-color);
-    }
-    &:hover {
-      .area { opacity: 0.5; }
-    }
-    .traceback {
-      stroke: black;
+  .verticalScroller {
+    overflow-x: hidden;
+    .gantt-canvas {
+      position: absolute;
     }
   }
-
-  .link {
-    .line {
-      stroke-width: 1px;
-      stroke: black; /* TODO: Unify me */
-      vector-effect: non-scaling-stroke;
-      pointer-events: none;
-    }
-  }
+}
+.GanttViewHorizontalScroller {
+  position: absolute;
+  overflow-y: hidden;
 }

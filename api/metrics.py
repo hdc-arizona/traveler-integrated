@@ -36,7 +36,7 @@ def get_procMetric_values(datasetId: str, metric: str, begin: float = None, end:
     return StreamingResponse(procMetricGenerator(), media_type='application/json')
 
 @router.get('/datasets/{datasetId}/utilizationHistogram')
-def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None, end: int = None, location: str = None, primitive: str = None):
+def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None, end: int = None, locations: str = None, primitive: str = None):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
@@ -46,14 +46,22 @@ def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None
 
     ret = {}
 
-    if location is not None and primitive is not None:
-        raise HTTPException(status_code=501, detail='Utilization histograms for both locations and primitives not yet supported.')
-    elif primitive is not None:
+    if locations:
+        locations = locations.split(',')
+
+    if primitive is not None:
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
             raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
-        ret['data'] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcIntervalHistogram(bins, begin, end)
-    elif location is not None:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
+        if locations:
+            ret['locations'] = {}
+            for location in locations:
+                ret['locations'][location] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
+        else:
+            ret['data'] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationHistogram(bins, begin, end)
+    elif locations:
+        ret['locations'] = {}
+        for location in locations:
+            ret['locations'][location] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
     else:
         ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
 

@@ -16,7 +16,7 @@ const COLOR_MODES = {
   DIVERGING: 'diverging'
 };
 
-class LinkedState extends uki.Model {
+class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   constructor (options) {
     options.resources = options.resources || [];
     options.resources.push({
@@ -73,7 +73,6 @@ class LinkedState extends uki.Model {
    * metric types or code file types exist in the dataset)
    */
   async getAvailableViews () {
-    await this.ready;
     const views = {
       SelectionInfoView: { status: VIEW_STATUS.AVAILABLE },
       TreeView: { status: VIEW_STATUS.UNAVAILABLE },
@@ -295,10 +294,9 @@ class LinkedState extends uki.Model {
   selectPrimitive (primitiveName) {
     const primitiveDetails = this.getPrimitiveDetails(primitiveName);
     this.selection = new PrimitiveSelection({
-      datasetId: this.info.datasetId,
+      linkedState: this,
       primitiveName,
-      primitiveDetails,
-      utilizationBins: undefined // overridden in TracedLinkedState
+      primitiveDetails
     });
   }
 }

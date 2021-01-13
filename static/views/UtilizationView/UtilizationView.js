@@ -20,19 +20,18 @@ class UtilizationView extends
       left: 40
     };
 
-    this.xBinScale = d3.scaleLinear().clamp(true);
-    this.xScale = d3.scaleLinear().clamp(true);
-    this.yScale = d3.scaleLinear();
+    this.xScale = d3.scaleLinear().clamp(true)
+      .domain(this.linkedState.overviewDomain); // The overviewDomain never changes, so we can set it in the constructor
+    this.yScale = d3.scaleLinear(); // We don't know the y domain yet...
 
-    // Render whenever there's a change to utilization state
-    this.linkedState.on('utilizationUnloaded', () => { this.render(); });
-    this.linkedState.on('utilizationLoaded', () => { this.render(); });
+    // Render whenever there's a change to the overviewUtilization data, and
+    // whenever the selection changes
+    this.linkedState.on('overviewLoaded', () => { this.render(); });
+    this.linkedState.on('overviewUnloaded', () => { this.render(); });
+    this.linkedState.on('selectionChanged', () => { this.render(); });
   }
 
-  /**
-   * Add or update view-specific utilization data from the server
-   */
-  async refreshData () {
+  updateResolution () {
     // Update our scale ranges (and bin count) based on how much space is available
     const bounds = this.getBounds();
     this.chartBounds = {
@@ -41,12 +40,8 @@ class UtilizationView extends
     };
     this.xScale.range([0, this.chartBounds.width]);
     this.yScale.range([this.chartBounds.height, 0]);
-    const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to one to prevent zero-bin / negative queries
-    this.xBinScale.range([0, bins]);
-
-    await this.linkedState.refreshUtilization(bins);
-
-    this.render();
+    const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
+    this.linkedState.overviewResolution = bins; // this will result in overviewLoaded / overviewUnloaded events
   }
 
   async setup () {
@@ -54,7 +49,9 @@ class UtilizationView extends
 
     // setup() is only called once this.d3el is ready; only at this point do we
     // know how many bins to ask for
-    this.refreshData();
+    this.updateResolution();
+    // Update the resolution whenever the view is resized
+    this.on('resize', () => { this.updateResolution(); });
 
     // Apply the template + our margin
     this.d3el.html(this.getNamedResource('template'))
@@ -64,25 +61,20 @@ class UtilizationView extends
 
     // Prep interactive callbacks for the brush
     this.setupBrush();
-    this.linkedState.on('detailDomainChanged', () => {
-      // Update the brush immediately if something else changes it (e.g.
-      // GanttView is zoomed)
-      this.drawBrush();
-    });
 
-    // Update our data whenever the view is resized or whenever the selection is
-    // changed
-    this.on('resize', () => { this.refreshData(); });
-    this.linkedState.on('selectionChanged', () => { this.refreshData(); });
+    // Update the brush immediately if some other view changes it (e.g.
+    // GanttView is zoomed)
+    this.linkedState.on('detailDomainChangedSync', () => { this.drawBrush(); });
+    this.linkedState.on('detailDomainChanged', () => { this.render(); });
   }
 
   get isLoading () {
     // Display the spinner + skip most of the draw call if we're still waiting
     // on utilization data
     return super.isLoading ||
-      this.linkedState.getNamedResource('utilization') === null ||
-      (this.linkedState.selection?.type === 'PrimitiveSelection' &&
-       this.linkedState.selection.getNamedResource('utilization') === null);
+      this.linkedState.getNamedResource('overviewUtilization') === null ||
+      (this.linkedState.selection?.hasNamedResource('overviewUtilization') &&
+       this.linkedState.selection.getNamedResource('overviewUtilization') === null);
   }
 
   get error () {
@@ -91,12 +83,12 @@ class UtilizationView extends
     }
     // In addition to any errors that happen during setup() or draw calls(),
     // display any errors that occurred trying to retrieve utilization data
-    if (this.linkedState.getNamedResource('utilization') instanceof Error) {
-      return this.linkedState.getNamedResource('utilization');
+    if (this.linkedState.getNamedResource('overviewUtilization') instanceof Error) {
+      return this.linkedState.getNamedResource('overviewUtilization');
     }
-    if (this.linkedState.selection?.type === 'PrimitiveSelection' &&
-        this.linkedState.selection.getNamedResource('utilization') instanceof Error) {
-      return this.linkedState.selection.getNamedResource('utilization');
+    if (this.linkedState.selection?.hasNamedResource('overviewUtilization') &&
+        this.linkedState.selection.getNamedResource('overviewUtilization') instanceof Error) {
+      return this.linkedState.selection.getNamedResource('overviewUtilization');
     }
     return null;
   }
@@ -104,33 +96,19 @@ class UtilizationView extends
   async draw () {
     await super.draw(...arguments);
 
-    if (this.isLoading) {
+    if (this.isLoading || this.error) {
       // Don't draw anything if we're still waiting on something; super.draw
-      // will show a spinner. Instead, ensure that another render() call is
-      // fired when we're finally ready
-      this.ready.then(() => { this.render(); });
-      return;
-    } else if (this.error) {
-      // If there's an upstream error, super.draw will already display an error
-      // message. Don't attempt to draw anything (or we'll probably just add to
-      // the noise of whatever is really wrong)
+      // will show a spinner. Or if there's an upstream error, super.draw will
+      // already display an error message. Don't attempt to draw anything (or
+      // we'll probably just add to the noise of whatever is really wrong)
       return;
     }
 
-    const totalUtilization = this.linkedState.getNamedResource('utilization');
-    const primitiveUtilization = this.linkedState.selection?.getNamedResource('utilization') || null;
+    const totalUtilization = this.linkedState.getNamedResource('overviewUtilization');
+    const selectionUtilization = this.linkedState.selection?.getNamedResource('overviewUtilization') || null;
 
-    // Set / update the scale domains based on the data we last saw from refreshData()
-
-    // Since we have 1 bin per pixel, xBinScale is always an identity mapping
-    // from array index to screen coordinates. If we someday decide to support
-    // zooming in the utilization view, then we might want to change this to
-    // animate the zoom while we're waiting for new data
-    this.xBinScale.domain([0, totalUtilization.metadata.bins]);
-    // this.xScale is responsible for mapping timestamps to screen coordinates
-    this.xScale.domain([totalUtilization.metadata.begin, totalUtilization.metadata.end]);
-    // totalUtilization will always be more than primitiveUtilization, so use
-    // its max for the y axis
+    // We finally can compute the y domain; totalUtilization will always be
+    // greater than selectionUtilization, so use its max for the y axis
     this.yScale.domain([0, d3.max(totalUtilization.data)]);
 
     // Update the (transparent) background rect that captures drag events
@@ -141,13 +119,14 @@ class UtilizationView extends
       .attr('height', this.yScale.range()[0] - this.yScale.range()[1]);
     // Update the axis
     this.drawAxes();
-    // Update the overview paths
-    this.drawPaths(this.d3el.select('.overview'), totalUtilization);
-    // Update the selected primitive path (if one exists, otherwise hide it)
-    this.d3el.select('.selectedPrimitive')
-      .style('display', primitiveUtilization === null ? 'none' : null);
-    if (primitiveUtilization !== null) {
-      this.drawPaths(this.d3el.select('.selectedPrimitive'), primitiveUtilization);
+    // Update the totalUtilization paths
+    this.drawPaths(this.d3el.select('.totalUtilization'), totalUtilization);
+    // Update the selectionUtilization paths (if a selection exists and has
+    // overviewUtilization data, otherwise hide them)
+    this.d3el.select('.selectionUtilization')
+      .style('display', selectionUtilization === null ? 'none' : null);
+    if (selectionUtilization !== null) {
+      this.drawPaths(this.d3el.select('.selectionUtilization'), selectionUtilization);
     }
     // Update the brush
     this.drawBrush();
@@ -164,7 +143,7 @@ class UtilizationView extends
     // Position the x label
     this.d3el.select('.xAxisLabel')
       .attr('x', this.chartBounds.width / 2)
-      .attr('y', this.chartBounds.height + this.margin.bottom - this.emSize / 2);
+      .attr('y', this.chartBounds.height + 2 * this.emSize);
 
     // Update the y axis
     this.d3el.select('.yAxis')
@@ -177,14 +156,14 @@ class UtilizationView extends
 
   drawPaths (container, histogram) {
     const outlinePathGenerator = d3.line()
-      .x((d, i) => this.xBinScale(i))
+      .x((d, i) => i) // bin number corresponds to screen coordinate
       .y(d => this.yScale(d));
     container.select('.outline')
       .datum(histogram.data)
       .attr('d', outlinePathGenerator);
 
     const areaPathGenerator = d3.area()
-      .x((d, i) => this.xBinScale(i))
+      .x((d, i) => i) // bin number corresponds to screen coordinate
       .y1(d => this.yScale(d))
       .y0(this.yScale(0));
     container.select('.area')
@@ -229,14 +208,14 @@ class UtilizationView extends
     const leftDrag = d3.drag().on('drag', event => {
       event.sourceEvent.stopPropagation();
       this.linkedState.detailDomain = [this.xScale.invert(event.x), undefined];
-      // setting detailDomain will automatically result in a render() call,
+      // setting detailDomain will eventually result in a render() call,
       // but draw the brush immediately for responsiveness
       this.drawBrush();
     });
     const rightDrag = d3.drag().on('drag', event => {
       event.sourceEvent.stopPropagation();
       this.linkedState.detailDomain = [undefined, this.xScale.invert(event.x)];
-      // setting detailDomain will automatically result in a render() call,
+      // setting detailDomain will eventually result in a render() call,
       // but draw the brush immediately for responsiveness
       this.drawBrush();
     });

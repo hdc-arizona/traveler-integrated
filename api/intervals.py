@@ -12,6 +12,7 @@ def get_intervals(datasetId: str, \
                   begin: int = None, \
                   end: int = None, \
                   includeDetails: bool = False, \
+                  includePrimitive: bool = False, \
                   minDuration: int = None, \
                   maxDuration: int = None, \
                   location: str = None, \
@@ -57,13 +58,22 @@ def get_intervals(datasetId: str, \
             if includeDetails:
                 # Send back everything we know about the interval
                 yield json.dumps(intervalObj)
-            else:
-                # To reduce the size of large queries, only return the
-                # enter/leave timestamps and the intervalId
+            elif includePrimitive:
+                # Send back the basics, but include the primitive name
                 yield json.dumps({
                     'enter': i.begin,
                     'leave': i.end,
-                    'intervalId': i.data
+                    'intervalId': i.data,
+                    'primitiveName': intervalObj['Primitive'],
+                    'location': intervalObj['Location']
+                })
+            else:
+                # Only send the minimal information
+                yield json.dumps({
+                    'enter': i.begin,
+                    'leave': i.end,
+                    'intervalId': i.data,
+                    'location': intervalObj['Location']
                 })
             firstItem = False
         yield ']'

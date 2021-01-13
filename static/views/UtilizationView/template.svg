@@ -7,11 +7,11 @@
     <g class="xAxis"></g>
     <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
   </g>
-  <g class="overview">
+  <g class="totalUtilization">
     <path class="area"></path>
     <path class="outline"></path>
   </g>
-  <g class="selectedPrimitive" style="display:none">
+  <g class="selectionUtilization" style="display:none">
     <path class="area"></path>
     <path class="outline"></path>
   </g>
