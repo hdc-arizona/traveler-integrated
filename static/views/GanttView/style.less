@@ -1,14 +1,16 @@
 .GanttView {
-  cursor: grab;
-  touch-action: none; /* Don't zoom the browser when the user pinches */
-  &:active {
-    cursor: grabbing;
+  .chart {
+    cursor: grab;
+    touch-action: none; /* Don't zoom the browser when the user pinches */
+    &:active {
+      cursor: grabbing;
+    }
   }
   text {
     font: 9px sans-serif;
     fill: var(--text-color);
   }
-  .background rect {
+  .background {
     fill: transparent;
   }
   .cursor {
@@ -19,14 +21,16 @@
     stroke-weight: 1px;
     stroke: var(--border-color);
   }
-  .verticalScroller {
+  .yScroller {
+    /* overflow-y set by javascript */
     overflow-x: hidden;
     .gantt-canvas {
       position: absolute;
     }
   }
 }
-.GanttViewHorizontalScroller {
+.xFakeScroller {
   position: absolute;
   overflow-y: hidden;
+  /* overflow-x set by javascript */
 }

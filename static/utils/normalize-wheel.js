@@ -3,9 +3,9 @@
  */
 
 // Reasonable defaults
-var PIXEL_STEP = 10;
-var LINE_HEIGHT = 40;
-var PAGE_HEIGHT = 800;
+const PIXEL_STEP = 10;
+const LINE_HEIGHT = 40;
+const PAGE_HEIGHT = 800;
 
 export default function normalizeWheel (event) {
   let sX = 0;

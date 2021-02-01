@@ -4,57 +4,34 @@ import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
 // Minimum vertical pixels per row
-const MIN_LOCATION_HEIGHT = 300;
+const MIN_LOCATION_HEIGHT = 100;
 
-class GanttView extends LinkedMixin(uki.ui.ParentSizeViewMixin(uki.ui.SvgGLView)) {
+// Fetch and draw 3x the time data than we're actually showing, for smooth
+// scrolling, zooming interactions
+const HORIZONTAL_SPILLOVER_FACTOR = 3;
+// Fetch and draw 3x the time data than we're actually showing, for smooth
+// scrolling interactions
+const VERTICAL_SPILLOVER_FACTOR = 0;
+
+class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
+  uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
+    uki.ui.SvgGLView)) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
   constructor (options) {
     options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/GanttView/style.less' },
-      { type: 'text', url: 'views/GanttView/template.svg', name: 'template' }
+      { type: 'text', url: 'views/GanttView/template.svg', name: 'template' },
+      // Placeholder resources that don't actually get updated until later
+      { type: 'placeholder', value: null, name: 'totalUtilization' },
+      { type: 'placeholder', value: null, name: 'selectionUtilization' },
+      { type: 'placeholder', value: null, name: 'selectedIntervalTrace' }
     ]);
     super(options);
 
-    this.overviewScale = d3.scaleLinear();
-    this.spilloverScale = d3.scaleLinear();
-    this.xScale = d3.scaleLinear();
-    this.yScale = d3.scaleBand()
-      .paddingInner(0.2)
-      .paddingOuter(0.1);
-    this.yScale.invert = function (x) { // think about the padding later
-      const domain = this.domain();
-      const range = this.range();
-      const scale = d3.scaleQuantize().domain(range).range(domain);
-      return scale(x);
-    };
-
-    // Render whenever there's a change to the detailUtilization, or when the
-    // selection changes
-    this.linkedState.on('detailUnloaded', () => { this.render(); });
-    this.linkedState.on('detailLoaded', () => { this.render(); });
-    this.linkedState.on('selectionChanged', () => { this.render(); });
-  }
-
-  get isLoading () {
-    // Display the spinner + skip most of the draw call if we're still waiting
-    // on utilization data
-    return super.isLoading ||
-      this.linkedState.getNamedResource('detailUtilization') === null ||
-      (this.linkedState.selection?.hasNamedResource('detailUtilization') &&
-       this.linkedState.selection.getNamedResource('detailUtilization') === null);
-  }
-
-  async setup () {
-    await super.setup(...arguments);
-
-    // setup() is only called once this.d3el is ready; only at this point do we
-    // know how many bins to ask for
-    this.updateResolution();
-    // Update the resolution whenever the view is resized
-    this.on('resize', () => { this.updateResolution(); });
-
-    // Set up the SVG element and position its .chart group
-    this.d3el.html(this.resources[1])
-      .classed('GanttView', true);
+    // Ensure unique clip path IDs for each GanttView instantiation (can create
+    // problems if there's more than one GanttView)
+    this.clipPathId = (GanttView.NEXT_CLIP_ID || 1);
+    GanttView.NEXT_CLIP_ID += 1;
+    this.clipPathId = 'clip' + this.clipPathId;
 
     this.margin = {
       top: 20,
@@ -62,79 +39,146 @@ class GanttView extends LinkedMixin(uki.ui.ParentSizeViewMixin(uki.ui.SvgGLView)
       bottom: 40,
       left: 40
     };
+
+    // yScale maps the full list of locationNames to the full height of the
+    // canvas
+    this.yScale = d3.scaleBand()
+      .domain(this.linkedState.info.locationNames)
+      .paddingInner(0.2)
+      .paddingOuter(0.1);
+    // scaleBand doesn't come with an invert function...
+    this.yScale.invert = function (x) { // think about the padding later
+      const domain = this.domain();
+      const range = this.range();
+      const scale = d3.scaleQuantize().domain(range).range(domain);
+      return scale(x);
+    };
+    // Also add a function to scaleBand to get which locations intersect with
+    // a numeric range
+    this.yScale.invertRange = function (low, high) {
+      const domain = this.domain();
+      const result = [];
+      let position = low;
+      let index = domain.indexOf(this.invert(low));
+      while (index < domain.length && position <= high) {
+        result.push(domain[index]);
+        index += 1;
+        position = this(domain[index]);
+      }
+      return result;
+    };
+
+    // xScale refers to the data that's visible; converts from timestamps to
+    // the width of .yScroller
+    this.xScale = d3.scaleLinear();
+    // overviewScale refers to the full range of the data; converts from
+    // timestamps to the full width of the canvas
+    this.overviewScale = d3.scaleLinear();
+  }
+
+  get isLoading () {
+    // Display the spinner + skip most of the draw call if we're still waiting
+    // on utilization or trace data
+    return super.isLoading ||
+      this.getNamedResource('totalUtilization') === null ||
+      (this.linkedState.selection?.utilizationParameters &&
+       this.getNamedResource('selectionUtilization') === null) ||
+      (this.linkedState.selection?.intervalTraceParameters &&
+       this.getNamedResource('selectedIntervalTrace') === null);
+  }
+
+  async setup () {
+    await super.setup(...arguments);
+
+    // Set up the SVG element and position its .chart group
+    this.d3el.html(this.getNamedResource('template'))
+      .classed('GanttView', true);
     this.d3el.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
-    // Insert two divs inside the goldenlayout wrapper to put a scrollbar
-    // *below* the x-axis, and to ensure that the loading spinner doesn't
-    // interfere with zoom / panning interactions
-    this.scrollEl = this.glEl.append('div')
-      .classed('GanttViewHorizontalScroller', true)
-      .style('top', this.margin.top + 'px')
+    // Link our y axis and the clip region
+    this.d3el.select('clipPath').attr('id', this.clipPathId);
+    this.d3el.select('.yAxis').attr('clip-path', `url(#${this.clipPathId})`);
+
+    // Insert a div inside the goldenlayout wrapper to put a scrollbar
+    // *below* the x-axis
+    this.xFakeScroller = this.glEl.append('div')
+      .classed('xFakeScroller', true)
       .style('left', this.margin.left + 'px');
-    this.scrollEl.append('div')
+    // Empty div inside to make CSS overflow-x work
+    this.xFakeScroller.append('div')
       .classed('scrollContent', true);
 
-    // Initialize the scales
-    this.xScale.domain(this.linkedState.detailDomain);
-    this.yScale.domain(this.linkedState.info.locationNames);
+    // Convenience pointer to .yScroller
+    this.yScroller = this.d3el.select('.yScroller');
 
-    // Set up zoom, pan, hover, and click interactions
+    // Render whenever the selection changes
+    this.linkedState.on('selectionChanged', () => { this.render(); });
+    // Do a quickDraw immediately for horizontal brush / scroll / zoom
+    // interactions...
+    this.linkedState.on('detailDomainChangedSync', () => { this.quickDraw(); });
+    // ... and ask for new data when we're confident that rapid interactions
+    // have finished
+    this.linkedState.on('detailDomainChanged', () => {
+      this.updateDataIfNeeded(this.getChartShape());
+    });
+
+    // Set up local zoom, pan, hover, and click interactions
     this.setupInteractions();
 
-    // Set up listeners on the model for domain changes
-    this.linkedState.on('detailDomainChangedSync', () => { this.quickDraw(); });
-    this.linkedState.on('detailDomainChanged', () => { this.render(); });
+    // setup() is only called once this.d3el is ready; only at this point do we
+    // know how many bins to ask for
+    this.updateDataIfNeeded(this.getChartShape());
   }
 
   setupInteractions () {
-    // Select / deselect intervals when the user clicks; note that we use
-    // this.scrollEl to capture the event because it's the top layer (and we
-    // can't just apply pointer-events: none to it, because it needs to capture
-    // the wheel for zooming)... but that's okay, because we look up intervals
-    // by mouse position anyway. If we went back to SVG bars + element-based
-    // selections, we might need to do this differently.
-    this.scrollEl
+    // Update whenever GoldenLayout resizes us
+    this.on('resize', () => { this.render(); });
+
+    this.d3el.select('.eventCapturer')
       .on('click', () => {
-        // TODO: just deselect for now
+        // Select / deselect intervals when the user clicks
         this.linkedState.selection = null;
+      })
+      .on('wheel', event => {
+        // Zoom when using the wheel over the main chart area
+        const zoomFactor = 1.05 ** (normalizeWheel(event).pixelY / 100);
+        // Where was the mouse, relative to the chart (not its actual target;
+        // this.xFakeScroller wouldn't work)
+        const chartBounds = this.d3el.select('.chart').node().getBoundingClientRect();
+        const mousedPosition = this.xScale.invert(event.clientX - chartBounds.left);
+        this.linkedState.detailDomain = [
+          mousedPosition - zoomFactor * (mousedPosition - this.linkedState.detailDomain[0]),
+          mousedPosition + zoomFactor * (this.linkedState.detailDomain[1] - mousedPosition)
+        ];
+        event.preventDefault();
+        return false;
       });
 
-    // Update y axis in response to vertical scrolling
-    this.d3el.select('.verticalScroller').on('scroll', () => { this.quickDraw(); });
-
-    this.scrollEl.on('scroll', event => {
-      // Update detailDomain in response to horizontal scrolling (will indirectly
-      // result in quickDraw() + render() calls because of the detailDomainChanged
-      // listeners)
-      this.linkedState.detailDomain = this.getScrolledDomain();
+    // Pan the detailDomain in response to scrolling the x axis
+    this.xFakeScroller.on('scroll', () => {
+      // Update the domain based on where we've scrolled to
+      const oldDomain = this.linkedState.detailDomain;
+      const left = this.overviewScale.invert(this.xFakeScroller.node().scrollLeft);
+      this.linkedState.detailDomain = [left, left + (oldDomain[1] - oldDomain[0])];
     });
 
-    // Zoom in / out with the mouse wheel (prevent default scrolling)
-    this.scrollEl.on('wheel', event => {
-      const zoomFactor = 1.05 ** (normalizeWheel(event).pixelY / 100);
-      // Where was the mouse, relative to the chart (not its actual target;
-      // this.scrollEl wouldn't work)
-      const chartBounds = this.d3el.select('.chart').node().getBoundingClientRect();
-      const mousedPosition = this.xScale.invert(event.clientX - chartBounds.left);
-      this.linkedState.detailDomain = [
-        mousedPosition - zoomFactor * (mousedPosition - this.linkedState.detailDomain[0]),
-        mousedPosition + zoomFactor * (this.linkedState.detailDomain[1] - mousedPosition)
-      ];
-      event.preventDefault();
-      return false;
+    // Make sure the y axis links with scrolling (TODO: fetch new data when done)
+    this.yScroller.on('scroll', () => { this.quickDraw(); });
+    // Link wheel events on the y axis back to vertical scrolling
+    this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
+      this.yScroller.node().scrollTop += event.deltaY;
     });
   }
 
   /**
    * This is called immediately for rapid updates during things like zooming or
-   * scrolling (so this should never include expensive drawing commands), and
-   * queues a final render() call that is internally debounced
+   * scrolling (so this should never include expensive drawing commands)
    */
   quickDraw () {
-    this.updateCanvasShape(true);
-    this.drawAxes();
-    this.render();
+    const chartShape = this.getChartShape();
+    this.moveCanvas(chartShape);
+    this.drawAxes(chartShape);
   }
 
   async draw () {
@@ -148,134 +192,199 @@ class GanttView extends LinkedMixin(uki.ui.ParentSizeViewMixin(uki.ui.SvgGLView)
       return;
     }
 
-    // Update the scales + the canvas, GanttViewFakeScroller elements
-    // (uki.ui.ParentSizeViewMixin already makes sure the SVG element matches
-    // the GoldenLayout size)
-    this.updateCanvasShape(false);
-    // Update the axes
-    this.drawAxes();
-    // Update the bars
-    this.drawBars();
+    const chartShape = this.getChartShape();
+
+    this.moveCanvas(chartShape);
+    this.drawAxes(chartShape);
+    this.drawBars(chartShape);
+
     // Update the trace lines (or clear them if there aren't any)
-    // this.drawTraceLines();
-  }
+    // this.drawTraceLines(chartShape);
 
-  updateResolution () {
-    // Update our scale ranges (and bin count) based on how much space is available
-    const bounds = this.getBounds();
-    this.chartBounds = {
-      width: bounds.width - this.margin.left - this.margin.right,
-      height: bounds.height - this.margin.top - this.margin.bottom
-    };
-    this.xScale.range([0, this.chartBounds.width]);
-    this.yScale.range([this.chartBounds.height, 0]);
-    const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
-    this.linkedState.detailResolution = bins; // this will result in overviewLoaded / overviewUnloaded events
-
-    // TODO: continue here; need to move some of the updateCanvasShape stuff here
+    // As part of the full render (that could have been triggered from anywhere,
+    // start the process of requesting fresh data if the viewport is out of date)
+    this.updateDataIfNeeded(chartShape);
   }
 
   /**
-   * Update the scales, the size of the background, the canvas, and its
-   * foreignObject wrapper so that the latter's scrollbars auto-update
-   * themselves; ideally this shouldn't do any drawing
+   * Checks to see if we need to request new data
    */
-  updateCanvasShape (quick) {
+  async updateDataIfNeeded (chartShape) {
+    const domain = chartShape.spilloverXScale.domain();
+    let locations = chartShape.locations;
+
+    // We consider chartShape to be out of date if:
+    // 1. the spillover domain is different, or...
+    const viewportChanged = !this._lastChartShape ||
+      this._lastChartShape.spilloverXScale.domain()
+        .some((timestamp, i) => domain[i] !== timestamp) ||
+    // 2. the expected locations are different
+      this._lastChartShape.locations.length !== locations.length ||
+      this._lastChartShape.locations.some((loc, i) => locations[i] !== loc);
+
+    if (viewportChanged) {
+      // Cache the shape that was currently relevant when the data was fetched
+      this._lastChartShape = chartShape;
+
+      // Make the list of locations a URL-friendly comma-separated list
+      locations = globalThis.encodeURIComponent(locations.join(','));
+
+      // Basic URL that both totalUtilization and selectionUtilization will use
+      const baseUrl = `/datasets/${this.datasetId}/utilizationHistogram?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}&locations=${locations}`;
+
+      // Add any additional per-selection parameters
+      const selectionParams = this.linkedState.selection?.utilizationParameters;
+
+      // Send the API requests
+      const totalPromise = this.updateResource({ name: 'totalUtilization', type: 'json', url: baseUrl });
+      const selectionPromise = selectionParams
+        ? this.updateResource({ name: 'selectionUtilization', type: 'json', url: baseUrl + selectionParams })
+        : this.updateResource({ name: 'selectionUtilization', type: 'placeholder', value: null }); // no current selection; replace data with null
+
+      // Initial render call to show the spinner if waiting for data takes a while
+      // (because render() is debounced, the spinner won't show if the request
+      // is fast)
+      this.render();
+      await Promise.all([totalPromise, selectionPromise]);
+      // Ensure that everything is updated with the new data
+      this.render();
+    }
+    return chartShape;
+  }
+
+  computeSpillover ([low, high], factor) {
+    const halfOriginalWidth = (high - low) / 2;
+    const center = low + halfOriginalWidth;
+    const halfSpilloverWidth = factor * halfOriginalWidth;
+    return [Math.floor(center - halfSpilloverWidth), Math.ceil(center + halfSpilloverWidth)];
+  }
+
+  /**
+   * Calculate the visible chart area, whether scrollbars should be showing,
+   * update all scales; after accounting for spillover space, figure out how
+   * many bins and which locations should be requested from the API
+   * @return {boolean} True if the viewport is inconsistent with the data that
+   * is currently loaded (i.e. it has been resized, scrolled, or zoomed since
+   * the last updateShapeAndDataIfNeeded call)
+   */
+  getChartShape () {
     // Figure out how much space we have, including whether or not to show the
     // scrollbars
     const bounds = this.getBounds();
-    let chartWidth = bounds.width - this.margin.left - this.margin.right;
-    let chartHeight = bounds.height - this.margin.top - this.margin.bottom;
-    const requiredHeight = MIN_LOCATION_HEIGHT * this.linkedState.info.locationNames.length;
-    const rightScrollbarIsShowing = requiredHeight > chartHeight;
-    const bottomScrollbarIsShowing =
+    const chartShape = {
+      chartWidth: bounds.width - this.margin.left - this.margin.right,
+      chartHeight: bounds.height - this.margin.top - this.margin.bottom,
+      requiredHeight: MIN_LOCATION_HEIGHT * this.linkedState.info.locationNames.length
+    };
+    chartShape.rightScrollbarIsShowing = chartShape.requiredHeight > chartShape.chartHeight;
+    chartShape.bottomScrollbarIsShowing =
       this.linkedState.detailDomain[0] > this.linkedState.overviewDomain[0] ||
       this.linkedState.detailDomain[1] < this.linkedState.overviewDomain[1];
-    if (rightScrollbarIsShowing) {
-      chartWidth -= this.scrollBarSize;
+    if (chartShape.rightScrollbarIsShowing) {
+      chartShape.chartWidth -= this.scrollBarSize;
     }
-    if (bottomScrollbarIsShowing) {
-      chartHeight -= this.scrollBarSize;
+    if (chartShape.bottomScrollbarIsShowing) {
+      chartShape.chartHeight -= this.scrollBarSize;
     }
-    const fullHeight = Math.max(requiredHeight, chartHeight);
+    // Force at least 1 px width, height
+    chartShape.chartWidth = Math.max(1, chartShape.chartWidth);
+    chartShape.chartHeight = Math.max(1, chartShape.chartHeight);
+    // Use either the required space or expand to use the space we have
+    chartShape.fullHeight = Math.max(chartShape.requiredHeight, chartShape.chartHeight);
 
     // Update the scales
-    this.yScale
-      .domain(this.linkedState.info.locationNames) // Note: if we ever enable alternate sorting, that should probably be implemented in linkedState, not here?
-      .range([0, fullHeight]);
-    this.xScale
-      .domain(this.linkedState.detailDomain)
-      .range([0, chartWidth]);
-    this.spilloverScale
-      .range([-chartWidth, 2 * chartWidth]) // (3x spillover width for smooth scrolling between quickDraw and draw calls)
-      .domain([this.xScale.invert(-chartWidth), this.xScale.invert(2 * chartWidth)]);
+    this.xScale.range([0, chartShape.chartWidth])
+      .domain(this.linkedState.detailDomain);
+    this.yScale.range([0, chartShape.fullHeight]);
 
     // How many pixels would the full data span at this zoom level?
-    const fullWidth =
+    chartShape.fullWidth =
       this.xScale(this.linkedState.overviewDomain[1]) -
       this.xScale(this.linkedState.overviewDomain[0]);
     this.overviewScale
       .domain(this.linkedState.overviewDomain)
-      .range([0, fullWidth]);
+      .range([0, chartShape.fullWidth]);
 
-    // Update the canvas size...
+    // Figure out the data / pixel bounds that we should query
+    const spilloverXDomain = this.computeSpillover(this.linkedState.detailDomain, HORIZONTAL_SPILLOVER_FACTOR);
+    // Ensure integer endpoints
+    spilloverXDomain[0] = Math.floor(spilloverXDomain[0]);
+    spilloverXDomain[1] = Math.ceil(spilloverXDomain[1]);
+    const spilloverXRange = spilloverXDomain.map(this.overviewScale);
+    chartShape.spilloverXScale = d3.scaleLinear()
+      .domain(spilloverXDomain)
+      .range(spilloverXRange);
+
+    // How many (integer) bins should we ask for (1 per pixel)?
+    chartShape.bins = Math.ceil(spilloverXRange[1] - spilloverXRange[0]);
+
+    // Given the scroll position and size, which locations should be visible?
+    let spilloverYRange = [
+      this.yScroller.node().scrollTop,
+      this.yScroller.node().scrollTop + chartShape.chartHeight
+    ];
+    // Add vertical spillover
+    spilloverYRange = this.computeSpillover(spilloverYRange, VERTICAL_SPILLOVER_FACTOR);
+    chartShape.spilloverYRange = spilloverYRange;
+    chartShape.locations = this.yScale.invertRange(...spilloverYRange);
+
+    return chartShape;
+  }
+
+  moveCanvas (chartShape) {
+    // Position the canvas horizontally using the OLD spilloverXScale (otherwise
+    // the canvas won't even move during scrolling... if they scroll really fast,
+    // it's possible to move the canvas offscreen, but that will get fixed with
+    // the next updateDataIfNeeded() call
+    const canvasPosition = this.xScale(
+      this._lastChartShape?.spilloverXScale.domain()[0] ||
+      chartShape.spilloverXScale.domain()[0]
+    );
+    // Update the canvas size to have space for the horizontal bins (vertically,
+    // we use the full height so that .yScroller shows a correct
+    // scrollbar, even though we might not draw the whole vertical space)
     this.d3el.select('.gantt-canvas')
-      .attr('width', this.spilloverScale.range()[1] - this.spilloverScale.range()[0])
-      .attr('height', fullHeight)
-      .style('left', -chartWidth + 'px');
-    // ... and the size of the wrapper
-    this.d3el.select('.verticalScroller')
-      .attr('width', chartWidth + (rightScrollbarIsShowing ? this.scrollBarSize : 0))
-      .attr('height', chartHeight)
-      .style('overflow-y', rightScrollbarIsShowing ? 'scroll' : 'hidden');
+      .attr('width', chartShape.bins)
+      .attr('height', chartShape.fullHeight)
+      .style('left', canvasPosition + 'px');
 
-    // Update the wrapper size / overflow based on whether the scrollbars should
-    // be visible
-    this.scrollEl
-      .style('width', chartWidth + 'px')
+    // Update the eventCapturer rect
+    this.d3el.select('.eventCapturer')
+      .attr('width', chartShape.chartWidth)
+      .attr('height', chartShape.chartHeight);
+
+    // Update the size of the foreignObject
+    this.yScroller
+      .attr('width', chartShape.chartWidth +
+        (chartShape.rightScrollbarIsShowing ? this.scrollBarSize : 0))
+      .attr('height', chartShape.chartHeight)
+      .style('overflow-y', chartShape.rightScrollbarIsShowing ? 'scroll' : 'hidden');
+    // Update the fake scroller position, size
+    this.xFakeScroller
+      .style('width', chartShape.chartWidth + 'px')
+      .style('top', (this.margin.top + chartShape.chartHeight) + 'px')
       .style('bottom', '0px')
-      .style('overflow-x', bottomScrollbarIsShowing ? 'scroll' : 'hidden');
-    // Update the empty div inside
-    this.scrollEl.select('.scrollContent')
-      .style('width', fullWidth + 'px')
-      .style('height', fullHeight + 'px');
-
-    // Scroll to the current position
-    let quickOffset = 0;
-    const targetPosition = this.overviewScale(this.linkedState.detailDomain[0]);
-    if (quick) {
-      // During quick drawing calls, slide the canvas left/right instead of
-      // redrawing it
-      quickOffset = targetPosition - this.scrollEl.node().scrollLeft;
-    }
-    this.scrollEl.node().scrollLeft = targetPosition;
-    this.d3el.select('.verticalScroller').node().scrollLeft = quickOffset;
+      .style('overflow-x', chartShape.bottomScrollbarIsShowing ? 'scroll' : 'hidden');
+    // Update the empty div inside to simulate the correct scrollbar position
+    this.xFakeScroller.select('.scrollContent')
+      .style('width', chartShape.fullWidth + 'px')
+      .style('height', chartShape.fullHeight + 'px');
+    // Scroll the empty div to the current position
+    chartShape.scrollLeft = this.overviewScale(this.linkedState.detailDomain[0]);
+    this.xFakeScroller.node().scrollLeft = chartShape.scrollLeft;
   }
 
-  /**
-   * Derive the domain that we'd expect to see given the current horizontal
-   * scroll position
-   */
-  getScrolledDomain () {
-    const leftOffset = this.scrollEl.node().scrollLeft;
-    const localWidth = this.xScale.range()[1];
-    return [leftOffset, leftOffset + localWidth].map(this.overviewScale.invert);
-  }
-
-  drawAxes () {
-    const chartWidth = parseFloat(this.d3el.select('.verticalScroller').attr('width'));
-    const chartHeight = parseFloat(this.d3el.select('.verticalScroller').attr('height'));
-
+  drawAxes (chartShape) {
     // Update the x axis
     const xAxisGroup = this.d3el.select('.xAxis')
-      .attr('transform', `translate(0, ${chartHeight})`)
+      .attr('transform', `translate(0, ${chartShape.chartHeight})`)
       .call(d3.axisBottom(this.xScale));
     cleanupAxis(xAxisGroup);
 
     // Position the x label
     this.d3el.select('.xAxisLabel')
-      .attr('x', chartWidth / 2)
-      .attr('y', chartHeight + 2 * this.emSize);
+      .attr('x', chartShape.chartWidth / 2)
+      .attr('y', chartShape.chartHeight + 2 * this.emSize);
 
     // Update the y axis
     let yTicks = this.d3el.select('.yAxis').selectAll('.tick')
@@ -285,19 +394,32 @@ class GanttView extends LinkedMixin(uki.ui.ParentSizeViewMixin(uki.ui.SvgGLView)
       .classed('tick', true);
     yTicks = yTicks.merge(yTicksEnter);
 
-    // Link the y axis position to .verticalScroller
-    const yOffset = this.d3el.select('.verticalScroller').node().scrollTop;
+    // Link the y axis position to yScroller
+    const yOffset = this.yScroller.node().scrollTop;
     this.d3el.select('.yAxis').attr('transform', `translate(0,${-yOffset})`);
+
+    // Update the clipPath position and dimensions
+    this.d3el.select('clipPath rect')
+      .attr('x', -this.margin.left)
+      .attr('y', yOffset)
+      .attr('width', chartShape.chartWidth + this.margin.left)
+      .attr('height', chartShape.chartHeight);
+
+    // Update .yAxisScrollCapturer
+    this.d3el.select('.yAxisScrollCapturer')
+      .attr('x', -this.margin.left)
+      .attr('width', this.margin.left)
+      .attr('height', chartShape.chartHeight);
 
     // y tick coordinate system in between each row
     yTicks.attr('transform', d => `translate(0,${this.yScale(d) + this.yScale.bandwidth() / 2})`);
 
-    // y ticks span the width of the chart
+    // y ticks span the full width of the chart
     const lineOffset = -this.yScale.step() / 2;
     yTicksEnter.append('line');
     yTicks.select('line')
       .attr('x1', 0)
-      .attr('x2', chartWidth)
+      .attr('x2', chartShape.chartWidth)
       .attr('y1', lineOffset)
       .attr('y2', lineOffset);
 
@@ -319,33 +441,41 @@ class GanttView extends LinkedMixin(uki.ui.ParentSizeViewMixin(uki.ui.SvgGLView)
 
     // Position the y label
     this.d3el.select('.yAxisLabel')
-      .attr('transform', `translate(${-this.emSize - 12},${chartHeight / 2}) rotate(-90)`);
+      .attr('transform', `translate(${-this.emSize - 12},${chartShape.chartHeight / 2}) rotate(-90)`);
   }
 
-  drawBars () {
+  drawBars (chartShape) {
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;
-    const intervals = this.linkedState.getNamedResource('intervals');
+    const totalUtilization = this.getNamedResource('totalUtilization');
+    const selectionUtilization = this.getNamedResource('selectionUtilization');
 
     const ctx = this.d3el.select('.gantt-canvas').node().getContext('2d');
-    const canvasWidth = this.spilloverScale.range()[1] - this.spilloverScale.range()[0];
-    const canvasHeight = this.yScale.range()[1] - this.yScale.range()[0];
-    // TODO: we could also probably get away with only drawing the visible subset of locations...
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    const spilloverWidth = chartShape.spilloverXScale.range()[1] - chartShape.spilloverXScale.range()[0];
+    ctx.clearRect(0, 0, spilloverWidth, chartShape.fullHeight);
 
-    const primitiveSelected = this.linkedState.selection?.type === 'PrimitiveSelection';
-    const intervalSelected = this.linkedState.selection?.type === 'IntervalSelection';
-    const height = this.yScale.bandwidth();
+    const bandwidth = this.yScale.bandwidth();
+    for (const [location, data] of Object.entries(totalUtilization.locations)) {
+      const y0 = this.yScale(location);
+      for (const [binNo, tUtil] of data.entries()) {
+        const sUtil = selectionUtilization?.locations?.[location]?.[binNo];
+        // Which border to draw (if any)?
+        if (sUtil >= 0) {
+          ctx.fillStyle = theme['--selection-border-color'];
+          ctx.fillRect(binNo, y0, 1, bandwidth);
+        } else if (tUtil >= 0) {
+          ctx.fillStyle = theme['--border-color'];
+          ctx.fillRect(binNo, y0, 1, bandwidth);
+        }
 
-    for (const interval of intervals) {
-      const selected =
-        (primitiveSelected && this.linkedState.selection.primitiveName === interval.primitiveName) ||
-        (intervalSelected && this.linkedState.selection.intervalId === interval.intervalId);
-      const left = this.spilloverScale(interval.enter);
-      const right = this.spilloverScale(interval.leave);
-      const top = this.yScale(interval.location);
-      // Draw the fill
-      ctx.fillStyle = selected ? theme['--selection-color'] : theme['--text-color-softer'];
-      ctx.fillRect()
+        // Which fill to draw (if any)?
+        if (sUtil >= 1) {
+          ctx.fillStyle = theme['--selection-color'];
+          ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+        } else if (tUtil >= 1) {
+          ctx.fillStyle = theme['--text-color-softer'];
+          ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+        }
+      }
     }
   }
 }

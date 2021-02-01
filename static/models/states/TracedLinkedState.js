@@ -5,128 +5,12 @@ const VIEW_STATUS = LinkedState.VIEW_STATUS;
 // detailDomain must be at least 1 ns
 const MIN_BRUSH_SIZE = 1;
 
-// how much data we should request beyond each end of detailDomain
-const SPILLOVER_WIDTH = 3;
-
 class TracedLinkedState extends LinkedState {
-  constructor (options) {
-    options.resources = options.resources || [];
-    options.resources.push(...[
-      // 'deferred' resources don't actually do anything other than serve as
-      // documentation / placeholders that we expect these resources to exist
-
-      // overviewUtilization is loaded later when _overviewResolution is set to
-      // a non-null value (e.g. when UtilizationView knows how many pixels it
-      // has to work with)
-      { type: 'deferred', initialValue: null, name: 'overviewUtilization' },
-
-      // detailUtilization is loaded later when _detailResolution is set to
-      // a non-null value (e.g. when GanttView knows how many pixels it has to
-      // work with)
-      { type: 'deferred', initialValue: null, name: 'detailUtilization' }
-    ]);
-    super(options);
+  constructor () {
+    super(...arguments);
 
     // Start the detail domain at the same level as the overview
     this._detailDomain = Array.from(this.overviewDomain);
-
-    // Both resolutions start as null because we don't know how many bins to
-    // ask for
-    this._overviewResolution = null;
-    this._detailResolution = null;
-  }
-
-  get overviewResolution () {
-    return this._overviewResolution;
-  }
-
-  /**
-   * @param  {integer|null} value The number of bins that the overview should
-   * contain, or null if we should revert to a loading state
-   */
-  set overviewResolution (value) {
-    if (this._overviewResolution !== value) {
-      this._overviewResolution = value;
-    }
-    this.refreshOverviewUtilization();
-  }
-
-  /**
-   * Update our overviewUtilization resource, as well as any selection's
-   * overviewUtilization
-   */
-  async refreshOverviewUtilization () {
-    this.trigger('overviewUnloaded');
-
-    // Fetch the total utilization
-    const totalPromise = this.updateResource({
-      name: 'overviewUtilization',
-      type: 'json',
-      url: `/datasets/${this.info.datasetId}/utilizationHistogram?bins=${this.overviewResolution}`
-    });
-
-    // If the current selection also needs to collect overview utilization data,
-    // update it as well
-    let selectionPromise = Promise.resolve();
-    if (this.selection?.refreshOverviewUtilization) {
-      selectionPromise = this.selection.refreshOverviewUtilization(this);
-    }
-
-    // Wait for both requests to finish before notifying views that we're ready
-    await Promise.all([totalPromise, selectionPromise]);
-    this.trigger('overviewLoaded');
-  }
-
-  get detailResolution () {
-    return this._detailResolution;
-  }
-
-  /**
-   * @param  {integer|null} value The number of bins that the details should
-   * contain, or null if we should revert to a loading state
-   */
-  set detailResolution (value) {
-    if (this._detailResolution !== value) {
-      this._detailResolution = value;
-    }
-    this.refreshDetailUtilization();
-  }
-
-  /**
-   * Some views (e.g. GanttView) need data beyond detailDomain; this computes
-   * the actual bins that we should request
-   */
-  get detailSpilloverResolution () {
-    return SPILLOVER_WIDTH * this.detailResolution;
-  }
-
-  /**
-   * Update our detailUtilization resource, as well as any selection's
-   * detailUtilization
-   */
-  async refreshDetailUtilization () {
-    this.trigger('detailUnloaded');
-
-    const [begin, end] = this.detailSpilloverDomain;
-    const locationList = encodeURIComponent(this.info.locationNames.join(','));
-
-    // Fetch the total utilization
-    const totalPromise = this.updateResource({
-      name: 'detailUtilization',
-      type: 'json',
-      url: `/datasets/${this.info.datasetId}/utilizationHistogram?bins=${this.detailSpilloverResolution}&begin=${begin}&end=${end}&locations=${locationList}`
-    });
-
-    // If the current selection also needs to collect detail utilization data,
-    // update it as well
-    let selectionPromise = Promise.resolve();
-    if (this.selection?.refreshDetailUtilization) {
-      selectionPromise = this.selection.refreshDetailUtilization(this);
-    }
-
-    // Wait for both requests to finish before notifying views that we're ready
-    await Promise.all([totalPromise, selectionPromise]);
-    this.trigger('detailLoaded');
   }
 
   /**
@@ -137,21 +21,11 @@ class TracedLinkedState extends LinkedState {
   }
 
   /**
-   * Extrapolate which begin / end to actually request from the server
-   */
-  get detailSpilloverDomain () {
-    const halfOriginalWidth = (this.detailDomain[1] - this.detailDomain[0]) / 2;
-    const center = this.detailDomain[0] + halfOriginalWidth;
-    const halfSpilloverWidth = SPILLOVER_WIDTH * halfOriginalWidth;
-    return [Math.floor(center - halfSpilloverWidth), Math.ceil(center + halfSpilloverWidth)];
-  }
-
-  /**
    * Constrain that detailDomain makes sense, and notify views when the it changes
    */
   set detailDomain (inputDomain) {
     // Allow views to set just one of the values (e.g. dragging one brush
-    // handle)
+    // handle in UtilizationView)
     const newDomain = [
       inputDomain[0] === undefined ? this._detailDomain[0] : inputDomain[0],
       inputDomain[1] === undefined ? this._detailDomain[1] : inputDomain[1]

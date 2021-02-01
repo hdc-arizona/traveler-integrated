@@ -2,7 +2,7 @@
 
 class Selection extends uki.utils.IntrospectableMixin(uki.Model) {
   /**
-   * A simple string that identifies the selection
+   * A short string that identifies the selection
    */
   get label () {
     throw new Error(`Selection class ${this.type} has not implemented the required label getter`);

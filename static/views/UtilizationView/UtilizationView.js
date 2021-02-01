@@ -9,7 +9,10 @@ class UtilizationView extends
   constructor (options) {
     options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/UtilizationView/style.less' },
-      { type: 'text', url: 'views/UtilizationView/template.svg', name: 'template' }
+      { type: 'text', url: 'views/UtilizationView/template.svg', name: 'template' },
+      // Placeholder resources that don't actually get updated until updateResolution()
+      { type: 'placeholder', value: null, name: 'total' },
+      { type: 'placeholder', value: null, name: 'selection' }
     ]);
     super(options);
 
@@ -23,15 +26,9 @@ class UtilizationView extends
     this.xScale = d3.scaleLinear().clamp(true)
       .domain(this.linkedState.overviewDomain); // The overviewDomain never changes, so we can set it in the constructor
     this.yScale = d3.scaleLinear(); // We don't know the y domain yet...
-
-    // Render whenever there's a change to the overviewUtilization data, and
-    // whenever the selection changes
-    this.linkedState.on('overviewLoaded', () => { this.render(); });
-    this.linkedState.on('overviewUnloaded', () => { this.render(); });
-    this.linkedState.on('selectionChanged', () => { this.render(); });
   }
 
-  updateResolution () {
+  async updateResolution () {
     // Update our scale ranges (and bin count) based on how much space is available
     const bounds = this.getBounds();
     this.chartBounds = {
@@ -41,7 +38,17 @@ class UtilizationView extends
     this.xScale.range([0, this.chartBounds.width]);
     this.yScale.range([this.chartBounds.height, 0]);
     const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
-    this.linkedState.overviewResolution = bins; // this will result in overviewLoaded / overviewUnloaded events
+
+    const baseUrl = `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}`;
+    const selectionParams = this.linkedState.selection?.utilizationParameters;
+    const totalPromise = this.updateResource({ name: 'total', type: 'json', url: baseUrl });
+    const selectionPromise = selectionParams
+      ? this.updateResource({ name: 'selection', type: 'json', url: baseUrl + selectionParams })
+      : this.updateResource({ name: 'selection', type: 'placeholder', value: null });
+    // Initial render call to show the spinner if waiting for data takes a while
+    this.render();
+    await Promise.all([totalPromise, selectionPromise]);
+    this.render();
   }
 
   async setup () {
@@ -59,38 +66,21 @@ class UtilizationView extends
     this.d3el.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
-    // Prep interactive callbacks for the brush
-    this.setupBrush();
-
-    // Update the brush immediately if some other view changes it (e.g.
-    // GanttView is zoomed)
+    // Ask for new data whenever the selection changes
+    this.linkedState.on('selectionChanged', () => { this.updateResolution(); });
+    // Update the brush immediately whenever any view changes it
     this.linkedState.on('detailDomainChangedSync', () => { this.drawBrush(); });
-    this.linkedState.on('detailDomainChanged', () => { this.render(); });
+    // Prep local interactive callbacks for updating the brush
+    this.setupBrush();
   }
 
   get isLoading () {
     // Display the spinner + skip most of the draw call if we're still waiting
     // on utilization data
     return super.isLoading ||
-      this.linkedState.getNamedResource('overviewUtilization') === null ||
-      (this.linkedState.selection?.hasNamedResource('overviewUtilization') &&
-       this.linkedState.selection.getNamedResource('overviewUtilization') === null);
-  }
-
-  get error () {
-    if (super.error) {
-      return super.error;
-    }
-    // In addition to any errors that happen during setup() or draw calls(),
-    // display any errors that occurred trying to retrieve utilization data
-    if (this.linkedState.getNamedResource('overviewUtilization') instanceof Error) {
-      return this.linkedState.getNamedResource('overviewUtilization');
-    }
-    if (this.linkedState.selection?.hasNamedResource('overviewUtilization') &&
-        this.linkedState.selection.getNamedResource('overviewUtilization') instanceof Error) {
-      return this.linkedState.selection.getNamedResource('overviewUtilization');
-    }
-    return null;
+      this.getNamedResource('total') === null ||
+      (this.linkedState.selection?.utilizationParameters &&
+       this.getNamedResource('selection') === null);
   }
 
   async draw () {
@@ -104,8 +94,8 @@ class UtilizationView extends
       return;
     }
 
-    const totalUtilization = this.linkedState.getNamedResource('overviewUtilization');
-    const selectionUtilization = this.linkedState.selection?.getNamedResource('overviewUtilization') || null;
+    const totalUtilization = this.getNamedResource('total');
+    const selectionUtilization = this.getNamedResource('selection');
 
     // We finally can compute the y domain; totalUtilization will always be
     // greater than selectionUtilization, so use its max for the y axis
