@@ -9,6 +9,13 @@ from intervaltree import Interval, IntervalTree
 from .sparseUtilizationList import SparseUtilizationList
 from . import logToConsole
 
+# Helper function from https://stackoverflow.com/a/4836734/1058935 for
+# human-friendly location name sorting
+def natural_sort(l):
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
+    return sorted(l, key = alphanum_key)
+
 # Tools for handling OTF2 traces
 eventLineParser = re.compile(r'^((?:ENTER)|(?:LEAVE))\s+(\d+)\s+(\d+)\s+(.*)$')
 attrParsers = {
@@ -152,7 +159,7 @@ async def processRawTrace(self, datasetId, file, log):
     await log('Lines skipped because they are not yet supported: %d' % unsupportedSkippedLines)
 
     # Now that we've seen all the locations, store that list in our info
-    self[datasetId]['info']['locationNames'] = sorted(self.sortedEventsByLocation.keys())
+    self[datasetId]['info']['locationNames'] = natural_sort(self.sortedEventsByLocation.keys())
 
 async def combineIntervals(self, datasetId, log):
     # Set up database file
@@ -181,7 +188,7 @@ async def combineIntervals(self, datasetId, log):
         return newInterval
 
     await log('Combining enter / leave events into intervals (.=2500 intervals)')
-    numIntervals = mismatchedIntervals = 0
+    numIntervals = mismatchedIntervals = missingPrimitives = 0
 
     # Keep track of the earliest and latest timestamps we see
     intervalDomain = [float('inf'), float('-inf')]
@@ -215,9 +222,15 @@ async def combineIntervals(self, datasetId, log):
                 if len(lastEventStack) > 0:
                     lastEventStack[-1]['Timestamp'] = event['Timestamp'] + 1  # move the enter event to after 1 time unit
             if currentInterval is not None:
-                # Count whether the primitive attribute differed between enter / leave
+                # Count whether the primitive attribute is missing or differed between enter / leave
                 if 'Primitive' not in currentInterval:
-                    mismatchedIntervals += 1
+                    if 'Primitive' not in currentInterval['enter'] or 'Primitive' not in currentInterval['leave']:
+                        missingPrimitives += 1
+                        currentInterval['Primitive'] = '(primitive name missing)'
+                    else:
+                        mismatchedIntervals += 1
+                        # Use the enter event's primitive name
+                        currentInterval['Primitive'] = currentInterval['enter']['Primitive']
                 intervals[intervalId] = currentInterval
                 # Update intervalDomain
                 intervalDomain[0] = min(intervalDomain[0], currentInterval['enter']['Timestamp'])
@@ -243,7 +256,7 @@ async def combineIntervals(self, datasetId, log):
     self[datasetId]['info']['intervalDomain'] = intervalDomain
 
     await log('')
-    await log('Finished creating %i intervals; %i refer to mismatching primitives' % (numIntervals, mismatchedIntervals))
+    await log('Finished creating %i intervals; %i had no primitive name; %i had mismatching primitives (ENTER primitive used)' % (numIntervals, missingPrimitives, mismatchedIntervals))
 
 async def buildIntervalTree(self, datasetId, log):
     await log('Building IntervalTree index of intervals (.=2500 intervals)')

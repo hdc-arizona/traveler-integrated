@@ -57,7 +57,7 @@ class TracedLinkedState extends LinkedState {
     if (newDomain[0] !== this._detailDomain[0] || newDomain[1] !== this._detailDomain[1]) {
       this._detailDomain = newDomain;
       this.syncTrigger('detailDomainChangedSync'); // For cheap responses like scrolling axes / adjusting brush sizes
-      this.stickyTrigger('detailDomainChanged'); // For more expensive responses like full re-renders of views
+      this.stickyTrigger('detailDomainChanged', null, 100); // For more expensive responses like full re-renders of views
     }
   }
 

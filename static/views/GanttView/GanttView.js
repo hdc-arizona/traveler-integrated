@@ -4,14 +4,14 @@ import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
 // Minimum vertical pixels per row
-const MIN_LOCATION_HEIGHT = 100;
+const MIN_LOCATION_HEIGHT = 30;
 
 // Fetch and draw 3x the time data than we're actually showing, for smooth
 // scrolling, zooming interactions
 const HORIZONTAL_SPILLOVER_FACTOR = 3;
 // Fetch and draw 3x the time data than we're actually showing, for smooth
 // scrolling interactions
-const VERTICAL_SPILLOVER_FACTOR = 0;
+const VERTICAL_SPILLOVER_FACTOR = 1;
 
 class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
   uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
@@ -163,8 +163,14 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       this.linkedState.detailDomain = [left, left + (oldDomain[1] - oldDomain[0])];
     });
 
-    // Make sure the y axis links with scrolling (TODO: fetch new data when done)
-    this.yScroller.on('scroll', () => { this.quickDraw(); });
+    // Make sure the y axis links with scrolling
+    this.yScroller.on('scroll', () => {
+      this.quickDraw();
+      this.render();
+      // render() is debounced, so it will only be called once when scrolling
+      // stops (and call its updateDataIfNeeded function if we need to load
+      // more vertical data)
+    });
     // Link wheel events on the y axis back to vertical scrolling
     this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
       this.yScroller.node().scrollTop += event.deltaY;
@@ -459,11 +465,11 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       for (const [binNo, tUtil] of data.entries()) {
         const sUtil = selectionUtilization?.locations?.[location]?.[binNo];
         // Which border to draw (if any)?
-        if (sUtil >= 0) {
+        if (sUtil > 0) {
           ctx.fillStyle = theme['--selection-border-color'];
           ctx.fillRect(binNo, y0, 1, bandwidth);
-        } else if (tUtil >= 0) {
-          ctx.fillStyle = theme['--border-color'];
+        } else if (tUtil > 0) {
+          ctx.fillStyle = theme['--text-color-richer'];
           ctx.fillRect(binNo, y0, 1, bandwidth);
         }
 
