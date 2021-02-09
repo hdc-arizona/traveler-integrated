@@ -111,6 +111,7 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
       left: 20
     };
     this.legendWidth = 300;
+    this.legendHeight = 60;
     this.nodeWidth = 50;
     this.wideNodeWidth = 120;
     this.nodeHeight = 20;
@@ -232,9 +233,9 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
       // How far over it could be if we use the available screen space
       viewBounds.width - this.scrollBarSize - this.wideNodeWidth - this.margin.right
     )];
-    const yRange = [this.margin.top + this.nodeHeight / 2, Math.max(
+    const yRange = [this.margin.top + this.legendHeight + this.nodeHeight / 2, Math.max(
       // The minimum bottom-most coordinate (remember the original domain is rotated)
-      this.margin.top + this.nodeHeight / 2 + xDomain[1] - xDomain[0],
+      this.margin.top + this.legendHeight + this.nodeHeight / 2 + xDomain[1] - xDomain[0],
       // How far down it could be if we use the available screen space
       viewBounds.height - this.scrollBarSize - this.nodeHeight / 2 - this.margin.bottom
     )];

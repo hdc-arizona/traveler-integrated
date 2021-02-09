@@ -148,9 +148,66 @@ a few opportunities for scalability:
   library that we could get away with cutting
 
 ## Debugging traveler-integrated inside a running JetLag docker container
-Debugging stuff inside a Docker container can be a pain. Assuming the
-`JetLag` and `traveler-integrated` repositories are both in the same directory,
-you can do the following (from `JetLag/docker`):
+
+### Strategy 1: Point JetLag to your host IP address
+***WSL setups will probably need to add something like `"bip": "192.168.200.1/24"` to Docker Desktop -> Settings -> Docker Engine for this to work***
+
+You will need to open two terminal windows:
+
+1. TERMINAL A: Run JetLag:
+
+```bash
+# Tell JetLag to send data to our host IP address
+export TRAVELER_IP=`hostname -I | xargs`
+
+# Here we build the latest version of JetLag locally...
+git clone https://github.com/STEllAR-GROUP/JetLag.git
+cd JetLag/docker
+docker build . -t jetlag:test
+docker run --rm -it -e TRAVELER_IP -p 8789:8789 --name jetlag_container jetlag:test
+# Note that we DON'T expose the -p 8000:8000 port; otherwise this would conflict with your host traveler instance
+```
+
+2. TERMINAL B: Start our local version of traveler:
+
+```bash
+cd traveler-integrated
+./serve.py
+```
+
+At this point, open up the jupyter notebook (url in TERMINAL A); `job.viz()`
+commands will now pipe data to the version of `traveler-integrated` running in TERMINAL B.
+
+To test that we can access the host instance of traveler from inside the docker container, in a third terminal:
+
+```bash
+docker exec -it jetlag_container bash
+
+echo $TRAVELER_IP
+# Should be the host's IP address
+
+# Kill the traveler instance inside the container so we don't accidentally
+# ping it
+ps -A
+kill PID # where PID corresponds to the python3 process
+
+# Now ping traveler on the host
+curl -I "$TRAVELER_IP:8000"
+```
+
+should look something like:
+
+```
+date: Wed, 03 Feb 2021 23:22:51 GMT
+server: uvicorn
+content-length: 31
+content-type: application/json
+```
+
+### Strategy 2: mount your version of traveler-integrated as a volume
+Be careful with this; changes that you make inside the docker container will also affect your host repo.
+
+1. From `JetLag/docker`:
 
 ```bash
 cp ../../traveler-integrated/docker-compose.jetlag.yml ./docker-compose.override.yml
@@ -162,10 +219,10 @@ Now JetLag will replace its cloned version of the `main` branch of
 
 I haven't tested this thoroughly. Likely hiccups:
 
-- This seems to be enough to tweak client-side stuff in `static`, but you'll
-  need to kill and restart the server if you make server-side changes;
-  `docker exec -it trav /bin/bash` should get you started. `serve.py` is likely
-  the only `python3` job if you run `ps -A`
+- This seems to be enough to tweak client-side stuff in `static`, but
+  you'll need to kill and restart the server inside the container if
+  you make server-side changes.
 
 - On non-Linux systems, you'll probably need to rebuild the
-  [C dependencies](#building-c-dependencies) for the docker container
+  [C dependencies](#building-c-dependencies) inside the docker
+  container

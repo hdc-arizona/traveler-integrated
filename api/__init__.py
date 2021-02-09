@@ -1,4 +1,6 @@
 import os
+import math
+import json
 import asyncio
 import argparse
 from fastapi import HTTPException
@@ -53,16 +55,60 @@ def validateDataset(datasetId, requiredFiles=None, filesMustBeReady=None, allFil
 
     return datasetId
 
+def getSanitizedDatasetInfo(datasetId):
+    # A bug in fastAPI / pydantic causes errors when returning infinite or nan
+    # floats: https://github.com/tiangolo/fastapi/issues/1310
+
+    def sanitize(value):
+        if type(value) == float and (math.isinf(value) or math.isnan(value)):
+            return str(value)
+        else:
+            return value;
+
+    def recurseList(original, sanitizedCopy):
+        for value in original:
+            if isinstance(value, list):
+                sanitizedCopy.append(recurseList(value, []))
+            elif isinstance(value, dict):
+                sanitizedCopy.append(recurseDict(value, {}))
+            else:
+                sanitizedCopy.append(sanitize(value))
+        return sanitizedCopy
+
+    def recurseDict(original, sanitizedCopy):
+        for key, value in original.items():
+            if isinstance(value, list):
+                sanitizedCopy[key] = recurseList(value, [])
+            elif isinstance(value, dict):
+                sanitizedCopy[key] = recurseDict(value, {})
+            else:
+                sanitizedCopy[key] = sanitize(value)
+        return sanitizedCopy
+
+    return recurseDict(db[datasetId]['info'], {})
+
 class ClientLogger:
     def __init__(self):
-        self.message = ''
+        self.extraArgs = {}
+        self.message = '{"logLines":["'
         self.finished = False
 
+    def addMetadata(self, key, value):
+        self.extraArgs[key] = value
+
     async def log(self, value, end='\n'):
-        self.message += value + end
+        self.message += value
+        if end == '\n':
+            self.message += '","'
+        else:
+            self.message += end
         await asyncio.sleep(0)
 
     def finish(self):
+        self.message += '"]'
+        for key, value in self.extraArgs.items():
+            self.message += ',"%s":%s' % (key, json.dumps(value))
+        self.message += '}'
         self.finished = True
 
     async def iterate(self, startProcess):

@@ -6,7 +6,7 @@ from typing import Optional, List
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, StreamingResponse
 
-from . import db, validateDataset, ClientLogger
+from . import db, validateDataset, getSanitizedDatasetInfo, ClientLogger
 
 router = APIRouter()
 
@@ -21,13 +21,12 @@ def index():
 
 @router.get('/datasets')
 def list_datasets():
-    for dataset in db:
-        yield dataset['info']
+    return [getSanitizedDatasetInfo(dataset['info']['datasetId']) for dataset in db]
 
 @router.get('/datasets/{datasetId}')
 def get_dataset(datasetId: str):
     datasetId = validateDataset(datasetId)
-    return db[datasetId]['info']
+    return getSanitizedDatasetInfo(datasetId)
 
 class BasicDataset(BaseModel):
     # TODO: ideally, these should all be UploadFile arguments instead of
@@ -48,6 +47,7 @@ def create_dataset(dataset: BasicDataset = None):
 
     async def startProcess():
         datasetId = db.createDataset()['info']['datasetId']
+        logger.addMetadata('datasetId', datasetId)
         if dataset:
             if dataset.tags:
                 tags = {t : True for t in dataset.tags}
@@ -160,11 +160,11 @@ def add_full_phylanx_log(datasetId: str, file: UploadFile = File(...)):
 class FakeOtf2File:  # pylint: disable=R0903
     def __init__(self, request):
         self.name = 'APEX.otf2'
-        self.request = request
+        self.stream = request.stream()
 
     async def __aiter__(self):
         line = ''
-        async for chunk in self.request.stream():
+        async for chunk in self.stream:
             line += chunk.decode()
             done = False
             while not done:
