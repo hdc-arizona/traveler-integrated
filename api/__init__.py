@@ -90,22 +90,20 @@ def getSanitizedDatasetInfo(datasetId):
 class ClientLogger:
     def __init__(self):
         self.extraArgs = {}
-        self.message = '{"logLines":["'
+        self.message = '{"log":"'
         self.finished = False
 
     def addMetadata(self, key, value):
         self.extraArgs[key] = value
 
     async def log(self, value, end='\n'):
-        self.message += value
-        if end == '\n':
-            self.message += '","'
-        else:
-            self.message += end
+        # json.dumps().strip() = sneaky way to escape characters for json while
+        # still appending to the string
+        self.message += json.dumps(value + end).strip('"')
         await asyncio.sleep(0)
 
     def finish(self):
-        self.message += '"]'
+        self.message += '"'
         for key, value in self.extraArgs.items():
             self.message += ',"%s":%s' % (key, json.dumps(value))
         self.message += '}'
