@@ -56,7 +56,6 @@ def processEvent(self, datasetId, event):
 async def processOtf2(self, datasetId, file, log=logToConsole):
     # Run each substep, with manual calls to python's garbage collector in
     # between
-    self.addSourceFile(datasetId, file.name, 'otf2')
     await self.processRawTrace(datasetId, file, log)
     gc.collect()
     await self.combineIntervals(datasetId, log)

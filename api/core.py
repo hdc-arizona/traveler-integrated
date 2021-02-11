@@ -49,6 +49,9 @@ def create_dataset(dataset: BasicDataset = None):
         datasetId = db.createDataset()['info']['datasetId']
         logger.addMetadata('datasetId', datasetId)
         if dataset:
+            print(dataset.label)
+            if dataset.label:
+                db.rename(datasetId, dataset.label)
             if dataset.tags:
                 tags = {t : True for t in dataset.tags}
                 db.addTags(datasetId, tags)

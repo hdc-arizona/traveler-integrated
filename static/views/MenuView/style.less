@@ -29,6 +29,7 @@
   .datasetWrapper {
     flex-grow: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     position: relative;
   }
 
@@ -229,9 +230,23 @@
           background-color: var(--background-color-richer);
         }
       }
+      .spinner {
+        width: 1em;
+        height: 1em;
+        filter: url(#recolorImageTo--inverted-shadow-color);
+        animation-name: spinnerKeyframes;
+        animation-duration: 2000ms;
+        animation-iteration-count: infinite;
+        animation-timing-function: linear;
+      }
     }
   }
   &.expanded .datasetList .dataset .button {
     flex-grow: 0;
   }
+}
+
+@keyframes spinnerKeyframes {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

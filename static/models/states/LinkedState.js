@@ -54,6 +54,10 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     this.trigger('colorModeChanged');
   }
 
+  get isLoading () {
+    return super.isLoading || this.info.sourceFiles.some(f => f.stillLoading);
+  }
+
   async getViewLayout () {
     return this._viewLayoutPromise;
   }
@@ -194,18 +198,32 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       {
         label: 'Delete',
         onclick: () => {
-          uki.ui.confirm({
-            content: `<img src="img/ex.svg" style="
+          if (this.isLoading) {
+            uki.ui.alert(`<img src="img/ex.svg" style="
+              width:2em;
+              margin:0 0.5em;
+              vertical-align:middle;
+              filter:url(#recolorImageTo--error-color)"/>
+              Can't delete ${this.info.label} while it is still loading.`);
+          } else {
+            uki.ui.confirm(`<img src="img/ex.svg" style="
               width:2em;
               margin:0 0.5em;
               vertical-align:middle;
               filter:url(#recolorImageTo--text-color-softer)"/>
               Permanently delete ${this.info.label}?`,
-            confirmAction: async () => {
-              await window.fetch(`/datasets/${this.info.datasetId}`, { method: 'DELETE' });
-              await window.controller.refreshDatasets();
-            }
-          });
+            {
+              confirmAction: async () => {
+                const response = await window.fetch(`/datasets/${this.info.datasetId}`, { method: 'DELETE' });
+                if (!response.ok) {
+                  uki.ui.alert(`Error attempting to delete ${this.info.datasetId}:<br/>
+                    <details><summary>Details</summary>
+                    ${response.status}: ${response.statusText}</details>`);
+                }
+                await window.controller.refreshDatasets();
+              }
+            });
+          }
         }
       }
     ];

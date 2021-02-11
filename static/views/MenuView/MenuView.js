@@ -12,7 +12,7 @@ class MenuView extends uki.View {
     super(options);
 
     this._expanded = false;
-    this._folderMode = false;
+    this._folderMode = true;
     this._tagSortMode = 'a-z(filtered)';
     this.openFolders = {};
     this.filteredTags = {};
@@ -159,6 +159,11 @@ class MenuView extends uki.View {
         }
       };
     });
+
+    datasetsEnter.append('img').classed('spinner', true);
+    datasets.select('.spinner')
+      .style('display', d => d.linkedState?.isLoading ? null : 'none')
+      .attr('src', 'img/spinner.png');
   }
 
   drawFolderStuff (datasetsEnter, datasets) {
@@ -268,6 +273,15 @@ class MenuView extends uki.View {
         datasets.classed('dragTarget', false);
         self.getFolderDragAction(event, d, true);
       }));
+  }
+
+  openAllAncestorFolders (label) {
+    let ancestorChain = '';
+    for (const ancestor of label.split('/').slice(0, -1)) {
+      ancestorChain += ancestorChain === '' ? ancestor : '/' + ancestor;
+      this.openFolders[ancestorChain] = true;
+    }
+    this.render();
   }
 
   getFolderDragAction (event, draggedDatum, performAction) {
