@@ -30,6 +30,13 @@ class Controller extends uki.ui.ThemeableView {
     this.datasetList = [];
     this.datasetLookup = {};
     this._currentDatasetId = null;
+    globalThis.addEventListener('hashchange', async () => {
+      await this.refreshDatasets();
+      const hash = window.decodeURIComponent(window.location.hash).substring(1);
+      if (this.datasetLookup[hash] !== undefined) {
+        this.currentDatasetId = hash;
+      }
+    });
     this.refreshDatasets();
   }
 

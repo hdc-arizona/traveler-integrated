@@ -10,7 +10,7 @@ class TracedLinkedState extends LinkedState {
     super(...arguments);
 
     // Start the detail domain at the same level as the overview
-    this._detailDomain = Array.from(this.overviewDomain);
+    this._detailDomain = this.overviewDomain && Array.from(this.overviewDomain);
   }
 
   /**

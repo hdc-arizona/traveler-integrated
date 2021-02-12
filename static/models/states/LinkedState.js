@@ -214,6 +214,9 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
               Permanently delete ${this.info.label}?`,
             {
               confirmAction: async () => {
+                if (window.controller.currentDatasetId === this.info.datasetId) {
+                  window.controller.currentDatasetId = null;
+                }
                 const response = await window.fetch(`/datasets/${this.info.datasetId}`, { method: 'DELETE' });
                 if (!response.ok) {
                   uki.ui.alert(`Error attempting to delete ${this.info.datasetId}:<br/>

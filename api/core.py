@@ -49,7 +49,6 @@ def create_dataset(dataset: BasicDataset = None):
         datasetId = db.createDataset()['info']['datasetId']
         logger.addMetadata('datasetId', datasetId)
         if dataset:
-            print(dataset.label)
             if dataset.label:
                 db.rename(datasetId, dataset.label)
             if dataset.tags:
@@ -207,7 +206,6 @@ async def add_physl(datasetId: str, file: UploadFile = File(...)):
 
 @router.get('/datasets/{datasetId}/python')
 def get_python(datasetId: str):
-    print('python endpoint', datasetId)
     datasetId = validateDataset(datasetId, requiredFiles=['python'], filesMustBeReady=['python'])
     return db[datasetId]['python']
 
