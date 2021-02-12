@@ -96,7 +96,9 @@ async def processRawTrace(self, datasetId, file, log):
             location = metricLineMatch.group(1)
             timestamp = int(metricLineMatch.group(2))
             metricType = metricLineMatch.group(3)
-            value = float(metricLineMatch.group(4))
+            # Usually group(4) is just a number, but sometimes we can get input
+            # like "DOUBLE <2>; 1234.0000"... we want the last number
+            value = float(re.findall('[0-9.]+', metricLineMatch.group(4))[-1])
 
             if metricType.startswith('PAPI'):
                 if currentEvent is None:

@@ -30,11 +30,13 @@ class Controller extends uki.ui.ThemeableView {
     this.datasetList = [];
     this.datasetLookup = {};
     this._currentDatasetId = null;
-    globalThis.addEventListener('hashchange', async () => {
-      await this.refreshDatasets();
-      const hash = window.decodeURIComponent(window.location.hash).substring(1);
-      if (this.datasetLookup[hash] !== undefined) {
-        this.currentDatasetId = hash;
+    window.addEventListener('hashchange', async () => {
+      if (window.location.hash !== this.currentDatasetId) {
+        await this.refreshDatasets();
+        const hash = window.decodeURIComponent(window.location.hash).substring(1);
+        if (this.datasetLookup[hash] !== undefined) {
+          this.currentDatasetId = hash;
+        }
       }
     });
     this.refreshDatasets();
@@ -113,6 +115,7 @@ class Controller extends uki.ui.ThemeableView {
     const index = this.datasetLookup[datasetId];
     if (index !== undefined) {
       this._currentDatasetId = datasetId;
+      window.location.hash = this._currentDatasetId;
       this.menuView.openAllAncestorFolders(this.datasetList[index].info.label);
       this.datasetList[index].getViewLayout().then(layout => {
         this.rootView.glLayout = layout;

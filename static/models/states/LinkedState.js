@@ -242,7 +242,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       : openViews[viewName];
     return {
       label,
-      img: viewStatus === VIEW_STATUS.LOADING ? 'img/spinner.gif' : null,
+      img: viewStatus === VIEW_STATUS.LOADING ? 'img/spinner.png' : null,
       disabled: viewStatus === VIEW_STATUS.UNAVAILABLE,
       checked: alreadyOpen,
       onclick: () => {

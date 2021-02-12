@@ -43,7 +43,6 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     // yScale maps the full list of locationNames to the full height of the
     // canvas
     this.yScale = d3.scaleBand()
-      .domain(this.linkedState.info.locationNames)
       .paddingInner(0.2)
       .paddingOuter(0.1);
     // scaleBand doesn't come with an invert function...
@@ -78,13 +77,37 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
 
   get isLoading () {
     // Display the spinner + skip most of the draw call if we're still waiting
-    // on utilization or trace data
-    return super.isLoading ||
-      this.getNamedResource('totalUtilization') === null ||
-      (this.linkedState.selection?.utilizationParameters &&
-       this.getNamedResource('selectionUtilization') === null) ||
-      (this.linkedState.selection?.intervalTraceParameters &&
-       this.getNamedResource('selectedIntervalTrace') === null);
+    // on utilization data
+    if (super.isLoading) {
+      return true;
+    }
+    const total = this.getNamedResource('totalUtilization');
+    if (total === null || (total instanceof Error && total.status === 503)) {
+      return true;
+    }
+    if (this.linkedState.selection?.utilizationParameters) {
+      const selection = this.getNamedResource('selectionUtilization');
+      if (selection === null || (selection instanceof Error && selection.status === 503)) {
+        return true;
+      }
+    }
+    if (this.linkedState.selection?.intervalTraceParameters) {
+      const trace = this.getNamedResource('selectedIntervalTrace');
+      if (trace === null || (trace instanceof Error && trace.status === 503)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  get error () {
+    const err = super.error;
+    if (err?.status === 503) {
+      // We don't want to count 503 errors (still loading data) as actual errors
+      return null;
+    } else {
+      return err;
+    }
   }
 
   async setup () {
@@ -301,7 +324,8 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     // Update the scales
     this.xScale.range([0, chartShape.chartWidth])
       .domain(this.linkedState.detailDomain);
-    this.yScale.range([0, chartShape.fullHeight]);
+    this.yScale.range([0, chartShape.fullHeight])
+      .domain(this.linkedState.info.locationNames);
 
     // How many pixels would the full data span at this zoom level?
     chartShape.fullWidth =

@@ -23,9 +23,8 @@ class UtilizationView extends
       left: 40
     };
 
-    this.xScale = d3.scaleLinear().clamp(true)
-      .domain(this.linkedState.overviewDomain); // The overviewDomain never changes, so we can set it in the constructor
-    this.yScale = d3.scaleLinear(); // We don't know the y domain yet...
+    this.xScale = d3.scaleLinear().clamp(true);
+    this.yScale = d3.scaleLinear();
   }
 
   async updateResolution () {
@@ -77,10 +76,30 @@ class UtilizationView extends
   get isLoading () {
     // Display the spinner + skip most of the draw call if we're still waiting
     // on utilization data
-    return super.isLoading ||
-      this.getNamedResource('total') === null ||
-      (this.linkedState.selection?.utilizationParameters &&
-       this.getNamedResource('selection') === null);
+    if (super.isLoading) {
+      return true;
+    }
+    const total = this.getNamedResource('total');
+    if (total === null || (total instanceof Error && total.status === 503)) {
+      return true;
+    }
+    if (this.linkedState.selection?.utilizationParameters) {
+      const selection = this.getNamedResource('selection');
+      if (selection === null || (selection instanceof Error && selection.status === 503)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  get error () {
+    const err = super.error;
+    if (err?.status === 503) {
+      // We don't want to count 503 errors (still loading data) as actual errors
+      return null;
+    } else {
+      return err;
+    }
   }
 
   async draw () {
@@ -100,6 +119,9 @@ class UtilizationView extends
     // We finally can compute the y domain; totalUtilization will always be
     // greater than selectionUtilization, so use its max for the y axis
     this.yScale.domain([0, d3.max(totalUtilization.data)]);
+    // Also set xScale's domain while we're at it (should never change in
+    // practice)
+    this.xScale.domain(this.linkedState.overviewDomain);
 
     // Update the (transparent) background rect that captures drag events
     this.d3el.select('.background rect')
