@@ -58,6 +58,7 @@ class Controller extends uki.ui.ThemeableView {
    * Update this.datasetList + this.datasetLookup from the server
    */
   async refreshDatasets () {
+    window.clearTimeout(this._refreshDatasetPollTimeout);
     const newDatasetLookup = {};
     this.datasetList = (await d3.json('/datasets')).map((info, index) => {
       let linkedState;
@@ -73,13 +74,12 @@ class Controller extends uki.ui.ThemeableView {
       }
       newDatasetLookup[linkedState.info.datasetId] = index;
 
-      if (Object.values(linkedState.getAvailableViews()).some(d => d === 'LOADING')) {
+      if (linkedState.isBundling) {
         // If any of the datasets are still loading something, call this
-        // function again in 1 second
-        window.clearTimeout(this._refreshDatasetPollTimeout);
+        // function again in 30 seconds
         this._refreshDatasetPollTimeout = window.setTimeout(() => {
           this.refreshDatasets();
-        }, 1000);
+        }, 30000);
       }
       return linkedState;
     });

@@ -54,8 +54,12 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     this.trigger('colorModeChanged');
   }
 
+  get isBundling () {
+    return this.info.sourceFiles.some(f => f.stillLoading);
+  }
+
   get isLoading () {
-    return super.isLoading || this.info.sourceFiles.some(f => f.stillLoading);
+    return super.isLoading || this.isBundling;
   }
 
   async getViewLayout () {

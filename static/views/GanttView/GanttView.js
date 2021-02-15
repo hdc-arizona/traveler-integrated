@@ -241,12 +241,8 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
   async updateDataIfNeeded (chartShape) {
     if (!this.ready || !this.linkedState.info.locationNames) {
       // We don't have enough information to know what data to ask for (e.g. the
-      // server might still be bundling a large dataset); try poll again in 10
-      // seconds
-      window.clearTimeout(this._updatePollTimeout);
-      this._updatePollTimeout = window.setTimeout(() => {
-        this.updateDataIfNeeded();
-      }, 10000);
+      // server might still be bundling a large dataset); wait for Controller.js
+      // to refreshDatasets()
       return;
     }
     if (!chartShape) {
