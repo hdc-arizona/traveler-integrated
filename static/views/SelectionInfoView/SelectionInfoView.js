@@ -34,21 +34,28 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
       return;
     }
 
-    let typeLabel = this.linkedState?.selection?.humanReadableType;
-    if (typeLabel) {
-      typeLabel += ':';
+    let typeLabel, selectionLabel, selectionDetails;
+    if (this.linkedState?.selection) {
+      typeLabel = this.linkedState.selection.humanReadableType + ':';
+      selectionLabel = this.linkedState.selection.label;
+      selectionDetails = this.linkedState.selection.details;
+    } else if (this.linkedState) {
+      typeLabel = 'No current selection; generic metadata about';
+      selectionLabel = this.linkedState.info.label;
+      selectionDetails = JSON.stringify(this.linkedState.info, null, 2);
     } else {
-      typeLabel = 'No current selection';
+      typeLabel = 'No current selection or dataset';
+      selectionLabel = null;
+      selectionDetails = null;
     }
     this.d3el.select('.selectionType')
       .text(typeLabel);
 
     this.d3el.select('.selectionLabel')
-      .text(this.linkedState?.selection?.label || null);
+      .text(selectionLabel);
 
-    const selectionDetails = this.linkedState?.selection?.details;
     this.d3el.select('pre')
-      .text(selectionDetails || null);
+      .text(selectionDetails);
   }
 }
 export default SelectionInfoView;

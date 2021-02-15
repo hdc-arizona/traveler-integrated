@@ -19,8 +19,8 @@ defaultInfo = {
 }
 
 async def logToConsole(value, end='\n'):
-    sys.stderr.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
-    sys.stderr.flush()
+    sys.stdout.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
+    sys.stdout.flush()
 
 class DataStore:
     def __init__(self, dbDir='/tmp/traveler-integrated', debugSources=False):

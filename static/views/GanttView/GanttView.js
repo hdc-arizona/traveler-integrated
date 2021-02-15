@@ -143,7 +143,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     // ... and ask for new data when we're confident that rapid interactions
     // have finished
     this.linkedState.on('detailDomainChanged', () => {
-      this.updateDataIfNeeded(this.getChartShape());
+      this.updateDataIfNeeded();
     });
 
     // Set up local zoom, pan, hover, and click interactions
@@ -151,7 +151,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
 
     // setup() is only called once this.d3el is ready; only at this point do we
     // know how many bins to ask for
-    this.updateDataIfNeeded(this.getChartShape());
+    this.updateDataIfNeeded();
   }
 
   setupInteractions () {
@@ -239,6 +239,19 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
    * Checks to see if we need to request new data
    */
   async updateDataIfNeeded (chartShape) {
+    if (!this.ready || !this.linkedState.info.locationNames) {
+      // We don't have enough information to know what data to ask for (e.g. the
+      // server might still be bundling a large dataset); try poll again in 10
+      // seconds
+      window.clearTimeout(this._updatePollTimeout);
+      this._updatePollTimeout = window.setTimeout(() => {
+        this.updateDataIfNeeded();
+      }, 10000);
+      return;
+    }
+    if (!chartShape) {
+      chartShape = this.getChartShape();
+    }
     const domain = chartShape.spilloverXScale.domain();
     let locations = chartShape.locations;
 

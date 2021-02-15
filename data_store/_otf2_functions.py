@@ -82,6 +82,7 @@ async def processRawTrace(self, datasetId, file, log):
     skippedMetricsForMissingPrior = 0
     skippedMetricsForMismatch = 0
     unsupportedSkippedLines = 0
+    badAddAttrLines = 0
 
     async for line in file:
         eventLineMatch = eventLineParser.match(line)
@@ -143,7 +144,10 @@ async def processRawTrace(self, datasetId, file, log):
             attrList = addAttrSplitter.split(addAttrLineMatch.group(1))
             for attrStr in attrList:
                 attr = addAttrParser.match(attrStr)
-                assert attr is not None
+                if attr is None:
+                    badAddAttrLines += 1
+                    await log('WARNING: omitting data from bad ADDITIONAL ATTRIBUTES line:\n%s' % line)
+                    continue
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
         else:
             # This is a line that we aren't capturing (yet), e.g. MPI_SEND
@@ -157,6 +161,7 @@ async def processRawTrace(self, datasetId, file, log):
     await log('Finished processing %i events' % numEvents)
     await log('New primitives: %d, References to existing primitives: %d' % (newR, seenR))
     await log('Metrics included: %d; skipped for no prior ENTER: %d; skipped for mismatch: %d' % (includedMetrics, skippedMetricsForMissingPrior, skippedMetricsForMismatch))
+    await log('Additional attribute lines skipped: %d' % badAddAttrLines)
     await log('Lines skipped because they are not yet supported: %d' % unsupportedSkippedLines)
 
     # Now that we've seen all the locations, store that list in our info

@@ -55,8 +55,9 @@ class FakeFile: #pylint: disable=R0903
     async def __aiter__(self):
         # otfPipe = subprocess.Popen(['otf2-print', self.name], stdout=subprocess.PIPE)
         otfPipe = subprocess.Popen(['otf2-print', self.name], stdout=subprocess.PIPE)
-        for line in otfPipe.stdout:
-            yield line.decode()
+        for bytesChunk in otfPipe.stdout:
+            yield bytesChunk.decode()
+            otfPipe.stdout.flush()
 
 async def main():
     args = vars(parser.parse_args())
