@@ -146,7 +146,7 @@ async def processRawTrace(self, datasetId, file, log):
                 attr = addAttrParser.match(attrStr)
                 if attr is None:
                     badAddAttrLines += 1
-                    await log('WARNING: omitting data from bad ADDITIONAL ATTRIBUTES line:\n%s' % line)
+                    await log('\nWARNING: omitting data from bad ADDITIONAL ATTRIBUTES line:\n%s' % line)
                     continue
                 currentEvent[attr.group(1)] = attr.group(2) #pylint: disable=unsupported-assignment-operation
         else:
@@ -188,7 +188,7 @@ async def combineIntervals(self, datasetId, log):
             else:
                 if attr == 'Location':
                     await log('')
-                    await log('WARNING: ENTER and LEAVE have different locations')
+                    await log('\nWARNING: ENTER and LEAVE have different locations')
                 newInterval['enter'][attr] = lastEvent[attr]  # pylint: disable=unsubscriptable-object
                 newInterval['leave'][attr] = event[attr]
         return newInterval
@@ -221,7 +221,7 @@ async def combineIntervals(self, datasetId, log):
                 if len(lastEventStack) == 0:
                     # TODO: factorial data used to trigger this... why?
                     await log('')
-                    await log('WARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['Primitive'])
+                    await log('\nWARNING: omitting LEAVE event without a prior ENTER event (%s)' % event['Primitive'])
                     continue
                 lastEvent = lastEventStack.pop()
                 currentInterval = await createNewInterval(event, lastEvent, intervalId)
@@ -253,7 +253,7 @@ async def combineIntervals(self, datasetId, log):
             # TODO: this seems to be triggered by recent distributed runs;
             # probably not a big deal as they're usually shudown_action events?
             await log('')
-            await log('WARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
+            await log('\nWARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
 
     # Clean up temporary lists
     del self.sortedEventsByLocation
@@ -299,6 +299,7 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict()}
     preMetricValue = dict()
     intervalDuration = dict()
+    allLocations = set()
 
     def updateSULForInterval(event, cur_location):
         if 'metrics' in event:
@@ -322,6 +323,7 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     await log('Building SparseUtilizationList indexes (.=2500 intervals)')
     for intervalObj in self[datasetId]['intervals'].values():
         loc = intervalObj['Location']
+        allLocations.add(loc)
         primitive_name = intervalObj['Primitive']
 
         # Update the full SparseUtilizationList
@@ -358,15 +360,15 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     extraExpected = expectedPrimitives - observedPrimitives
     extraObserved = observedPrimitives - expectedPrimitives
     if len(extraExpected) > 0:
-        await log('WARNING: Did not observe intervals for primitives: ' + ', '.join(extraExpected))
+        await log('\nWARNING: Did not observe intervals for primitives: ' + ', '.join(extraExpected))
     if len(extraObserved) > 0:
-        await log('WARNING: Observed intervals for unknown primitives: ' + ', '.join(extraObserved))
+        await log('\nWARNING: Observed intervals for unknown primitives: ' + ', '.join(extraObserved))
 
     # Second pass to finish each SparseUtilizationList
     await log('Finalizing indexes')
     flatSulList = [allSuls['intervals']] + list(allSuls['primitives'].values()) + list(allSuls['metrics'].values())
     for sul in flatSulList:
-        sul.finalize()
+        sul.finalize(allLocations)
         await log('.', end='')
     await log('')
 

@@ -19,10 +19,11 @@ class SparseUtilizationList():
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
 
-    def finalize(self):
-        for loc in self.locationDict.keys():
-            self.sortAtLoc(loc)
-            self.locationDict[loc] = np.array(self.locationDict[loc])
+    def finalize(self, allLocations):
+        for loc in allLocations:
+            if loc in self.locationDict:
+                self.sortAtLoc(loc)
+            self.locationDict[loc] = np.array(self.locationDict.get(loc, []))
 
             length = len(self.locationDict[loc])
             counter = 0
@@ -95,10 +96,6 @@ class SparseUtilizationList():
         maxArray = np.amax(array, axis=0)
         stdArray = np.std(array, axis=0)
         return {"min": minArray.tolist(), "max": maxArray.tolist(), "average": avgArray.tolist(), "std": stdArray.tolist()}
-
-    # Calculates histogram for interval duration
-    def calcIntervalHistogram(self, bins=100, begin=None, end=None):
-        return self.calcUtilizationForLocation(bins, begin, end, 1, False)
 
     # Calculates utilization for one location in a Gantt chart
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart

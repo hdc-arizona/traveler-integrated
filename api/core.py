@@ -186,6 +186,7 @@ async def add_otf2_trace(datasetId: str, request: Request):  # request: Request
         db.addSourceFile(datasetId, 'APEX.otf2', 'otf2')
         await db.processOtf2(datasetId, FakeOtf2File(request), logger.log)
         db.finishLoadingSourceFile(datasetId, 'APEX.otf2')
+        await db.save(datasetId, logger.log)
         logger.finish()
 
     return StreamingResponse(logger.iterate(startProcess), media_type='text/text')

@@ -163,6 +163,7 @@ async def main():
 
             # Handle otf2
             if 'otf2' in paths:
+                db.addSourceFile(datasetId, paths['otf2'], 'otf2')
                 await db.processOtf2(datasetId, FakeFile(paths['otf2']))
 
 

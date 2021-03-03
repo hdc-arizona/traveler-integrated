@@ -2,8 +2,8 @@ import LinkedState from './LinkedState.js';
 
 const VIEW_STATUS = LinkedState.VIEW_STATUS;
 
-// detailDomain must be at least 1 ns
-const MIN_BRUSH_SIZE = 1;
+// detailDomain must be at least 30 ns
+const MIN_BRUSH_SIZE = 30;
 
 class TracedLinkedState extends LinkedState {
   constructor () {

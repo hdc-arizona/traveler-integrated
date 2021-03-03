@@ -1,4 +1,5 @@
 import os
+import sys
 import math
 import json
 import asyncio
@@ -15,8 +16,12 @@ parser.add_argument('-s', '--debug', dest='debug', action='store_true',
                     help='Store additional information for debugging source files, etc.')
 parser.add_argument('-p', '--port', dest='port', default=os.environ.get('TRAVELER_PORT', '8000'),
                     help='Port to serve the interface from. Will override TRAVELER_PORT if specified.')
+parser.add_argument('-l', '--log_level', dest='log_level', default='warning',
+                    help='log_level corresponding to Uvicorn settings (https://www.uvicorn.org/settings/); levels above info will also display traveler parsing logs')
 
 args = parser.parse_args()
+
+traveler_parse_levels = ['info', 'debug', 'trace']
 
 db = DataStore(args.dbDir, args.debug)
 
@@ -100,6 +105,9 @@ class ClientLogger:
         # json.dumps().strip() = sneaky way to escape characters for json while
         # still appending to the string
         self.message += json.dumps(value + end).strip('"')
+        if args.log_level in traveler_parse_levels:
+            sys.stdout.write('\x1b[0;32;40m' + value + end + '\x1b[0m')
+            sys.stdout.flush()
         await asyncio.sleep(0)
 
     def finish(self):

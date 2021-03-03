@@ -135,14 +135,16 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     // Convenience pointer to .yScroller
     this.yScroller = this.d3el.select('.yScroller');
 
-    // Render whenever the selection changes
-    this.linkedState.on('selectionChanged', () => { this.render(); });
     // Do a quickDraw immediately for horizontal brush / scroll / zoom
     // interactions...
     this.linkedState.on('detailDomainChangedSync', () => { this.quickDraw(); });
     // ... and ask for new data when we're confident that rapid interactions
     // have finished
     this.linkedState.on('detailDomainChanged', () => {
+      this.updateDataIfNeeded();
+    });
+    // Also ask for new data when the selection changes
+    this.linkedState.on('selectionChanged', () => {
       this.updateDataIfNeeded();
     });
 
@@ -180,9 +182,16 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
 
     // Pan the detailDomain in response to scrolling the x axis
     this.xFakeScroller.on('scroll', () => {
+      if (this._ignoreXScrollEvents) {
+        // This was an artificial scroll event from setting element.scrollLeft;
+        // ignore it
+        this._ignoreXScrollEvents = false;
+        return;
+      }
+      const scrollLeft = this.xFakeScroller.node().scrollLeft;
       // Update the domain based on where we've scrolled to
       const oldDomain = this.linkedState.detailDomain;
-      const left = this.overviewScale.invert(this.xFakeScroller.node().scrollLeft);
+      const left = this.overviewScale.invert(scrollLeft);
       this.linkedState.detailDomain = [left, left + (oldDomain[1] - oldDomain[0])];
     });
 
@@ -239,7 +248,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
    * Checks to see if we need to request new data
    */
   async updateDataIfNeeded (chartShape) {
-    if (!this.ready || !this.linkedState.info.locationNames) {
+    if (!this.linkedState.detailDomain || !this.linkedState.info.locationNames) {
       // We don't have enough information to know what data to ask for (e.g. the
       // server might still be bundling a large dataset); wait for Controller.js
       // to refreshDatasets()
@@ -252,17 +261,21 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     let locations = chartShape.locations;
 
     // We consider chartShape to be out of date if:
-    // 1. the spillover domain is different, or...
-    const viewportChanged = !this._lastChartShape ||
+    // 1. the spillover domain is different,
+    const needsRefresh = !this._lastChartShape ||
       this._lastChartShape.spilloverXScale.domain()
         .some((timestamp, i) => domain[i] !== timestamp) ||
-    // 2. the expected locations are different
+    // 2. the expected locations are different,
       this._lastChartShape.locations.length !== locations.length ||
-      this._lastChartShape.locations.some((loc, i) => locations[i] !== loc);
+      this._lastChartShape.locations.some((loc, i) => locations[i] !== loc) ||
+    // 3. the selection has changed
+      this._lastSelectionId !== this.linkedState.selection?.id;
 
-    if (viewportChanged) {
-      // Cache the shape that was currently relevant when the data was fetched
+    if (needsRefresh) {
+      // Cache the shape and selection ids that are currently relevant, so we
+      // know if something changed since last time
       this._lastChartShape = chartShape;
+      this._lastSelectionId = this.linkedState.selection?.id;
 
       // Make the list of locations a URL-friendly comma-separated list
       locations = globalThis.encodeURIComponent(locations.join(','));
@@ -410,6 +423,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       .style('height', chartShape.fullHeight + 'px');
     // Scroll the empty div to the current position
     chartShape.scrollLeft = this.overviewScale(this.linkedState.detailDomain[0]);
+    this._ignoreXScrollEvents = true;
     this.xFakeScroller.node().scrollLeft = chartShape.scrollLeft;
   }
 

@@ -45,7 +45,7 @@
 
   /* Traveler-specific color schemes; TODO: do we need to tweak for dark mode? */
 	--selection-color: #e6ab02; /* yellow */
-	--selection-border-color: darken(--selection-color, 50%);
+	--selection-border-color: #a67b00;
 
   /* Inclusive mode color scheme: purples scale */
   --inclusive-color-0: #f2f0f7; /* lighest purple */
