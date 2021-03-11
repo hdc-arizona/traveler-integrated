@@ -161,10 +161,6 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     this.on('resize', () => { this.render(); });
 
     this.d3el.select('.eventCapturer')
-      .on('click', () => {
-        // Select / deselect intervals when the user clicks
-        this.linkedState.selection = null;
-      })
       .on('wheel', event => {
         // Zoom when using the wheel over the main chart area
         const zoomFactor = 1.05 ** (normalizeWheel(event).pixelY / 100);
@@ -178,7 +174,24 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
         ];
         event.preventDefault();
         return false;
-      });
+      }).call(d3.drag()
+        .on('start', event => {
+          this._dragState = {
+            initialDomain: this.linkedState.detailDomain,
+            x0: event.x,
+            y0: event.y,
+            dx: 0,
+            dy: 0
+          };
+        }).on('drag', event => {
+          this._dragState.dx = event.x - this._dragState.x0;
+          this._dragState.dy = event.y - this._dragState.y0;
+          // TODO: update this.linkedState.detailDomain
+          this.quickDraw();
+        }).on('end', () => {
+          // TODO: if dx and dy are zero, select the clicked interval
+          this.render();
+        }));
 
     // Pan the detailDomain in response to scrolling the x axis
     this.xFakeScroller.on('scroll', () => {
@@ -384,21 +397,17 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
   }
 
   moveCanvas (chartShape) {
-    // Position the canvas horizontally using the OLD spilloverXScale (otherwise
-    // the canvas won't even move during scrolling... if they scroll really fast,
-    // it's possible to move the canvas offscreen, but that will get fixed with
-    // the next updateDataIfNeeded() call
-    const canvasPosition = this.xScale(
-      this._lastChartShape?.spilloverXScale.domain()[0] ||
-      chartShape.spilloverXScale.domain()[0]
-    );
+    // TODO: explain quickDraw + why we're using this.overviewScale
+    const spilloverRange = chartShape.spilloverXScale.domain()
+      .map(this.overviewScale);
+
     // Update the canvas size to have space for the horizontal bins (vertically,
     // we use the full height so that .yScroller shows a correct
     // scrollbar, even though we might not draw the whole vertical space)
     this.d3el.select('.gantt-canvas')
-      .attr('width', chartShape.bins)
+      .attr('width', spilloverRange[1] - spilloverRange[0])
       .attr('height', chartShape.fullHeight)
-      .style('left', canvasPosition + 'px');
+      .style('left', spilloverRange[0] + 'px');
 
     // Update the eventCapturer rect
     this.d3el.select('.eventCapturer')
