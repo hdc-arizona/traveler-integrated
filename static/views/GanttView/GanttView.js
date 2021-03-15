@@ -243,18 +243,21 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       return;
     }
 
-    const chartShape = this.getChartShape();
+    // Store the shape that was last fully rendered (note that this is different
+    // from _lastChartShape, which indicates which shape was last queried)
+    delete this._renderedChartShape;
+    this._renderedChartShape = this.getChartShape();
 
-    this.moveCanvas(chartShape);
-    this.drawAxes(chartShape);
-    this.drawBars(chartShape);
+    this.moveCanvas(this._renderedChartShape);
+    this.drawAxes(this._renderedChartShape);
+    this.drawBars(this._renderedChartShape);
 
     // Update the trace lines (or clear them if there aren't any)
     // this.drawTraceLines(chartShape);
 
     // As part of the full render (that could have been triggered from anywhere,
     // start the process of requesting fresh data if the viewport is out of date)
-    this.updateDataIfNeeded(chartShape);
+    this.updateDataIfNeeded(this._renderedChartShape);
   }
 
   /**
@@ -363,12 +366,11 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       .domain(this.linkedState.info.locationNames);
 
     // How many pixels would the full data span at this zoom level?
-    chartShape.fullWidth =
-      this.xScale(this.linkedState.overviewDomain[1]) -
-      this.xScale(this.linkedState.overviewDomain[0]);
+    const overviewRange = this.linkedState.overviewDomain.map(this.xScale);
+    chartShape.fullWidth = overviewRange[1] - overviewRange[0];
     this.overviewScale
       .domain(this.linkedState.overviewDomain)
-      .range([0, chartShape.fullWidth]);
+      .range(overviewRange);
 
     // Figure out the data / pixel bounds that we should query
     const spilloverXDomain = this.computeSpillover(this.linkedState.detailDomain, HORIZONTAL_SPILLOVER_FACTOR);
@@ -393,21 +395,29 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     chartShape.spilloverYRange = spilloverYRange;
     chartShape.locations = this.yScale.invertRange(...spilloverYRange);
 
+    // Figure out what transformations we need relateive to the last time a
+    // full render happened
+    if (this._renderedChartShape) {
+      const originalDomain = this._renderedChartShape.spilloverXScale.domain();
+      chartShape.zoomFactor = (originalDomain[1] - originalDomain[0]) / (spilloverXDomain[1] - spilloverXDomain[0]);
+      chartShape.leftOffset = chartShape.spilloverXScale(this._renderedChartShape.spilloverXScale.domain()[0]);
+    } else {
+      chartShape.zoomFactor = 1.0;
+      chartShape.leftOffset = spilloverXRange[0];
+    }
+
     return chartShape;
   }
 
   moveCanvas (chartShape) {
-    // TODO: explain quickDraw + why we're using this.overviewScale
-    const spilloverRange = chartShape.spilloverXScale.domain()
-      .map(this.overviewScale);
-
-    // Update the canvas size to have space for the horizontal bins (vertically,
-    // we use the full height so that .yScroller shows a correct
-    // scrollbar, even though we might not draw the whole vertical space)
+    // Note that we resize the canvas using CSS transforms instead of width /
+    // height attributes to get a scaling effect while we're zooming / panning.
+    // CSS transforms already take advantage of the GPU; see also:
+    // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas#scaling_canvas_using_css_transforms
     this.d3el.select('.gantt-canvas')
-      .attr('width', spilloverRange[1] - spilloverRange[0])
-      .attr('height', chartShape.fullHeight)
-      .style('left', spilloverRange[0] + 'px');
+      .style('transform-origin', '0px 0px')
+      .style('transform', `scale(${chartShape.zoomFactor}, 1)`)
+      .style('left', `${chartShape.leftOffset}px`);
 
     // Update the eventCapturer rect
     this.d3el.select('.eventCapturer')
@@ -511,9 +521,18 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     const totalUtilization = this.getNamedResource('totalUtilization');
     const selectionUtilization = this.getNamedResource('selectionUtilization');
 
-    const ctx = this.d3el.select('.gantt-canvas').node().getContext('2d');
-    const spilloverWidth = chartShape.spilloverXScale.range()[1] - chartShape.spilloverXScale.range()[0];
-    ctx.clearRect(0, 0, spilloverWidth, chartShape.fullHeight);
+    // We only want to set canvas width / height ATTRIBUTES here, because doing
+    // so in another context (e.g. zooming / panning) would clear the canvas
+    // (in that context, we only want to set transform STYLES to scale
+    // what we previously drew here)
+    const canvas = this.d3el.select('.gantt-canvas')
+      .attr('width', chartShape.bins)
+      .attr('height', chartShape.fullHeight)
+      .style('transform-origin', null)
+      .style('transform', null);
+
+    const ctx = canvas.node().getContext('2d');
+    ctx.clearRect(0, 0, chartShape.bins, chartShape.fullHeight);
 
     const bandwidth = this.yScale.bandwidth();
     for (const [location, data] of Object.entries(totalUtilization.locations)) {

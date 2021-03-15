@@ -3,7 +3,7 @@ import LinkedState from './LinkedState.js';
 const VIEW_STATUS = LinkedState.VIEW_STATUS;
 
 // detailDomain must be at least 30 ns
-const MIN_BRUSH_SIZE = 30;
+const MIN_BRUSH_SIZE = 1000;
 
 class TracedLinkedState extends LinkedState {
   constructor () {
@@ -30,15 +30,17 @@ class TracedLinkedState extends LinkedState {
       inputDomain[0] === undefined ? this._detailDomain[0] : inputDomain[0],
       inputDomain[1] === undefined ? this._detailDomain[1] : inputDomain[1]
     ];
+    // Clamp to the lowest / highest possible values
+    newDomain[0] = Math.max(newDomain[0], this.overviewDomain[0]);
+    newDomain[1] = Math.max(newDomain[1], this.overviewDomain[0]);
+    newDomain[1] = Math.min(newDomain[1], this.overviewDomain[1]);
+    newDomain[0] = Math.min(newDomain[0], this.overviewDomain[1]);
     // Ensure begin < end
     if (newDomain[1] < newDomain[0]) {
       const temp = newDomain[1];
       newDomain[1] = newDomain[0];
       newDomain[0] = temp;
     }
-    // Clamp to the lowest / highest possible values
-    newDomain[0] = Math.max(newDomain[0], this.overviewDomain[0]);
-    newDomain[1] = Math.min(newDomain[1], this.overviewDomain[1]);
     // Ensure the brush is at least MIN_BRUSH_SIZE
     if (newDomain[1] - newDomain[0] < MIN_BRUSH_SIZE) {
       if (inputDomain[0] === undefined || newDomain[1] + MIN_BRUSH_SIZE <= this.overviewDomain[1]) {
