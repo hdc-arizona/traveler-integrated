@@ -567,7 +567,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
           ctx.fillStyle = theme['--selection-border-color'];
           ctx.fillRect(binNo, y0, 1, bandwidth);
         } else if (tUtil > 0) {
-          ctx.fillStyle = theme['--text-color-richer'];
+          ctx.fillStyle = theme['--text-color-softer'];
           ctx.fillRect(binNo, y0, 1, bandwidth);
         }
 
@@ -576,7 +576,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
           ctx.fillStyle = theme['--selection-color'];
           ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
         } else if (tUtil >= 1) {
-          ctx.fillStyle = theme['--text-color-softer'];
+          ctx.fillStyle = theme['--disabled-color'];
           ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
         }
       }
