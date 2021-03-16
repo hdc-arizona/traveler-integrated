@@ -70,9 +70,10 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     // xScale refers to the data that's visible; converts from timestamps to
     // the width of .yScroller
     this.xScale = d3.scaleLinear();
-    // overviewScale refers to the full range of the data; converts from
-    // timestamps to the full width of the canvas
-    this.overviewScale = d3.scaleLinear();
+    // xFakeScrollerScale refers to the full range of the data; converts from
+    // timestamps to how wide the canvas *would* be if we could fit it all
+    // onscreen (used only for the horizontal scrollbar)
+    this.xFakeScrollerScale = d3.scaleLinear();
   }
 
   get isLoading () {
@@ -165,7 +166,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
         // Zoom when using the wheel over the main chart area
         const zoomFactor = 1.05 ** (normalizeWheel(event).pixelY / 100);
         // Where was the mouse, relative to the chart (not its actual target;
-        // this.xFakeScroller wouldn't work)
+        // .eventCapturer wouldn't work)
         const chartBounds = this.d3el.select('.chart').node().getBoundingClientRect();
         const mousedPosition = this.xScale.invert(event.clientX - chartBounds.left);
         this.linkedState.detailDomain = [
@@ -176,8 +177,11 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
         return false;
       }).call(d3.drag()
         .on('start', event => {
+          const initialDomain = this.linkedState.detailDomain;
+          const originalWidth = initialDomain[1] - initialDomain[0];
           this._dragState = {
-            initialDomain: this.linkedState.detailDomain,
+            initialDomain,
+            originalWidth,
             x0: event.x,
             y0: event.y,
             dx: 0,
@@ -186,8 +190,23 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
         }).on('drag', event => {
           this._dragState.dx = event.x - this._dragState.x0;
           this._dragState.dy = event.y - this._dragState.y0;
-          // TODO: update this.linkedState.detailDomain
-          this.quickDraw();
+          const mouseDelta = this.xScale.invert(event.x) -
+            this.xScale.invert(event.x + this._dragState.dx);
+          const newDomain = [
+            this._dragState.initialDomain[0] + mouseDelta,
+            this._dragState.initialDomain[1] + mouseDelta
+          ];
+          // Prevent zooming when dragging to the end of the screen
+          if (newDomain[0] <= this.linkedState.overviewDomain[0]) {
+            newDomain[0] = this.linkedState.overviewDomain[0];
+            newDomain[1] = this.linkedState.overviewDomain[0] +
+              this._dragState.originalWidth;
+          } else if (newDomain[1] >= this.linkedState.overviewDomain[1]) {
+            newDomain[1] = this.linkedState.overviewDomain[1];
+            newDomain[0] = this.linkedState.overviewDomain[1] -
+              this._dragState.originalWidth;
+          }
+          this.linkedState.detailDomain = newDomain;
         }).on('end', () => {
           // TODO: if dx and dy are zero, select the clicked interval
           this.render();
@@ -204,7 +223,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       const scrollLeft = this.xFakeScroller.node().scrollLeft;
       // Update the domain based on where we've scrolled to
       const oldDomain = this.linkedState.detailDomain;
-      const left = this.overviewScale.invert(scrollLeft);
+      const left = this.xFakeScrollerScale.invert(scrollLeft);
       this.linkedState.detailDomain = [left, left + (oldDomain[1] - oldDomain[0])];
     });
 
@@ -368,16 +387,20 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     // How many pixels would the full data span at this zoom level?
     const overviewRange = this.linkedState.overviewDomain.map(this.xScale);
     chartShape.fullWidth = overviewRange[1] - overviewRange[0];
-    this.overviewScale
+    chartShape.overviewScale = d3.scaleLinear()
       .domain(this.linkedState.overviewDomain)
       .range(overviewRange);
+    // Update this.xFakeScrollerScale while we're at it
+    this.xFakeScrollerScale
+      .domain(this.linkedState.overviewDomain)
+      .range([0, chartShape.fullWidth]);
 
     // Figure out the data / pixel bounds that we should query
     const spilloverXDomain = this.computeSpillover(this.linkedState.detailDomain, HORIZONTAL_SPILLOVER_FACTOR);
     // Ensure integer endpoints
     spilloverXDomain[0] = Math.floor(spilloverXDomain[0]);
     spilloverXDomain[1] = Math.ceil(spilloverXDomain[1]);
-    const spilloverXRange = spilloverXDomain.map(this.overviewScale);
+    const spilloverXRange = spilloverXDomain.map(chartShape.overviewScale);
     chartShape.spilloverXScale = d3.scaleLinear()
       .domain(spilloverXDomain)
       .range(spilloverXRange);
@@ -441,9 +464,9 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       .style('width', chartShape.fullWidth + 'px')
       .style('height', chartShape.fullHeight + 'px');
     // Scroll the empty div to the current position
-    chartShape.scrollLeft = this.overviewScale(this.linkedState.detailDomain[0]);
+    const scrollLeft = this.xFakeScrollerScale(this.linkedState.detailDomain[0]);
     this._ignoreXScrollEvents = true;
-    this.xFakeScroller.node().scrollLeft = chartShape.scrollLeft;
+    this.xFakeScroller.node().scrollLeft = scrollLeft;
   }
 
   drawAxes (chartShape) {
