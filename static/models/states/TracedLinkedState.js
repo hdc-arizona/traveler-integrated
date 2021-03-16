@@ -1,5 +1,7 @@
 import LinkedState from './LinkedState.js';
 
+import IntervalSelection from '../selections/IntervalSelection.js';
+
 const VIEW_STATUS = LinkedState.VIEW_STATUS;
 
 // detailDomain must be at least 30 ns
@@ -195,8 +197,18 @@ class TracedLinkedState extends LinkedState {
    * this.selection to null / deselect if no interval exists at the queried
    * time + location)
    */
-  selectInterval (timestamp, location) {
-    // TODO
+  async selectInterval (timestamp, location) {
+    const url = `/datasets/${this.info.datasetId}/intervals?begin=${timestamp}&end=${timestamp + 1}&location=${location}&includeDetails=true`;
+    const response = await window.fetch(url);
+    const intervalList = await response.json();
+    if (intervalList.length === 0) {
+      this.selection = null;
+    } else {
+      this.selection = new IntervalSelection({
+        linkedState: this,
+        intervalDetails: intervalList[0]
+      });
+    }
   }
 }
 TracedLinkedState.MIN_BRUSH_SIZE = MIN_BRUSH_SIZE;

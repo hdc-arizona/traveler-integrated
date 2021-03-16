@@ -11,7 +11,7 @@ const MIN_LOCATION_HEIGHT = 30;
 const HORIZONTAL_SPILLOVER_FACTOR = 3;
 // Fetch and draw 3x the time data than we're actually showing, for smooth
 // scrolling interactions
-const VERTICAL_SPILLOVER_FACTOR = 1;
+const VERTICAL_SPILLOVER_FACTOR = 3;
 
 class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
   uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
@@ -182,14 +182,19 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
           this._dragState = {
             initialDomain,
             originalWidth,
+            initialYScroll: this.yScroller.node().scrollTop,
             x0: event.x,
             y0: event.y,
             dx: 0,
             dy: 0
           };
         }).on('drag', event => {
-          this._dragState.dx = event.x - this._dragState.x0;
+          // Vertical dragging
           this._dragState.dy = event.y - this._dragState.y0;
+          this.yScroller.node().scrollTop = this._dragState.initialYScroll -
+            this._dragState.dy;
+          // Horizontal dragging
+          this._dragState.dx = event.x - this._dragState.x0;
           const mouseDelta = this.xScale.invert(event.x) -
             this.xScale.invert(event.x + this._dragState.dx);
           const newDomain = [
@@ -207,8 +212,13 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
               this._dragState.originalWidth;
           }
           this.linkedState.detailDomain = newDomain;
-        }).on('end', () => {
-          // TODO: if dx and dy are zero, select the clicked interval
+        }).on('end', event => {
+          if (this._dragState.dx === 0 && this._dragState.dy === 0) {
+            const timestamp = Math.round(this.xScale.invert(event.x));
+            const location = this.yScale.invert(event.y + this.yScroller.node().scrollTop);
+            this.linkedState.selectInterval(timestamp, location);
+          }
+          delete this._dragState;
           this.render();
         }));
 
