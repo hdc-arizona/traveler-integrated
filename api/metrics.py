@@ -36,7 +36,12 @@ def get_procMetric_values(datasetId: str, metric: str, begin: float = None, end:
     return StreamingResponse(procMetricGenerator(), media_type='application/json')
 
 @router.get('/datasets/{datasetId}/utilizationHistogram')
-def get_utilization_histogram(datasetId: str, bins: int = 100, begin: int = None, end: int = None, locations: str = None, primitive: str = None):
+def get_utilization_histogram(datasetId: str,
+                              bins: int = 100,
+                              begin: int = None,
+                              end: int = None,
+                              locations: str = None,
+                              primitive: str = None):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:

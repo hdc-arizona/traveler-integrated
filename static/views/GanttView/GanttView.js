@@ -13,6 +13,9 @@ const HORIZONTAL_SPILLOVER_FACTOR = 3;
 // scrolling interactions
 const VERTICAL_SPILLOVER_FACTOR = 3;
 
+// Don't show trace lines when we're zoomed out beyond this time limit
+const TRACE_LINE_TIME_LIMIT = 50000000;
+
 class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
   uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
     uki.ui.SvgGLView)) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
@@ -606,7 +609,9 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
 
   drawTraceLines (chartShape) {
     const trace = this.getNamedResource('selectedIntervalTrace');
-    if (trace === null) {
+    const currentTimespan = this.linkedState.detailDomain[1] -
+      this.linkedState.detailDomain[0];
+    if (trace === null || currentTimespan > TRACE_LINE_TIME_LIMIT) {
       return;
     }
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;

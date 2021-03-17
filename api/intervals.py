@@ -123,7 +123,7 @@ def intervalTrace(datasetId: str,
 
         # Second phase: yield intervals until we encounter one beyond
         # the queried range (or we run out)
-        while intervalObj['parent'] is not None and intervalObj['leave']['Timestamp'] >= begin:
+        while intervalObj is not None and intervalObj['leave']['Timestamp'] >= begin:
             if yieldComma:
                 yield ','
             yieldComma = True
@@ -131,7 +131,7 @@ def intervalTrace(datasetId: str,
             yield format_interval(intervalObj, childId)
             lastInterval = intervalObj
             parentId = intervalObj['parent']
-            intervalObj = db[datasetId]['intervals'][parentId]
+            intervalObj = db[datasetId]['intervals'][parentId] if parentId is not None else None
 
         # Start on descendants
         yield '},"descendants":{'
