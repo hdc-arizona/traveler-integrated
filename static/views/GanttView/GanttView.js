@@ -279,10 +279,10 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
 
     this.moveCanvas(this._renderedChartShape);
     this.drawAxes(this._renderedChartShape);
+    // More expensive rendering that should only happen here, not quickDraw
+    this.prepCanvas(this._renderedChartShape);
+    this.drawTraceLines(this._renderedChartShape);
     this.drawBars(this._renderedChartShape);
-
-    // Update the trace lines (or clear them if there aren't any)
-    // this.drawTraceLines(chartShape);
 
     // As part of the full render (that could have been triggered from anywhere,
     // start the process of requesting fresh data if the viewport is out of date)
@@ -331,17 +331,27 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       // Add any additional per-selection parameters
       const selectionParams = this.linkedState.selection?.utilizationParameters;
 
-      // Send the API requests
+      // Send the utilization API requests
       const totalPromise = this.updateResource({ name: 'totalUtilization', type: 'json', url: baseUrl });
       const selectionPromise = selectionParams
         ? this.updateResource({ name: 'selectionUtilization', type: 'json', url: baseUrl + selectionParams })
         : this.updateResource({ name: 'selectionUtilization', type: 'placeholder', value: null }); // no current selection; replace data with null
 
+      // Update the traceback data for the selected interval (if there is one)
+      const selectedIntervalId = this.linkedState.selection?.intervalDetails?.intervalId;
+      const tracebackPromise = selectedIntervalId
+        ? this.updateResource({
+            name: 'selectedIntervalTrace',
+            type: 'json',
+            url: `/datasets/${this.datasetId}/intervals/${selectedIntervalId}/trace?begin=${domain[0]}&end=${domain[1]}`
+          })
+        : this.updateResource({ name: 'selectedIntervalTrace', type: 'placeholder', value: null });
+
       // Initial render call to show the spinner if waiting for data takes a while
       // (because render() is debounced, the spinner won't show if the request
       // is fast)
       this.render();
-      await Promise.all([totalPromise, selectionPromise]);
+      await Promise.all([totalPromise, selectionPromise, tracebackPromise]);
       // Ensure that everything is updated with the new data
       this.render();
     }
@@ -549,23 +559,24 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
       .attr('transform', `translate(${-this.emSize - 12},${chartShape.chartHeight / 2}) rotate(-90)`);
   }
 
+  prepCanvas (chartShape) {
+    // We only want to set canvas width / height ATTRIBUTES here, because doing
+    // so clears the canvas. In another context (e.g. zooming / panning), we
+    // only want to set transform STYLES to scale what we previously drew here)
+    this.d3el.select('.gantt-canvas')
+      .attr('width', chartShape.bins)
+      .attr('height', chartShape.fullHeight)
+      .style('transform-origin', null)
+      .style('transform', null);
+  }
+
   drawBars (chartShape) {
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;
     const totalUtilization = this.getNamedResource('totalUtilization');
     const selectionUtilization = this.getNamedResource('selectionUtilization');
 
-    // We only want to set canvas width / height ATTRIBUTES here, because doing
-    // so in another context (e.g. zooming / panning) would clear the canvas
-    // (in that context, we only want to set transform STYLES to scale
-    // what we previously drew here)
-    const canvas = this.d3el.select('.gantt-canvas')
-      .attr('width', chartShape.bins)
-      .attr('height', chartShape.fullHeight)
-      .style('transform-origin', null)
-      .style('transform', null);
-
+    const canvas = this.d3el.select('.gantt-canvas');
     const ctx = canvas.node().getContext('2d');
-    ctx.clearRect(0, 0, chartShape.bins, chartShape.fullHeight);
 
     const bandwidth = this.yScale.bandwidth();
     for (const [location, data] of Object.entries(totalUtilization.locations)) {
@@ -589,6 +600,48 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
           ctx.fillStyle = theme['--disabled-color'];
           ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
         }
+      }
+    }
+  }
+
+  drawTraceLines (chartShape) {
+    const trace = this.getNamedResource('selectedIntervalTrace');
+    if (trace === null) {
+      return;
+    }
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+
+    const canvas = this.d3el.select('.gantt-canvas');
+    const ctx = canvas.node().getContext('2d');
+
+    const bandwidth = this.yScale.bandwidth();
+    ctx.strokeStyle = theme['--selection-border-color'];
+    ctx.lineWidth = 3;
+
+    const drawPath = (parent, child) => {
+      ctx.beginPath();
+      ctx.moveTo(
+        chartShape.spilloverXScale(parent.leave) - chartShape.leftOffset,
+        this.yScale(parent.location) + bandwidth / 2
+      );
+      ctx.lineTo(
+        chartShape.spilloverXScale(child.enter) - chartShape.leftOffset,
+        this.yScale(child.location) + bandwidth / 2
+      );
+      ctx.stroke();
+    };
+
+    for (const parent of Object.values(trace.ancestors)) {
+      const child = trace.ancestors[parent.child];
+      if (child) {
+        drawPath(parent, child);
+      }
+    }
+
+    for (const child of Object.values(trace.descendants)) {
+      const parent = trace.descendants[child.parent];
+      if (parent) {
+        drawPath(parent, child);
       }
     }
   }

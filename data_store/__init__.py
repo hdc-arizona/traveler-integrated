@@ -207,4 +207,4 @@ class DataStore:
     from ._csv_functions import processCsvLine, processCsv, processCsvFile
     from ._code_functions import processCode, processCodeFile
     from ._log_functions import processPhylanxLog, processPhylanxLogFile
-    from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree, buildSparseUtilizationLists
+    from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree, connectIntervals, buildSparseUtilizationLists

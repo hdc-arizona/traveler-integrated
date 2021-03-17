@@ -198,7 +198,7 @@ class TracedLinkedState extends LinkedState {
    * time + location)
    */
   async selectInterval (timestamp, location) {
-    const url = `/datasets/${this.info.datasetId}/intervals?begin=${timestamp}&end=${timestamp + 1}&location=${location}&includeDetails=true`;
+    const url = `/datasets/${this.info.datasetId}/intervals?begin=${timestamp}&end=${timestamp + 1}&location=${location}`;
     const response = await window.fetch(url);
     const intervalList = await response.json();
     if (intervalList.length === 0) {

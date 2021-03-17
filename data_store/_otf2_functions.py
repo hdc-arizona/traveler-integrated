@@ -62,6 +62,8 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     gc.collect()
     await self.buildIntervalTree(datasetId, log)
     gc.collect()
+    await self.connectIntervals(datasetId, log)
+    gc.collect()
     await self.buildSparseUtilizationLists(datasetId, log)
     gc.collect()
     self.finishLoadingSourceFile(datasetId, file.name)
@@ -174,7 +176,7 @@ async def combineIntervals(self, datasetId, log):
 
     # Helper function for creating interval objects
     async def createNewInterval(event, lastEvent, intervalId):
-        newInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId}
+        newInterval = {'enter': {}, 'leave': {}, 'intervalId': intervalId, 'parent': None, 'children': []}
         # Copy all of the attributes from the OTF2 events into the interval object. If the values
         # differ (or it's the timestamp), put them in nested enter / leave objects. Otherwise, put
         # them directly in the interval object
@@ -293,6 +295,68 @@ async def buildIntervalTree(self, datasetId, log):
     gc.collect()
     await log('')
     await log('Finished indexing %i intervals' % count)
+
+async def connectIntervals(self, datasetId, log=logToConsole):
+    await log('Connecting intervals with the same GUID (.=2500 intervals)')
+    idDir = os.path.join(self.dbDir, datasetId)
+    guids = self.datasets[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
+
+    intervalCount = missingCount = newLinks = seenLinks = 0
+    for iv in self[datasetId]['intervalIndex'].iterOverlap(endOrder=True):
+        intervalId = iv.data
+        intervalObj = self[datasetId]['intervals'][intervalId]
+
+        # Parent GUIDs refer to the one in the enter event, not the leave event
+        guid = intervalObj.get('GUID', intervalObj['enter'].get('GUID', None))
+
+        if guid is None:
+            missingCount += 1
+        else:
+            if not guid in guids:
+                guids[guid] = []
+            guids[guid] = guids[guid] + [intervalId]
+
+        # Connect to most recent interval with the parent GUID
+        parentGuid = intervalObj.get('Parent GUID', intervalObj['enter'].get('Parent GUID', None))
+
+        if parentGuid is not None and parentGuid in guids:
+            foundPrior = False
+            for parentIntervalId in reversed(guids[parentGuid]):
+                parentInterval = self[datasetId]['intervals'][parentIntervalId]
+                if parentInterval['enter']['Timestamp'] <= intervalObj['enter']['Timestamp']:
+                    foundPrior = True
+                    intervalCount += 1
+                    # Store the id of the most recent interval
+                    intervalObj['parent'] = parentIntervalId
+                    # add our id to the parent interval
+                    parentInterval['children'].append(intervalId)
+                    # Because intervals is a diskcache.Index, it needs copies to know that something changed
+                    self[datasetId]['intervals'][intervalId] = intervalObj.copy()
+                    self[datasetId]['intervals'][parentIntervalId] = parentInterval.copy()
+
+                    # While we're here, note the parent-child link in the primitive graph
+                    # (for now, only assume links from the parent's leave interval to the
+                    # child's enter when primitive names are mismatched)
+                    childPrimitive = intervalObj.get('Primitive', intervalObj['enter'].get('Primitive', None))
+                    parentPrimitive = parentInterval.get('Primitive', intervalObj['leave'].get('Primitive', None))
+                    if childPrimitive is not None and parentPrimitive is not None:
+                        l = self.addPrimitiveChild(datasetId, parentPrimitive, childPrimitive, 'otf2')[1]
+                        newLinks += l
+                        seenLinks += 1 if l == 0 else 0
+                    break
+            if not foundPrior:
+                missingCount += 1
+        else:
+            missingCount += 1
+
+        if (missingCount + intervalCount) % 2500 == 0:
+            await log('.', end='')
+        if (missingCount + intervalCount) % 100000 == 0:
+            await log('processed %i intervals' % (missingCount + intervalCount))
+
+    await log('Finished connecting intervals')
+    await log('Interval links created: %i, Intervals without prior parent GUIDs: %i' % (intervalCount, missingCount))
+    await log('New primitive links based on GUIDs: %d, Observed existing links: %d' % (newLinks, seenLinks))
 
 async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # create allSuls obj

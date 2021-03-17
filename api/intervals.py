@@ -11,8 +11,6 @@ router = APIRouter()
 def get_intervals(datasetId: str, \
                   begin: int = None, \
                   end: int = None, \
-                  includeDetails: bool = False, \
-                  includePrimitive: bool = False, \
                   minDuration: int = None, \
                   maxDuration: int = None, \
                   location: str = None, \
@@ -54,37 +52,42 @@ def get_intervals(datasetId: str, \
             # This interval has passed all filters; yield it
             if not firstItem:
                 yield ','
-
-            if includeDetails:
-                # Send back everything we know about the interval
-                yield json.dumps(intervalObj)
-            elif includePrimitive:
-                # Send back the basics, but include the primitive name
-                yield json.dumps({
-                    'enter': i.begin,
-                    'leave': i.end,
-                    'intervalId': i.data,
-                    'primitiveName': intervalObj['Primitive'],
-                    'location': intervalObj['Location']
-                })
-            else:
-                # Only send the minimal information
-                yield json.dumps({
-                    'enter': i.begin,
-                    'leave': i.end,
-                    'intervalId': i.data,
-                    'location': intervalObj['Location']
-                })
+            yield json.dumps(intervalObj)
             firstItem = False
         yield ']'
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 @router.get('/datasets/{datasetId}/intervals/{intervalId}/trace')
-def intervalTrace(datasetId: str, intervalId: str, begin: float = None, end: float = None):
-    # This streams back a list of string IDs, as well as two special metadata
-    # objects for drawing lines to the left and right of the queried range when
-    # the full traceback is not requested
+def intervalTrace(datasetId: str,
+                  intervalId: str,
+                  begin: float = None,
+                  end: float = None):
+    # This streams back a graph formatted this way:
+    # {
+    #   "ancestors": {
+    #     "id": {
+    #       "enter": #####,
+    #       "leave": #####,
+    #       "location": "...",
+    #       "child": "id"  <-- may be omitted if id==intervalId
+    #     },
+    #     ... (ancestors are streamed first, working backward; children always
+    #     streamed before parents)
+    #   },
+    #   "descendants": {
+    #     "id": {
+    #       "enter": #####,
+    #       "leave": #####,
+    #       "location": "...",
+    #       "parent": "id"
+    #     },
+    #     ... (descendants are streamed last, working forward; parents always
+    #     streamed before children)
+    #   }
+    # }
+    # If within the queried begin / end window, an object for the associated
+    # intervalId will exist in both ancestors and descendants
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
@@ -92,65 +95,73 @@ def intervalTrace(datasetId: str, intervalId: str, begin: float = None, end: flo
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
-    def intervalIdGenerator():
-        yield '['
-        targetInterval = intervalObj = db[datasetId]['intervals'][intervalId]
+    def format_interval(intervalObj, childId = None):
+        result = {
+            'enter': intervalObj['enter']['Timestamp'],
+            'leave': intervalObj['leave']['Timestamp'],
+            'location': intervalObj['Location']
+        }
+        if childId is None:
+            result['parent'] = intervalObj['parent']
+        else:
+            result['child'] = childId
+        return '"' + intervalObj['intervalId'] + '":' + json.dumps(result)
+
+    def intervalGenerator():
+        yield '{"ancestors":{'
+
         lastInterval = None
         yieldComma = False
+        intervalObj = targetInterval = db[datasetId]['intervals'][intervalId]
 
-        # First phase: from the targetInterval, step backward until we encounter
+        # First phase: from the targetInterval, rewind until we encounter
         # an interval in the queried range (or we run out of intervals)
-        while 'lastParentInterval' in intervalObj and intervalObj['enter']['Timestamp'] > end:
+        while intervalObj['parent'] is not None and intervalObj['enter']['Timestamp'] > end:
             lastInterval = intervalObj
-            parentId = intervalObj['lastParentInterval']['id']
+            parentId = intervalObj['parent']
             intervalObj = db[datasetId]['intervals'][parentId]
 
-        if targetInterval != intervalObj:
-            # Because the target interval isn't in the query window, yield some
-            # metadata about the interval beyond the end boundary, so the client
-            # can draw lines beyond the window (and won't need access to the
-            # interval beyond the window itself)
-            yield json.dumps({
-                'type': 'beyondRight',
-                'id': lastInterval['intervalId'],
-                'location': lastInterval['Location'],
-                'beginTimestamp': lastInterval['enter']['Timestamp']
-            })
-            yieldComma = True
-
-        # Second phase: yield interval ids until we encounter an interval beyond
+        # Second phase: yield intervals until we encounter one beyond
         # the queried range (or we run out)
-        while 'lastParentInterval' in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
+        while intervalObj['parent'] is not None and intervalObj['leave']['Timestamp'] >= begin:
             if yieldComma:
                 yield ','
             yieldComma = True
-            yield '"%s"' % intervalObj['intervalId']
+            childId = lastInterval['intervalId'] if lastInterval is not None else None
+            yield format_interval(intervalObj, childId)
             lastInterval = intervalObj
-            parentId = intervalObj['lastParentInterval']['id']
+            parentId = intervalObj['parent']
             intervalObj = db[datasetId]['intervals'][parentId]
 
-        if 'lastParentInterval' not in intervalObj and intervalObj['leave']['Timestamp'] >= begin:
-            # We ran out of intervals, and the last one was in range; just yield
-            # its id (no beyondLeft metadata needed)
-            if yieldComma:
-                yield ','
-            yieldComma = True
-            yield '"%s"' % intervalObj['intervalId']
-        elif lastInterval and lastInterval['leave']['Timestamp'] >= begin:
-            # Yield some metadata about the interval beyond the begin boundary,
-            # so the client can draw lines beyond the window (and won't need
-            # access to the interval itself)
-            if yieldComma:
-                yield ','
-            yieldComma = True
-            yield json.dumps({
-                'type': 'beyondLeft',
-                'id': intervalObj['intervalId'],
-                'location': intervalObj['Location'],
-                'endTimestamp': intervalObj['leave']['Timestamp']
-            })
+        # Start on descendants
+        yield '},"descendants":{'
+        childQueue = [intervalId]
+        fastForwarding = True
+        yieldComma = False
+
+        while len(childQueue) > 0:
+            intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
+            if fastForwarding:
+                # First phase: from the targetInterval, fast forward until we
+                # encounter an interval in the queried range
+                if intervalObj['leave']['Timestamp'] >= begin:
+                    fastForwarding = False
+
+            if not fastForwarding and intervalObj['enter']['Timestamp'] <= end:
+                # Second phase: yield intervals that fit the queried range
+                if yieldComma:
+                    yield ','
+                yieldComma = True
+                yield format_interval(intervalObj)
+
+            # Only add children to the queue if this interval ends before the
+            # queried range
+            if intervalObj['leave']['Timestamp'] <= end:
+                for childId in intervalObj['children']:
+                    if not childId in childQueue:
+                        childQueue.append(childId)
 
         # Finished
-        yield ']'
+        yield '}}'
 
-    return StreamingResponse(intervalIdGenerator(), media_type='application/json')
+    return StreamingResponse(intervalGenerator(), media_type='application/json')
