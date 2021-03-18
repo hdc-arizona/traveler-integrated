@@ -194,11 +194,15 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
             dx: 0,
             dy: 0
           };
+          // Prevent false scroll events from changing scrollTop as a result of
+          // dragging
+          this._ignoreYScrollEvents = true;
         }).on('drag', event => {
           // Vertical dragging
           this._dragState.dy = event.y - this._dragState.y0;
-          this.yScroller.node().scrollTop = this._dragState.initialYScroll -
-            this._dragState.dy;
+          const scrollTop = this._dragState.initialYScroll - this._dragState.dy;
+          const forceQuickDraw = scrollTop !== this.yScroller.node().scrollTop;
+          this.yScroller.node().scrollTop = scrollTop;
           // Horizontal dragging
           this._dragState.dx = event.x - this._dragState.x0;
           const mouseDelta = this.xScale.invert(event.x) -
@@ -217,6 +221,14 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
             newDomain[0] = this.linkedState.overviewDomain[1] -
               this._dragState.initialTimespan;
           }
+          if (forceQuickDraw &&
+              newDomain[0] === this.linkedState.detailDomain[0] &&
+              newDomain[1] === this.linkedState.detailDomain[1]) {
+            // TracedLinkedState won't otherwise issue a quickDraw in this case,
+            // which can result in some funny effects if there was vertical
+            // panning
+            this.quickDraw();
+          }
           this.linkedState.detailDomain = newDomain;
         }).on('end', event => {
           if (this._dragState.dx === 0 && this._dragState.dy === 0) {
@@ -225,6 +237,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
             this.linkedState.selectInterval(timestamp, location);
           }
           delete this._dragState;
+          delete this._ignoreYScrollEvents;
           this.render();
         }));
 
@@ -245,11 +258,10 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
 
     // Make sure the y axis links with scrolling
     this.yScroller.on('scroll', () => {
-      this.quickDraw();
-      this.render();
-      // render() is debounced, so it will only be called once when scrolling
-      // stops (and call its updateDataIfNeeded function if we need to load
-      // more vertical data)
+      if (!this._ignoreYScrollEvents) {
+        this.quickDraw();
+        this.render();
+      }
     });
     // Link wheel events on the y axis back to vertical scrolling
     this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
