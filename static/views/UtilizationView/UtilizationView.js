@@ -1,11 +1,13 @@
 /* globals uki, d3 */
 import LinkedMixin from '../common/LinkedMixin.js';
+import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
 class UtilizationView extends
   LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
-    uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
-      uki.ui.SvgGLView)) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
+    CursoredViewMixin( // Adds and updates a line in the background wherever the user is mousing
+      uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
+        uki.ui.SvgGLView))) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
   constructor (options) {
     options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/UtilizationView/style.less' },
@@ -50,6 +52,20 @@ class UtilizationView extends
     this.render();
   }
 
+  getMousedTime (offsetX) {
+    return this.xScale.invert(offsetX - this.margin.left);
+  }
+
+  getCursorHeight () {
+    return this.yScale.range()[0] - this.yScale.range()[1];
+  }
+
+  getCursorPosition (time) {
+    return time < this.xScale.domain()[0] || time > this.xScale.domain()[1]
+      ? null
+      : this.xScale(time);
+  }
+
   async setup () {
     await super.setup(...arguments);
 
@@ -71,6 +87,8 @@ class UtilizationView extends
     this.linkedState.on('detailDomainChangedSync', () => { this.drawBrush(); });
     // Prep local interactive callbacks for updating the brush
     this.setupBrush();
+    // Set up the cursor
+    this.setupCursor(this.d3el.select('.chart'));
   }
 
   get isLoading () {
@@ -125,10 +143,10 @@ class UtilizationView extends
 
     // Update the (transparent) background rect that captures drag events
     this.d3el.select('.background rect')
-      .attr('x', this.margin.left)
-      .attr('y', this.margin.top)
       .attr('width', this.xScale.range()[1] - this.xScale.range()[0])
       .attr('height', this.yScale.range()[0] - this.yScale.range()[1]);
+    // Update the cursor
+    this.drawCursor();
     // Update the axis
     this.drawAxes();
     // Update the totalUtilization paths

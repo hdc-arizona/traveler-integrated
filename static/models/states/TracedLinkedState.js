@@ -13,6 +13,7 @@ class TracedLinkedState extends LinkedState {
 
     // Start the detail domain at the same level as the overview
     this._detailDomain = this.overviewDomain && Array.from(this.overviewDomain);
+    this._cursorPosition = null;
   }
 
   /**
@@ -70,6 +71,22 @@ class TracedLinkedState extends LinkedState {
    */
   get overviewDomain () {
     return this.info.intervalDomain;
+  }
+
+  /**
+   * Views that show any timeline should have a common cursor where the user
+   * is mousing
+   */
+  get cursorPosition () {
+    return this._cursorPosition;
+  }
+
+  /**
+   * Notify any listening views whenever the cursor is updated
+   */
+  set cursorPosition (value) {
+    this._cursorPosition = value;
+    this.trigger('moveCursor');
   }
 
   /**

@@ -4,7 +4,7 @@
   </clipPath>
 </defs>
 <g class="chart">
-  <line class="cursor" style="display:none"></line>
+  <line class="cursor"></line>
   <g class="yAxis"></g>
   <text class="yAxisLabel" text-anchor="middle">Location</text>
   <rect class="yAxisScrollCapturer" fill="transparent"></rect>

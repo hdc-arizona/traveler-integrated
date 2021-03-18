@@ -1,7 +1,7 @@
 <g class="chart">
   <g class="background">
     <rect></rect>
-    <line class="cursor" style="display:none"></line>
+    <line class="cursor"></line>
     <g class="yAxis"></g>
     <text class="yAxisLabel" text-anchor="middle">Utilization</text>
     <g class="xAxis"></g>

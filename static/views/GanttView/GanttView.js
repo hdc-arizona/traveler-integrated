@@ -1,5 +1,6 @@
 /* globals uki, d3 */
 import LinkedMixin from '../common/LinkedMixin.js';
+import CursoredViewMixin from '../common/CursoredViewMixin.js';
 import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
 
@@ -17,8 +18,9 @@ const VERTICAL_SPILLOVER_FACTOR = 3;
 const TRACE_LINE_TIME_LIMIT = 50000000;
 
 class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
-  uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
-    uki.ui.SvgGLView)) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
+  CursoredViewMixin( // Adds and updates a line in the background wherever the user is mousing
+    uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
+      uki.ui.SvgGLView))) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
   constructor (options) {
     options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/GanttView/style.less' },
@@ -155,6 +157,9 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     // Set up local zoom, pan, hover, and click interactions
     this.setupInteractions();
 
+    // Set up the cursor
+    this.setupCursor(this.d3el.select('.chart'));
+
     // setup() is only called once this.d3el is ready; only at this point do we
     // know how many bins to ask for
     this.updateDataIfNeeded();
@@ -176,15 +181,13 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
           mousedPosition - zoomFactor * (mousedPosition - this.linkedState.detailDomain[0]),
           mousedPosition + zoomFactor * (this.linkedState.detailDomain[1] - mousedPosition)
         ];
-        event.preventDefault();
-        return false;
-      }).call(d3.drag()
+      }, { passive: true }).call(d3.drag()
         .on('start', event => {
           const initialDomain = this.linkedState.detailDomain;
-          const originalWidth = initialDomain[1] - initialDomain[0];
+          const initialTimespan = initialDomain[1] - initialDomain[0];
           this._dragState = {
             initialDomain,
-            originalWidth,
+            initialTimespan,
             initialYScroll: this.yScroller.node().scrollTop,
             x0: event.x,
             y0: event.y,
@@ -208,11 +211,11 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
           if (newDomain[0] <= this.linkedState.overviewDomain[0]) {
             newDomain[0] = this.linkedState.overviewDomain[0];
             newDomain[1] = this.linkedState.overviewDomain[0] +
-              this._dragState.originalWidth;
+              this._dragState.initialTimespan;
           } else if (newDomain[1] >= this.linkedState.overviewDomain[1]) {
             newDomain[1] = this.linkedState.overviewDomain[1];
             newDomain[0] = this.linkedState.overviewDomain[1] -
-              this._dragState.originalWidth;
+              this._dragState.initialTimespan;
           }
           this.linkedState.detailDomain = newDomain;
         }).on('end', event => {
@@ -280,6 +283,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     delete this._renderedChartShape;
     this._renderedChartShape = this.getChartShape();
 
+    this.drawCursor();
     this.moveCanvas(this._renderedChartShape);
     this.drawAxes(this._renderedChartShape);
     // More expensive rendering that should only happen here, not quickDraw
@@ -453,6 +457,20 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
     }
 
     return chartShape;
+  }
+
+  getMousedTime (offsetX) {
+    return this.xScale.invert(offsetX - this.margin.left);
+  }
+
+  getCursorHeight () {
+    return this._renderedChartShape?.chartHeight || 0;
+  }
+
+  getCursorPosition (time) {
+    return time < this.xScale.domain()[0] || time > this.xScale.domain()[1]
+      ? null
+      : this.xScale(time);
   }
 
   moveCanvas (chartShape) {
