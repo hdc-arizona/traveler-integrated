@@ -121,7 +121,13 @@ def intervalTrace(datasetId: str,
             parentId = intervalObj['parent']
             intervalObj = db[datasetId]['intervals'][parentId]
 
-        # Second phase: yield intervals until we encounter one beyond
+        # Second phase: if we had to rewind, include the lastInterval to enable
+        # drawing offscreen lines to the right
+        if intervalObj != targetInterval:
+            yield format_interval(lastInterval, None)
+            yieldComma = True
+
+        # Third phase: include intervals until we encounter one beyond
         # the queried range (or we run out)
         while intervalObj is not None and intervalObj['leave']['Timestamp'] >= begin:
             if yieldComma:
@@ -133,29 +139,40 @@ def intervalTrace(datasetId: str,
             parentId = intervalObj['parent']
             intervalObj = db[datasetId]['intervals'][parentId] if parentId is not None else None
 
+        # Fourth phase: if the last intervalObj was offscreen, we still want to
+        # include it to enable drawing a line offscreen to the left
+        if intervalObj is not None:
+            if yieldComma:
+                yield ','
+            yieldComma = True
+            childId = lastInterval['intervalId'] if lastInterval is not None else None
+            yield format_interval(intervalObj, childId)
+
         # Start on descendants
         yield '},"descendants":{'
         childQueue = [intervalId]
-        fastForwarding = True
         yieldComma = False
 
         while len(childQueue) > 0:
             intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
-            if fastForwarding:
-                # First phase: from the targetInterval, fast forward until we
-                # encounter an interval in the queried range
-                if intervalObj['leave']['Timestamp'] >= begin:
-                    fastForwarding = False
+            # yield any interval where itself or its child (to allow offscreen
+            # lines to the left) is in the queried range
+            yieldThisInterval = False
+            if intervalObj['leave']['Timestamp'] >= begin:
+                yieldThisInterval = True
+            else:
+                for childId in intervalObj['children']:
+                    if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
+                        yieldThisInterval = True
 
-            if not fastForwarding and intervalObj['enter']['Timestamp'] <= end:
-                # Second phase: yield intervals that fit the queried range
+            if yieldThisInterval:
                 if yieldComma:
                     yield ','
                 yieldComma = True
                 yield format_interval(intervalObj)
 
             # Only add children to the queue if this interval ends before the
-            # queried range
+            # queried range does
             if intervalObj['leave']['Timestamp'] <= end:
                 for childId in intervalObj['children']:
                     if not childId in childQueue:

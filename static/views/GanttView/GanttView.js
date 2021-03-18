@@ -15,7 +15,7 @@ const HORIZONTAL_SPILLOVER_FACTOR = 3;
 const VERTICAL_SPILLOVER_FACTOR = 3;
 
 // Don't show trace lines when we're zoomed out beyond this time limit
-const TRACE_LINE_TIME_LIMIT = 50000000;
+const TRACE_LINE_TIME_LIMIT = Infinity;
 
 class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
   CursoredViewMixin( // Adds and updates a line in the background wherever the user is mousing
@@ -639,7 +639,7 @@ class GanttView extends LinkedMixin( // Ensures that this.linkedState is updated
 
     const bandwidth = this.yScale.bandwidth();
     ctx.strokeStyle = theme['--selection-border-color'];
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 1;
 
     const drawPath = (parent, child) => {
       ctx.beginPath();
