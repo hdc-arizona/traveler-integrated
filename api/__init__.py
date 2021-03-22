@@ -8,16 +8,22 @@ from fastapi import HTTPException
 from data_store import DataStore
 
 
-parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface')
+parser = argparse.ArgumentParser(description='Serve the traveler-integrated interface',
+                                 formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-d', '--db_dir', dest='dbDir', default='/tmp/traveler-integrated',
-                    help=('Directory where the bundled data is already / will be stored '
+                    help=('Directory where the bundled data is already / will be stored\n' +
                           '(default: /tmp/traveler-integrated)'))
-parser.add_argument('-s', '--debug', dest='debug', action='store_true',
-                    help='Store additional information for debugging source files, etc.')
 parser.add_argument('-p', '--port', dest='port', default=os.environ.get('TRAVELER_PORT', '8000'),
-                    help='Port to serve the interface from. Will override TRAVELER_PORT if specified.')
+                    help='Port to serve the interface from.\n'+
+                         'Will override TRAVELER_PORT if specified.')
 parser.add_argument('-l', '--log_level', dest='log_level', default='warning',
-                    help='log_level corresponding to Uvicorn settings (https://www.uvicorn.org/settings/); levels above info will also display traveler parsing logs')
+                    help='log_level string must be one of:\n' +
+                         'critical, error, warning, info, debug, trace (Default: warning)\n' +
+                         'corresponding to Uvicorn settings (https://www.uvicorn.org/settings/);\n' +
+                         'info and above will also display traveler parsing logs')
+parser.add_argument('-s', '--debug', dest='debug', action='store_true',
+                    help='When bundling data, store additional information for\n' +
+                    'debugging primitive / interval source files, etc.')
 
 args = parser.parse_args()
 

@@ -6,12 +6,12 @@
 <g class="chart">
   <line class="cursor"></line>
   <g class="yAxis"></g>
-  <text class="yAxisLabel" text-anchor="middle">Location</text>
+  <text class="yAxisLabel" text-anchor="middle">TODO: subclasses should replace this</text>
   <rect class="yAxisScrollCapturer" fill="transparent"></rect>
   <g class="xAxis"></g>
   <text class="xAxisLabel" text-anchor="middle">Time in Nanoseconds</text>
-  <foreignObject class="yScroller">
-    <canvas class="gantt-canvas"></canvas>
+  <foreignObject>
+    <canvas></canvas>
   </foreignObject>
   <rect class="eventCapturer" fill="transparent"></rect>
 </g>
