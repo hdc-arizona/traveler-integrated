@@ -38,11 +38,17 @@ class RootView extends uki.ui.GLRootView {
   async setup () {
     await super.setup(...arguments);
 
-    this.goldenLayout.on('stateChanged', () => {
+    const updateLayout = () => {
       if (window.controller.currentDataset) {
-        window.controller.currentDataset.viewLayout = this.glLayout;
+        window.controller.currentDataset.updateViewLayout(this.glLayout);
       }
-    });
+    };
+
+    // Notify each LinkedState that its layout has changed when GoldenLayout
+    // rearranges / closes / opens something
+    this.on('stateChanged', updateLayout);
+    this.on('itemDestroyed', updateLayout);
+    this.on('itemCreated', updateLayout);
   }
 }
 

@@ -29,8 +29,10 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     this.info = options.info;
     this._selection = options.priorLinkedState?.selection || null;
     this._colorMode = COLOR_MODES.INCLUSIVE;
-    this._viewLayoutPromise = options.priorLinkedState?._viewLayoutPromise ||
-      this.ready.then(() => this.getDefaultLayout());
+    this._viewLayout = options.priorLinkedState?._viewLayout || null;
+    this._viewLayoutPromise = this._viewLayout
+      ? Promise.resolve(this._viewLayout)
+      : this.ready.then(() => this.getDefaultLayout());
     if (options.priorLinkedState) {
       this.takeOverEvents(options.priorLinkedState);
     }
@@ -64,6 +66,15 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
   async getViewLayout () {
     return this._viewLayoutPromise;
+  }
+
+  updateViewLayout (newLayout) {
+    this._viewLayout = newLayout;
+    // We use _viewLayoutPromise promise because, at least initially, the layout
+    // depends on data from the server about which views are available. To
+    // change the layout (e.g. when a user closes or moves a view), we just
+    // override the value that that promise resolves
+    this._viewLayoutPromise = this._viewLayoutPromise.then(() => newLayout);
   }
 
   /**
@@ -149,8 +160,8 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   }
 
   /**
-   * Return a dict that indicates whether specific views (and which variants)
-   * are currently open
+   * Return a dict that indicates whether specific views (and which variants,
+   * e.g. metric type or physl vs cpp code views) are currently open
    */
   async getOpenViews () {
     const openViews = {};
