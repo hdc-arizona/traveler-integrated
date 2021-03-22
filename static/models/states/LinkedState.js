@@ -156,7 +156,9 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     const openViews = {};
     function helper (glLayer) {
       if (glLayer.type === 'component') {
-        openViews[glLayer.componentName] = { open: true };
+        if (!openViews[glLayer.componentName]) {
+          openViews[glLayer.componentName] = { open: true };
+        }
         if (glLayer.componentState.variant) {
           openViews[glLayer.componentName].variants = openViews[glLayer.componentName].variants || [];
           openViews[glLayer.componentName].variants.push(glLayer.componentState.variant);
@@ -244,10 +246,14 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     const alreadyOpen = variant
       ? openViews[viewName] && openViews[viewName].variants.indexOf(variant) !== -1
       : openViews[viewName];
+    let disabled = viewStatus === VIEW_STATUS.UNAVAILABLE;
+    if (variant && !disabled) {
+      disabled = availableViews[viewName].variants.indexOf(variant) === -1;
+    }
     return {
       label,
       img: viewStatus === VIEW_STATUS.LOADING ? 'img/spinner.png' : null,
-      disabled: viewStatus === VIEW_STATUS.UNAVAILABLE,
+      disabled,
       checked: alreadyOpen,
       onclick: () => {
         window.controller.openView(this.info.datasetId, viewName, variant);
@@ -276,7 +282,8 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
             case 'cpp': label = 'C++'; break;
           }
           return this.createViewMenuEntry(label, 'CodeView', variant, availableViews, openViews);
-        })
+        }),
+        disabled: availableViews.CodeView.status === VIEW_STATUS.UNAVAILABLE
       }
     ];
   }

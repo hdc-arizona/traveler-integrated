@@ -152,7 +152,7 @@ class TracedLinkedState extends LinkedState {
    */
   async getViewMenu () {
     const availableViews = await this.getAvailableViews();
-    const openViews = this.getOpenViews();
+    const openViews = await this.getOpenViews();
 
     // First, create submenus...
     // ... for regular metrics
