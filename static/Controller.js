@@ -129,21 +129,6 @@ class Controller extends uki.ui.ThemeableView {
     this.menuView.render();
     this.trigger('currentDatasetChanged');
   }
-
-  openView (datasetId, viewClassName, variant) {
-    if (datasetId !== this.currentDatasetId) {
-      // Because changing the current dataset will load a totally different
-      // layout, wait until GoldenLayout is ready to add the new view
-      this.on('initialised.tempAddViewListener', () => {
-        this.off('initialised.tempAddViewListener');
-        this.rootView.openView(viewClassName, variant);
-      });
-      this.currentDatasetId = datasetId;
-    } else {
-      // Add the new view immediately
-      this.rootView.openView(viewClassName, variant);
-    }
-  }
 }
 
 window.controller = new Controller();

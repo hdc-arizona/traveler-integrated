@@ -58,7 +58,16 @@ class RootView extends uki.ui.GLRootView {
         throw new Error('Can\'t open view when no dataset is loaded');
       }
 
-      // TODO: check if the view is already open
+      // Check if the view is already open
+      for (const view of Object.values(this.views)) {
+        if (view.constructor.name === viewClassName &&
+          (variant === null || view.glState.variant === variant)) {
+          // View exists, just make sure it's on top of a stack if it had been
+          // buried
+          this.raiseView(view);
+          return;
+        }
+      }
 
       const config = {
         type: 'component',
@@ -116,7 +125,7 @@ class RootView extends uki.ui.GLRootView {
         this.off('initialised.tempAddViewListener');
         helper();
       });
-      this.currentDatasetId = datasetId;
+      window.controller.currentDatasetId = datasetId;
     } else {
       // Add the new view immediately
       helper();
