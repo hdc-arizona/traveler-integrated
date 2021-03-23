@@ -165,17 +165,17 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
    */
   async getOpenViews () {
     const openViews = {};
-    function helper (glLayer) {
-      if (glLayer.type === 'component') {
-        if (!openViews[glLayer.componentName]) {
-          openViews[glLayer.componentName] = { open: true };
+    function helper (glItem) {
+      if (glItem.type === 'component') {
+        if (!openViews[glItem.componentName]) {
+          openViews[glItem.componentName] = { open: true };
         }
-        if (glLayer.componentState.variant) {
-          openViews[glLayer.componentName].variants = openViews[glLayer.componentName].variants || [];
-          openViews[glLayer.componentName].variants.push(glLayer.componentState.variant);
+        if (glItem.componentState.variant) {
+          openViews[glItem.componentName].variants = openViews[glItem.componentName].variants || [];
+          openViews[glItem.componentName].variants.push(glItem.componentState.variant);
         }
       } else {
-        for (const nestedLayer of glLayer.content || []) {
+        for (const nestedLayer of glItem.content || []) {
           helper(nestedLayer);
         }
       }
@@ -267,7 +267,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       disabled,
       checked: alreadyOpen,
       onclick: () => {
-        window.controller.openView(this.info.datasetId, viewName, variant);
+        window.controller.rootView.openView(this.info.datasetId, viewName, variant);
       }
     };
   }

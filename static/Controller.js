@@ -118,6 +118,8 @@ class Controller extends uki.ui.ThemeableView {
       window.location.hash = this._currentDatasetId;
       this.menuView.openAllAncestorFolders(this.datasetList[index].info.label);
       this.datasetList[index].getViewLayout().then(layout => {
+        // Setting this eventually triggers an 'initialised' event from
+        // GoldenLayout
         this.rootView.glLayout = layout;
       });
     } else {
@@ -128,13 +130,19 @@ class Controller extends uki.ui.ThemeableView {
     this.trigger('currentDatasetChanged');
   }
 
-  openView (datasetId, viewName) {
+  openView (datasetId, viewClassName, variant) {
     if (datasetId !== this.currentDatasetId) {
+      // Because changing the current dataset will load a totally different
+      // layout, wait until GoldenLayout is ready to add the new view
+      this.on('initialised.tempAddViewListener', () => {
+        this.off('initialised.tempAddViewListener');
+        this.rootView.openView(viewClassName, variant);
+      });
       this.currentDatasetId = datasetId;
+    } else {
+      // Add the new view immediately
+      this.rootView.openView(viewClassName, variant);
     }
-    // TODO: tell rootView to open the new view (somewhere), and
-    // update the linkedState's viewLayout if the stateChanged callback
-    // doesn't already handle it
   }
 }
 

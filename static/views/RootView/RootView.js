@@ -1,4 +1,5 @@
 /* globals uki */
+import ZoomableTimelineView from '../ZoomableTimelineView/ZoomableTimelineView.js';
 import SelectionInfoView from '../SelectionInfoView/SelectionInfoView.js';
 import TreeView from '../TreeView/TreeView.js';
 import CodeView from '../CodeView/CodeView.js';
@@ -44,11 +45,82 @@ class RootView extends uki.ui.GLRootView {
       }
     };
 
-    // Notify each LinkedState that its layout has changed when GoldenLayout
+    // Notify LinkedState that its layout has changed when GoldenLayout
     // rearranges / closes / opens something
     this.on('stateChanged', updateLayout);
     this.on('itemDestroyed', updateLayout);
     this.on('itemCreated', updateLayout);
+  }
+
+  openView (datasetId, viewClassName, variant) {
+    const helper = () => {
+      if (!window.controller.currentDatasetId) {
+        throw new Error('Can\'t open view when no dataset is loaded');
+      }
+
+      // TODO: check if the view is already open
+
+      const config = {
+        type: 'component',
+        componentName: viewClassName,
+        componentState: {
+          datasetId: window.controller.currentDataset.info.datasetId,
+          variant
+        }
+      };
+
+      // TODO: in theory this should work instead of string checking:
+      // this.viewClassLookup[viewClassName].prototype instanceof ZoomableTimelineView
+      // however, uki currently gives false positives:
+      // https://github.com/ukijs/uki/pull/1
+      const timelineBasedView =
+        viewClassName === 'UtilizationView' ||
+        viewClassName === 'GanttView' ||
+        viewClassName === 'ContourBoxPlotView' ||
+        viewClassName === 'LineChartView';
+
+      this.addView(config, glItem => {
+        // uki-ui iterates through GoldenLayout's structure to ask us which item
+        // to add this view to; for traveler, we want to add timeline-based views
+        // to the left column, and anything else to the right column if they
+        // exist (columns might not exist if the user has moved things around)
+
+        // TODO: this could probably be more sophisticated (e.g. try to put
+        // timeline views below the GanttView wherever it is)... but that also
+        // likely will involve wrapping GanttView in a GoldenLayout column
+
+        if (glItem.type !== 'column' ||
+            glItem.parent?.type !== 'row' ||
+            glItem.parent.parent?.type !== 'root') {
+          return null;
+        }
+        const columnIndex = glItem.parent.contentItems.indexOf(glItem);
+        if (timelineBasedView && columnIndex === 0) {
+          return glItem;
+        } else if (!timelineBasedView && columnIndex === 1) {
+          return glItem;
+        } else {
+          return null;
+        }
+      }, glItem => {
+        // Once we've picked which column to add to, which index should we insert
+        // the new view? For now, we default to the bottom of the column
+        return glItem.contentItems.length;
+      });
+    };
+
+    if (datasetId !== window.controller.currentDatasetId) {
+      // Because changing the current dataset will load a totally different
+      // layout, wait until GoldenLayout is ready to add the new view
+      this.on('initialised.tempAddViewListener', () => {
+        this.off('initialised.tempAddViewListener');
+        helper();
+      });
+      this.currentDatasetId = datasetId;
+    } else {
+      // Add the new view immediately
+      helper();
+    }
   }
 }
 
