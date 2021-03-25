@@ -39,11 +39,6 @@ class UtilizationView extends
     this.xScale.range([0, this.chartBounds.width]);
     this.yScale.range([this.chartBounds.height, 0]);
     const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
-    if (bins === this._lastBins) {
-      // Don't actually need to change anything
-      return;
-    }
-    this._lastBins = bins;
 
     const baseUrl = `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}`;
     const selectionParams = this.linkedState.selection?.utilizationParameters;

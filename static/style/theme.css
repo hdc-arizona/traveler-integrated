@@ -1,8 +1,8 @@
 :root {
   /* Default UI light theme: light background, dark text, blue accent, red-orange error color */
 	--theme-hue: 0;					/* white */
-	--accent-hue: 194;			/* blue */
-  --error-hue: 14;        /* red-orange */
+	--accent-hue: 266;			/* purple */
+  --error-hue: 329;        /* pink */
 
 	--text-color-richer: hsl(var(--theme-hue), 0%, 5%);
 	--text-color: hsl(var(--theme-hue), 0%, 13%);

@@ -96,6 +96,7 @@ class IntervalHistogramView extends
   }
 
   combineHistograms () {
+    const selectedInterval = this.linkedState.selection?.intervalDetails;
     const selectedPrimitive = this.linkedState.selection?.primitiveName;
     const intervalDurationSpan = this.linkedState.selection?.intervalDurationSpan || null;
     const allBars = [];
@@ -111,7 +112,7 @@ class IntervalHistogramView extends
         minDuration = Math.min(minDuration, duration);
         maxDuration = Math.max(maxDuration, duration);
         maxCount = Math.max(maxCount, count);
-        let selected = true;
+        let selected = this.linkedState.selection && !selectedInterval;
         if (selectedPrimitive) {
           selected = selected && selectedPrimitive === primitive;
         }
@@ -140,7 +141,6 @@ class IntervalHistogramView extends
     }
 
     // Add an extra small bar when there's an IntervalSelection
-    const selectedInterval = this.linkedState.selection?.intervalDetails;
     if (selectedInterval) {
       allBars.push({
         primitive: selectedInterval.Primitive,

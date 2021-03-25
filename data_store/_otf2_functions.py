@@ -298,14 +298,24 @@ async def buildIntervalTree(self, datasetId, log):
 
 async def connectIntervals(self, datasetId, log=logToConsole):
     await log('Connecting intervals with the same GUID (.=2500 intervals)')
-    # set up guids index
-    idDir = os.path.join(self.dbDir, datasetId)
-    guids = self.datasets[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
 
+    guids = {}
+    # TODO: using a simple dict piles up GUIDs and intervalIds in memory... if
+    # this gets too big, a (REALLY slow) alternative to guids = {}:
+    # 
+    # idDir = os.path.join(self.dbDir, datasetId)
+    # guids = self.datasets[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
+    #
+    # ... also, I'm not totally sure that guids[guid].append(intervalId) below
+    # even works correctly with a diskcache.Index; it might need the slower
+    # guids[guid] = guids[guid] + [intervalId]
+
+    intervals = self[datasetId]['intervals']
     intervalCount = missingCount = newLinks = seenLinks = 0
+
     for iv in self[datasetId]['intervalIndex'].iterOverlap(endOrder=True):
         intervalId = iv.data
-        intervalObj = self[datasetId]['intervals'][intervalId]
+        intervalObj = intervals[intervalId]
 
         # Parent GUIDs refer to the one in the enter event, not the leave event
         guid = intervalObj.get('GUID', intervalObj['enter'].get('GUID', None))
@@ -315,7 +325,7 @@ async def connectIntervals(self, datasetId, log=logToConsole):
         else:
             if not guid in guids:
                 guids[guid] = []
-            guids[guid] = guids[guid] + [intervalId]
+            guids[guid].append(intervalId)
 
         # Connect to most recent interval with the parent GUID
         parentGuid = intervalObj.get('Parent GUID', intervalObj['enter'].get('Parent GUID', None))
@@ -323,7 +333,7 @@ async def connectIntervals(self, datasetId, log=logToConsole):
         if parentGuid is not None and parentGuid in guids:
             foundPrior = False
             for parentIntervalId in reversed(guids[parentGuid]):
-                parentInterval = self[datasetId]['intervals'][parentIntervalId]
+                parentInterval = intervals[parentIntervalId]
                 if parentInterval['enter']['Timestamp'] <= intervalObj['enter']['Timestamp']:
                     foundPrior = True
                     intervalCount += 1
@@ -331,9 +341,9 @@ async def connectIntervals(self, datasetId, log=logToConsole):
                     intervalObj['parent'] = parentIntervalId
                     # add our id to the parent interval
                     parentInterval['children'].append(intervalId)
-                    # Because intervals is a diskcache.Index, it needs copies to know that something changed
-                    self[datasetId]['intervals'][intervalId] = intervalObj.copy()
-                    self[datasetId]['intervals'][parentIntervalId] = parentInterval.copy()
+                    # Because intervals is a diskcache.Index, it needs to know that something changed
+                    intervals[intervalId] = intervalObj
+                    intervals[parentIntervalId] = parentInterval
 
                     # While we're here, note the parent-child link in the primitive graph
                     # (for now, only assume links from the parent's leave interval to the
