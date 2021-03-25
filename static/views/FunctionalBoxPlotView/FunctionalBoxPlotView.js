@@ -2,7 +2,7 @@
 
 import ZoomableTimelineView from '../ZoomableTimelineView/ZoomableTimelineView.js';
 
-class LineChartView extends ZoomableTimelineView { // abstracts a lot of common logic for smooth zooming + panning + rendering offscreen + showing scrollbars for timeline-based views
+class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of common logic for smooth zooming + panning + rendering offscreen + showing scrollbars for timeline-based views
   constructor (options) {
     options.resources = (options.resources || []).concat(...[
       // Placeholder resources that don't actually get updated until later
@@ -79,4 +79,4 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
   }
 }
 
-export default LineChartView;
+export default FunctionalBoxPlotView;

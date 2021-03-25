@@ -39,3 +39,15 @@ def getUtilizationForPrimitive(datasetId: str,
                                                                                                duration_bins),
            'metadata': {'begin': begin, 'end': end, 'bins': bins}}
     return ret
+
+@router.get('/datasets/{datasetId}/primitives/{primitive}/intervalHistogram')
+def getIntervalHistogram(datasetId: str,
+                         primitive: str = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+
+    if begin is None:
+        begin = db[datasetId]['info']['intervalDomain'][0]
+    if end is None:
+        end = db[datasetId]['info']['intervalDomain'][1]
+
+    return db[datasetId]['intervalHistograms'].get(primitive, {})

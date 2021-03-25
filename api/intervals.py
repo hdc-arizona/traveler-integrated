@@ -58,6 +58,12 @@ def get_intervals(datasetId: str, \
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
+@router.get('/datasets/{datasetId}/intervals/{intervalId}')
+def get_interval(datasetId: str, \
+                 intervalId: str):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+    return db[datasetId]['intervals'].get(intervalId, None)
+
 @router.get('/datasets/{datasetId}/intervals/{intervalId}/trace')
 def intervalTrace(datasetId: str,
                   intervalId: str,

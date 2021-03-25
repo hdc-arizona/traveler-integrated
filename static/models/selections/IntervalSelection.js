@@ -32,5 +32,37 @@ class IntervalSelection extends Selection {
   get details () {
     return JSON.stringify(this.intervalDetails, null, 2);
   }
+
+  /**
+   * A list of relevant selections to this one to enable easy pivoting
+   * to this interval's primitive, ancestor interval, or child intervals
+   */
+  get links () {
+    const links = [{
+      label: `Select primitive: ${this.intervalDetails.Primitive}`,
+      pivot: () => {
+        window.controller.currentDataset
+          .selectPrimitive(this.intervalDetails.Primitive);
+      }
+    }];
+    if (this.intervalDetails.parent) {
+      links.push({
+        label: `Select parent: ${this.intervalDetails.parent}`,
+        pivot: () => {
+          window.controller.currentDataset
+            .selectIntervalById(this.intervalDetails.parent);
+        }
+      });
+    }
+    links.push(...this.intervalDetails.children.map(childId => {
+      return {
+        label: `Select child: ${childId}`,
+        pivot: () => {
+          window.controller.currentDataset.selectIntervalById(childId);
+        }
+      };
+    }));
+    return links;
+  }
 }
 export default IntervalSelection;

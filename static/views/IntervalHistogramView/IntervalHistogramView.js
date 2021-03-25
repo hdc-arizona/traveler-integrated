@@ -1,381 +1,375 @@
-/* globals d3 */
-import GoldenLayoutView from '../common/GoldenLayoutView.js';
+/* globals uki, d3 */
 import LinkedMixin from '../common/LinkedMixin.js';
-import CursoredViewMixin from '../common/CursoredViewMixin.js';
-import normalizeWheel from '../../utils/normalize-wheel.js';
 import cleanupAxis from '../../utils/cleanupAxis.js';
-import SvgViewMixin from '../common/SvgViewMixin.js';
 
-// d3 canvas source reference - https://github.com/xoor-io/d3-canvas-example
-class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
-  constructor (argObj) {
-    argObj.resources = [
+class IntervalHistogramView extends
+  LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
+    uki.ui.ParentSizeViewMixin( // Keeps the SVG element sized based on how much space GoldenLayout gives us
+      uki.ui.SvgGLView)) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
+  constructor (options) {
+    options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/IntervalHistogramView/style.less' },
-      { type: 'text', url: 'views/IntervalHistogramView/template.svg' }
-    ];
-    super(argObj);
-    // d3 vars
-    this.xScale = d3.scaleLog();// d3.scaleLinear();
-    this.yScale = d3.scaleLog();// d3.scaleLinear();
-
-    this.svgElement = null;
-    // canvas vars
-    this.canvasElement = null;
-    this.canvasContext = null;
-
-    this.selectedLocation = '1';
-    this.baseOpacity = 0.3;
-    this.wasRendered = false;
-    this.initialDragState = null;
-    this.ClickState = { background: 0, hover: 1, singleClick: 2, doubleClick: 3 };
-    this.isMouseInside = false;
-    this.curPrimitive = this.linkedState.selectedPrimitiveHistogram;
-
-    // Some things like SVG clipPaths require ids instead of classes...
-    this.uniqueDomId = `IntervalHistogramView${IntervalHistogramView.DOM_COUNT}`;
-    IntervalHistogramView.DOM_COUNT++;
-  }
-
-  get isLoading () {
-    return super.isLoading || this.linkedState.isLoadingPrimitiveHistogram;
-  }
-
-  get isEmpty () {
-    return this.error;
-  }
-
-  getChartBounds () {
-    const bounds = this.getAvailableSpace();
-    const result = {
-      width: bounds.width - this.margin.left - this.margin.right,
-      height: bounds.height - this.margin.top - this.margin.bottom,
-      left: bounds.left + this.margin.left,
-      top: bounds.top + this.margin.top,
-      right: bounds.right - this.margin.right,
-      bottom: bounds.bottom - this.margin.bottom
-    };
-    this.xScale.range([0, result.width]);
-    this.yScale.range([0, result.height]);
-    return result;
-  }
-
-  setYDomain (maxMin) {
-    var yOffset = (maxMin.max - maxMin.min) / 10;
-    this.yScale.domain([maxMin.max, maxMin.min + 1]).nice();
-  }
-
-  getSpilloverWidth (width) {
-    return width * 1;
-  }
-
-  setup () {
-    super.setup();
-
-    this.content.html(this.resources[1]);
+      { type: 'text', url: 'views/IntervalHistogramView/template.svg', name: 'template' }
+    ]);
+    super(options);
 
     this.margin = {
       top: 20,
       right: 20,
-      bottom: 40,
+      bottom: 100,
       left: 40
     };
-    this._bounds = this.getChartBounds();
-    this.content.select('.chart')
+
+    this.xScale = d3.scaleLog();
+    this.yScale = d3.scaleSymlog();
+
+    this.currentPrimitive = null;
+  }
+
+  get informativeMessage () {
+    // If we've picked a primitive that has no interval data, show a message to
+    // reduce confusion
+    if (this.currentPrimitive) {
+      const nBins = Object.keys(this.linkedState?.info?.intervalHistograms?.[this.currentPrimitive] || {}).length;
+      return nBins === 0 ? `No interval data for primitive:<br/>${this.currentPrimitive}` : null;
+    } else {
+      return null;
+    }
+  }
+
+  async setup () {
+    await super.setup(...arguments);
+
+    // Apply our css namespace, our template, and our margin
+    this.glEl.classed('IntervalHistogramView', true);
+    this.d3el.html(this.getNamedResource('template'));
+    this.d3el.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
-    this.svgElement = this.content.select('.svg-plot');
-    this.yScale.domain([10, 0]).nice();// remove this later
+    // Set up the primitive menu
+    this.setupPrimitiveMenu();
 
-    // Create a view-specific clipPath id, as there can be more than one
-    const clipId = this.uniqueDomId + 'clip';
-    this.content.select('clipPath')
-      .attr('id', clipId);
-    this.content.select('.clippedStuff')
-      .attr('clip-path', `url(#${clipId})`);
-
-    this.currentClickState = this.ClickState.background;
-    var __self = this;
-    // mouse events
-    this.canvasElement = this.content.select('.histogram-plot');
-    this.canvasContext = this.canvasElement.node().getContext('2d');
-    this.linkedState.fetchIntervalHistogram(this.curPrimitive);
-    this.linkedState.on('intervalHistogramUpdated', () => {
-      if (this.curPrimitive === this.linkedState.selectedPrimitiveHistogram) {
-        this.updateTheView();
-      }
-    });
-  }
-
-  clearAllTimer () {
-    if (this._mouseHoverTimeout) {
-      window.clearTimeout(this._mouseHoverTimeout);
-      this._mouseHoverTimeout = null;
-    }
-    if (this._mouseClickTimeout) {
-      window.clearTimeout(this._mouseClickTimeout);
-      this._mouseClickTimeout = null;
-    }
-  }
-
-  showDetailsTooltip (xx, yy) {
-    var __self = this;
-    var tm = __self.xScale.invert(xx);
-    var loc = __self.yScale.invert(yy);
-    var dr = __self.canvasElement.node().getBoundingClientRect();
-    dr.x = xx + dr.left;
-    dr.y = yy + dr.top;
-
-    const intervalDomains = this.linkedState.intervalHistogram;
-    var offset = (intervalDomains.metadata.end - intervalDomains.metadata.begin) / intervalDomains.metadata.bins;
-    var ll = (tm - intervalDomains.metadata.begin) / offset;
-    var bin = Math.trunc(ll);
-    var convertedTime = this.linkedState.getTimeStampFromBin(bin, intervalDomains.metadata);
-    var rightBoundary = __self.xScale(convertedTime) + (this.barWidth / 2);
-    var leftBoundary = __self.xScale(convertedTime) - (this.barWidth / 2);
-    var val = intervalDomains.data[bin];
-    if (bin > 0) {
-      val = val - intervalDomains.data[bin - 1];
-    }
-    if (xx <= rightBoundary && xx >= leftBoundary && val > 0) {
-      var dd = { Duration: convertedTime, Count: val };
-      window.controller.tooltip.show({
-        content: `<pre>${JSON.stringify(dd, null, 2)}</pre>`,
-        targetBounds: dr,
-        hideAfterMs: null
-      });
-      __self.currentClickState = __self.ClickState.hover;
-    } else {
-      window.controller.tooltip.hide();
-      __self.currentClickState = __self.ClickState.background;
-    }
-  }
-
-  updateTheView () {
-    var xWindow = [this.linkedState.intervalHistogramBeginLimit, this.linkedState.intervalHistogramEndLimit];
-    this.xScale.domain(xWindow).nice();
+    // Prep local interactive callbacks for updating the brush
     this.setupBrush();
-    this.render();
+
+    // Redraw when the selection changes
+    this.linkedState.on('selectionChanged', () => { this.render(); });
   }
 
-  draw () {
-    super.draw();
-    if (this.isHidden) {
-      return;
-    } else if (this.isEmpty) {
-      if (this.error) {
-        this.emptyStateDiv.html('<p>Error communicating with the server</p>');
-        return;
-      }
-    } else if (this.isLoading) {
+  async draw () {
+    await super.draw(...arguments);
+
+    if (this.isLoading || this.error) {
+      // Don't draw anything if we're still waiting on something; super.draw
+      // will show a spinner. Or if there's an upstream error, super.draw will
+      // already display an error message. Don't attempt to draw anything (or
+      // we'll probably just add to the noise of whatever is really wrong)
       return;
     }
-    // Update the dimensions of the plot in case we were resized (NOT updated by
-    // immediately-drawn things like drawAxes that get executed repeatedly by
-    // scrolling / panning)
-    this._bounds = this.getChartBounds();
 
-    this.content.select('.histogram-container')
-      .attr('width', this.getSpilloverWidth(this._bounds.width))
-      .attr('height', this._bounds.height);
-    // .attr('transform', `translate(${-this._bounds.width}, 0)`);
-    this.canvasElement.attr('width', this.getSpilloverWidth(this._bounds.width))
-      .attr('height', this._bounds.height);
+    // How much space do we have to work with?
+    const chartBounds = this.getChartBounds();
+    this.xScale.range([0, chartBounds.width]);
+    this.yScale.range([chartBounds.height, 0]);
 
-    // Update whether we're showing the spinner
-    this.drawSpinner();
-    // Update the clip rect
-    this.drawClip();
-    // Hide the small spinner
-    this.drawBrush();
+    // Get the list of bars to draw, and update our scale domains before drawing
+    // anything
+    const allBars = this.combineHistograms();
 
-    // Update the axes (also updates scales)
-    this.drawWrapper();
+    // Update the (transparent) background rect that captures drag events
+    this.d3el.select('.background rect')
+      .attr('width', this.xScale.range()[1] - this.xScale.range()[0])
+      .attr('height', this.yScale.range()[0] - this.yScale.range()[1]);
+
+    this.drawAxes(chartBounds);
+    this.drawBars(chartBounds, allBars);
+    this.drawBrush(chartBounds);
+    this.drawPrimitiveMenu();
   }
 
-  drawWrapper () {
-    if (this.initialDragState) return;
-    var localXScale = this.xScale;
+  getChartBounds () {
+    const bounds = this.getBounds();
+    return {
+      width: bounds.width - this.margin.left - this.margin.right,
+      height: bounds.height - this.margin.top - this.margin.bottom
+    };
+  }
 
-    this._bounds = this.getChartBounds();
-    if (!(this.curPrimitive in this.linkedState.intervalHistogram)) return;
-    const data = this.linkedState.intervalHistogram[this.curPrimitive];
+  combineHistograms () {
+    const selectedPrimitive = this.linkedState.selection?.primitiveName;
+    const intervalDurationSpan = this.linkedState.selection?.intervalDurationSpan || null;
+    const allBars = [];
+    let maxCount = 0;
+    let minDuration = Infinity;
+    let maxDuration = 0;
 
-    var maxY = Number.MIN_VALUE;
-    var minY = Number.MAX_VALUE;
-
-    for (var i = 0; i < data.data.length; i++) {
-      var d = data.data[i];
-      if (i > 0) {
-        d = d - data.data[i - 1];
+    // Add a dict of counts to our list:
+    const helper = (primitive, durationCounts) => {
+      for (let [duration, count] of Object.entries(durationCounts)) {
+        duration = parseInt(duration);
+        count = parseInt(count);
+        minDuration = Math.min(minDuration, duration);
+        maxDuration = Math.max(maxDuration, duration);
+        maxCount = Math.max(maxCount, count);
+        let selected = true;
+        if (selectedPrimitive) {
+          selected = selected && selectedPrimitive === primitive;
+        }
+        if (intervalDurationSpan) {
+          selected = selected && duration >= intervalDurationSpan[0] && duration <= intervalDurationSpan[1];
+        }
+        // Standard bars for when there's an IntervalDurationSelection or
+        // PrimitiveSelection
+        allBars.push({
+          primitive,
+          duration,
+          count,
+          selected
+        });
       }
-      maxY = Math.max(maxY, d);
-      minY = Math.min(minY, d);
+    };
+
+    if (this.currentPrimitive) {
+      // Just show the current primitive's intervals
+      helper(this.currentPrimitive, this.linkedState.info.intervalHistograms[this.currentPrimitive]);
+    } else {
+      // Show all intervals
+      for (const [primitive, durationCounts] of Object.entries(this.linkedState.info.intervalHistograms)) {
+        helper(primitive, durationCounts);
+      }
     }
-    this.setYDomain({ max: maxY, min: minY });
-    this.drawAxes();
 
-    // Update the lines
-    this.canvasContext.clearRect(0, 0, this._bounds.width, this._bounds.height);
-    data.data.forEach((d, i) => {
-      var x = localXScale(this.linkedState.getTimeStampFromBin(i, data.metadata));
-      var ss = 0;
-      if (i > 0) {
-        ss = data.data[i - 1];
-      }
-      var dd = { x: x, y: ((d - ss) + 1) };
-      this.drawLines(dd);
+    // Add an extra small bar when there's an IntervalSelection
+    const selectedInterval = this.linkedState.selection?.intervalDetails;
+    if (selectedInterval) {
+      allBars.push({
+        primitive: selectedInterval.Primitive,
+        duration: selectedInterval.leave.Timestamp - selectedInterval.enter.Timestamp,
+        count: 1,
+        selected: true
+      });
+    }
+
+    // Update our scale domains
+    this.xScale.domain([minDuration, maxDuration]).nice();
+    this.yScale.domain([0, maxCount]);
+    return allBars;
+  }
+
+  setupPrimitiveMenu () {
+    // Add a select menu after the SVG element for picking / switching primitives
+    this.primitiveMenu = this.glEl.insert('select', 'svg + *');
+
+    this.primitiveMenu.on('change', event => {
+      this.currentPrimitive = event.target.value;
+      this.render();
     });
-    this.wasRendered = true;
+    this.linkedState.on('selectionChanged', () => {
+      const newPrimitive = this.linkedState.selection?.primitiveName;
+      if (newPrimitive && newPrimitive !== this.currentPrimitive) {
+        this.currentPrimitive = newPrimitive;
+      }
+      this.render();
+    });
   }
 
-  drawLines (d) {
-    this.barWidth = 10;
-    this.canvasContext.fillStyle = this.linkedState.contentFillColor;
-    this.canvasContext.strokeStyle = this.linkedState.contentBorderColor;
-    this.canvasContext.fillRect(d.x - (this.barWidth / 2), this.yScale(d.y), this.barWidth, this._bounds.height - this.yScale(d.y));
-    this.canvasContext.strokeRect(d.x - (this.barWidth / 2), this.yScale(d.y), this.barWidth, this._bounds.height - this.yScale(d.y));
+  drawPrimitiveMenu () {
+    let primitiveList = this.linkedState.getNamedResource('primitives');
+    if (!primitiveList) {
+      // Still loading...
+      return;
+    }
+    primitiveList = ['', null].concat(Object.keys(primitiveList));
+    let options = this.primitiveMenu.selectAll('option')
+      .data(primitiveList, d => d);
+    options.exit().remove();
+    const optionsEnter = options.enter().append('option');
+    options = options.merge(optionsEnter);
+
+    options.text(d => d === '' ? 'All primitives' : d === null ? '----' : d)
+      .attr('value', d => d)
+      .property('disabled', d => d === null);
+
+    this.primitiveMenu.node().value = this.currentPrimitive || '';
   }
 
-  drawSpinner () {
-    this.content.select('.small.spinner').style('display', 'none');
-  }
-
-  drawClip () {
-    this.content.select('clipPath rect')
-      .attr('width', this._bounds.width)
-      .attr('height', this._bounds.height);
-  }
-
-  drawAxes () {
-    const bounds = this.getChartBounds();
-
-    var xaxes = d3.axisBottom(this.xScale).ticks(50, ',.1s');// number of ticks, tick format
+  drawAxes (chartBounds) {
     // Update the x axis
-    const xAxisGroup = this.svgElement.select('.xAxis')
-      .attr('transform', `translate(0, ${this._bounds.height})`)
-      .call(xaxes);
-    cleanupAxis(xAxisGroup);
+    this.d3el.select('.xAxis')
+      .attr('transform', `translate(0, ${chartBounds.height})`)
+      .call(d3.axisBottom(this.xScale));
 
     // Position the x label
-    this.svgElement.select('.xAxisLabel')
-      .attr('x', this._bounds.width / 2)
-      .attr('y', this._bounds.height + this.margin.bottom - this.emSize / 2);
+    this.d3el.select('.xAxisLabel')
+      .attr('x', chartBounds.width / 2)
+      .attr('y', chartBounds.height + 2 * this.emSize);
 
-    var yaxes = d3.axisLeft(this.yScale)
-      .ticks(10, ',.1s');
-    // .tickFormat(d3.format(",.0f"))
-    // .tickArguments([d3.every(15)]);
     // Update the y axis
-    this.svgElement.select('.yAxis')
-      .call(yaxes);
+    const axisGenerator = d3.axisLeft(this.yScale);
+    // Fractional ticks don't make sense if we're showing integer counts;
+    // prevent showing extra ticks when the number is small
+    const maxCount = this.yScale.domain()[1];
+    if (maxCount <= 10) {
+      axisGenerator.ticks(maxCount);
+    }
+    const yAxis = this.d3el.select('.yAxis')
+      .call(axisGenerator);
+    // Prevent overlapping tick labels
+    cleanupAxis(yAxis);
 
     // Position the y label
-    this.svgElement.select('.yAxisLabel')
-      .attr('transform', `translate(${-1.5 * this.emSize},${bounds.height / 2}) rotate(-90)`);
+    this.d3el.select('.yAxisLabel')
+      .attr('transform', `translate(${-1.5 * this.emSize},${chartBounds.height / 2}) rotate(-90)`);
+  }
+
+  drawBars (chartBounds, allBars) {
+    let bars = this.d3el.select('.bars')
+      .selectAll('.bar').data(allBars);
+    bars.exit().remove();
+    const barsEnter = bars.enter().append('g')
+      .classed('bar', true);
+    bars = bars.merge(barsEnter);
+    bars.sort((a, b) => {
+      // Make sure selected bars appear on top
+      if (b.selected && !a.selected) {
+        return -1;
+      } else if (a.selected && !b.selected) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+
+    barsEnter.append('line');
+    bars.classed('selected', d => d.selected)
+      .select('line')
+      .attr('x1', d => this.xScale(d.duration))
+      .attr('x2', d => this.xScale(d.duration))
+      .attr('y1', d => this.yScale(d.count))
+      .attr('y2', d => this.yScale(0));
+
+    bars.on('mouseenter', function (event, d) {
+      uki.showTooltip({
+        content: `Primitive: ${d.primitive}`,
+        target: d3.select(this),
+        anchor: { x: 1, y: -1 }
+      });
+    }).on('mouseleave', () => {
+      uki.hideTooltip();
+    }).on('click', (event, d) => {
+      this.linkedState.selectPrimitive(d.primitive);
+    });
   }
 
   setupBrush () {
-    let initialState = null;
-    const brush = this.content.select('.histogram_brush');
+    // Behaviors for manipulating the existing brush
+    const brush = this.d3el.select('.brush');
     const brushDrag = d3.drag()
-      .on('start', () => {
-        // d3.event.sourceEvent.stopPropagation();
-        this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
-        initialState = {
-          begin: this.linkedState.intervalHistogramBegin,
-          end: this.linkedState.intervalHistogramEnd,
-          x: this.xScale.invert(d3.event.x)
+      .on('start', event => {
+        event.sourceEvent.stopPropagation();
+        const intervalDurationSpan = this.linkedState.selection.intervalDurationSpan;
+        this._dragState = {
+          begin: intervalDurationSpan[0],
+          end: intervalDurationSpan[1],
+          x: this.xScale.invert(event.x)
         };
       })
-      .on('drag', () => {
-        this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
-        const dx = this.xScale.invert(d3.event.x) - initialState.x;
-        let begin = initialState.begin + dx;
-        let end = initialState.end + dx;
+      .on('drag', event => {
+        const dx = this.xScale.invert(event.x) - this._dragState.x;
+        let begin = this._dragState.begin + dx;
+        let end = this._dragState.end + dx;
         // clamp to the lowest / highest possible values
-        if (begin <= this.linkedState.intervalHistogramBeginLimit) {
-          const offset = this.linkedState.intervalHistogramBeginLimit - begin;
+        const fullDomain = this.xScale.domain();
+        if (begin <= fullDomain[0]) {
+          const offset = fullDomain[0] - begin;
           begin += offset;
           end += offset;
         }
-        if (end >= this.linkedState.intervalHistogramEndLimit) {
-          const offset = end - this.linkedState.intervalHistogramEndLimit;
+        if (end >= fullDomain[1]) {
+          const offset = end - fullDomain[1];
           begin -= offset;
           end -= offset;
         }
-        this.linkedState.setIntervalHistogramWindow({ begin, end });
-        // For responsiveness, draw the brush immediately
-        // (instead of waiting around for debounced events / server calls)
-        this.drawBrush({ begin, end });
+        this.linkedState.selection.intervalDurationSpan = [begin, end];
+        // Do an immediate update of the brush while dragging,
+        // without waiting for the debounced render() + draw() cycle
+        this.drawBrush();
       });
-    const leftDrag = d3.drag().on('drag', () => {
-      this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
-      // d3.event.sourceEvent.stopPropagation();
-      let begin = this.xScale.invert(d3.event.x);
-      // clamp to the lowest possible value
-      begin = Math.max(begin, this.linkedState.intervalHistogramBeginLimit);
-      // clamp to the current upper value minus one
-      begin = Math.min(begin, this.linkedState.intervalHistogramEnd - 1);
-      this.linkedState.setIntervalHistogramWindow({ begin });
-      // For responsiveness, draw the brush immediately
-      // (instead of waiting around for debounced events / server calls)
-      this.drawBrush({ begin });
+    const leftDrag = d3.drag().on('drag', event => {
+      event.sourceEvent.stopPropagation();
+      this.linkedState.selection.intervalDurationSpan = [this.xScale.invert(event.x), undefined];
+      // setting intervalDurationSpan will eventually result in a render() call,
+      // but draw the brush immediately for responsiveness
+      this.drawBrush();
     });
-    const rightDrag = d3.drag().on('drag', () => {
-      this.linkedState.selectedPrimitiveHistogram = this.curPrimitive;
-      // d3.event.sourceEvent.stopPropagation();
-      let end = this.xScale.invert(d3.event.x);
-      // clamp to the highest possible value
-      end = Math.min(end, this.linkedState.intervalHistogramEndLimit);
-      // clamp to the current lower value plus one
-      end = Math.max(end, this.linkedState.intervalHistogramBegin + 1);
-      this.linkedState.setIntervalHistogramWindow({ end });
-      // For responsiveness, draw the brush immediately
-      // (instead of waiting around for debounced events / server calls)
-      this.drawBrush({ end });
+    const rightDrag = d3.drag().on('drag', event => {
+      event.sourceEvent.stopPropagation();
+      this.linkedState.selection.intervalDurationSpan = [undefined, this.xScale.invert(event.x)];
+      // setting intervalDurationSpan will eventually result in a render() call,
+      // but draw the brush immediately for responsiveness
+      this.drawBrush();
     });
     brush.call(brushDrag);
     brush.select('.leftHandle .hoverTarget').call(leftDrag);
     brush.select('.rightHandle .hoverTarget').call(rightDrag);
 
-    // const directDrag = d3.drag()
-    //     .on('start', () => {
-    //       d3.event.sourceEvent.stopPropagation();
-    //       initialState = {
-    //         x0: this.xScale.invert(d3.event.x - this.margin.left)
-    //       };
-    //     })
-    //     .on('drag', () => {
-    //       let begin = initialState.x0;
-    //       let end = this.xScale.invert(d3.event.x - this.margin.left);
-    //       // In case we're dragging to the left...
-    //       if (end < begin) {
-    //         const temp = begin;
-    //         begin = end;
-    //         end = temp;
-    //       }
-    //       // clamp to the lowest / highest possible values
-    //       begin = Math.max(begin, this.linkedState.intervalHistogramBeginLimit);
-    //       end = Math.min(end, this.linkedState.intervalHistogramEndLimit);
-    //       this.linkedState.setIntervalHistogramWindow({ begin, end });
-    //       // For responsiveness, draw the brush immediately
-    //       // (instead of waiting around for debounced events / server calls)
-    //       this.drawBrush({ begin, end });
-    //     });
-    // this.content.select('.chart').call(directDrag);
+    // Behaviors for drawing a new brushed area (note that, unlike the above
+    // interactions, this is attached to the whole un-transformed chart area so
+    // we need to account for the margins)
+    const directDrag = d3.drag()
+      .on('start', event => {
+        event.sourceEvent.stopPropagation();
+        this._dragState = {
+          start: this.xScale.invert(event.x - this.margin.left)
+        };
+      })
+      .on('drag', event => {
+        if (!this.linkedState.selection?.intervalDurationSpan ||
+            this.linkedState.selection?.primitiveName !== this.currentPrimitive) {
+          // With the user starting to drag, create the selection and update this
+          // view when the brushed domain changes
+          this.linkedState.selectIntervalDuration(
+            [this._dragState.start, this._dragState.start + 1],
+            this.xScale.domain(),
+            this.currentPrimitive);
+          this.linkedState.selection.on('intervalDurationSpanChanged', () => { this.render(); });
+        }
+        this.linkedState.selection.intervalDurationSpan = [
+          this._dragState.start,
+          this.xScale.invert(event.x - this.margin.left)
+        ];
+        // setting intervalDurationSpan will automatically result in a render() call,
+        // but draw the brush immediately for responsiveness
+        this.drawBrush();
+      })
+      .on('end', event => {
+        if (this.xScale.invert(event.x - this.margin.left) - this._dragState.start === 0) {
+          // Zero-size selection; clear it
+          this.linkedState.selection = null;
+        }
+      });
+    this.d3el.select('.chart').call(directDrag);
   }
 
-  drawBrush ({
-    begin = this.linkedState.intervalHistogramBegin,
-    end = this.linkedState.intervalHistogramEnd
-  } = {}) {
-    const bounds = this.getChartBounds();
-    let x1 = this.xScale(begin);
-    const showLeftHandle = x1 >= 0 && x1 <= bounds.width;
+  drawBrush (chartBounds) {
+    if (!chartBounds) {
+      chartBounds = this.getChartBounds();
+    }
+    const intervalDurationSpan = this.linkedState.selection?.intervalDurationSpan;
+
+    const brush = this.d3el.select('.brush')
+      .style('display', intervalDurationSpan ? null : 'none');
+
+    if (!intervalDurationSpan) {
+      return;
+    }
+
+    let x1 = this.xScale(intervalDurationSpan[0]);
+    const showLeftHandle = x1 >= 0 && x1 <= chartBounds.width;
     x1 = Math.max(0, x1);
-    let x2 = this.xScale(end);
-    const showRightHandle = x2 >= 0 && x2 <= bounds.width;
-    x2 = Math.min(bounds.width, x2);
+    let x2 = this.xScale(intervalDurationSpan[1]);
+    const showRightHandle = x2 >= 0 && x2 <= chartBounds.width;
+    x2 = Math.min(chartBounds.width, x2);
 
     // Ensure at least 1em interactable space for each hoverTarget and the
     // space between them
@@ -387,18 +381,17 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
       x2Offset = handleWidth / 2;
     }
 
-    const brush = this.content.select('.histogram_brush');
     brush.select('.area')
       .attr('x', x1)
       .attr('y', 0)
       .attr('width', x2 - x1)
-      .attr('height', bounds.height);
+      .attr('height', chartBounds.height);
     brush.select('.top.outline')
       .attr('y1', 0)
       .attr('y2', 0);
     brush.select('.bottom.outline')
-      .attr('y1', bounds.height)
-      .attr('y2', bounds.height);
+      .attr('y1', chartBounds.height)
+      .attr('y2', chartBounds.height);
     brush.selectAll('.top.outline, .bottom.outline')
       .attr('x1', x1)
       .attr('x2', x2);
@@ -412,12 +405,12 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         .attr('x1', x1)
         .attr('x2', x1)
         .attr('y1', 0)
-        .attr('y2', bounds.height);
+        .attr('y2', chartBounds.height);
       brush.select('.leftHandle .hoverTarget')
         .attr('x', x1 - handleWidth / 2 + x1Offset)
         .attr('width', handleWidth)
         .attr('y', 0)
-        .attr('height', bounds.height);
+        .attr('height', chartBounds.height);
     }
 
     if (showRightHandle) {
@@ -425,14 +418,13 @@ class IntervalHistogramView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(G
         .attr('x1', x2)
         .attr('x2', x2)
         .attr('y1', 0)
-        .attr('y2', bounds.height);
+        .attr('y2', chartBounds.height);
       brush.select('.rightHandle .hoverTarget')
         .attr('x', x2 - handleWidth / 2 + x2Offset)
         .attr('width', handleWidth)
         .attr('y', 0)
-        .attr('height', bounds.height);
+        .attr('height', chartBounds.height);
     }
   }
 }
-IntervalHistogramView.DOM_COUNT = 1;
 export default IntervalHistogramView;

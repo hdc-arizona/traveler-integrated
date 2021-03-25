@@ -1,6 +1,7 @@
 import LinkedState from './LinkedState.js';
 
 import IntervalSelection from '../selections/IntervalSelection.js';
+import IntervalDurationSelection from '../selections/IntervalDurationSelection.js';
 
 const VIEW_STATUS = LinkedState.VIEW_STATUS;
 
@@ -24,7 +25,7 @@ class TracedLinkedState extends LinkedState {
   }
 
   /**
-   * Constrain that detailDomain makes sense, and notify views when the it changes
+   * Constrain that detailDomain makes sense, and notify views when it changes
    */
   set detailDomain (inputDomain) {
     // Allow views to set just one of the values (e.g. dragging one brush
@@ -106,10 +107,10 @@ class TracedLinkedState extends LinkedState {
       variants: Object.keys(this.getNamedResource('primitives') || {})
     };
     views.LineChartView = { status: otf2Status, variants: [] };
-    views.ContourBoxPlotView = { status: otf2Status, variants: [] };
+    views.FunctionalBoxPlotView = { status: otf2Status, variants: [] };
     for (const metric of this.info.procMetricList) {
       if (metric.toUpperCase().startsWith('PAPI')) {
-        views.ContourBoxPlotView.variants.push(metric);
+        views.FunctionalBoxPlotView.variants.push(metric);
       } else {
         views.LineChartView.variants.push(metric);
       }
@@ -182,26 +183,19 @@ class TracedLinkedState extends LinkedState {
       subEntries: this.info.procMetricList
         .filter(metric => metric.toUpperCase().startsWith('PAPI'))
         .map(metric => {
-          return this.createViewMenuEntry(metric, 'ContourBoxPlotView', metric, availableViews, openViews);
-        })
-    };
-    // ... for per-primitive interval histograms
-    const intervalHistogramSubmenu = {
-      label: 'Interval Histograms',
-      subEntries: Object.keys(this.getNamedResource('primitives'))
-        .map(primitiveName => {
-          return this.createViewMenuEntry(primitiveName, 'IntervalHistogramView', primitiveName, availableViews, openViews);
+          return this.createViewMenuEntry(metric, 'FunctionalBoxPlotView', metric, availableViews, openViews);
         })
     };
 
     const baseMenu = await super.getViewMenu();
     baseMenu.push(...[
-      // Core views
+      // Singular views
       this.createViewMenuEntry('Gantt Timeline', 'GanttView', null, availableViews, openViews),
-      this.createViewMenuEntry('Utilization Overview', 'UtilizationView', null, availableViews, openViews)
+      this.createViewMenuEntry('Utilization Overview', 'UtilizationView', null, availableViews, openViews),
+      this.createViewMenuEntry('Interval Histogram', 'IntervalHistogramView', null, availableViews, openViews)
     ]);
     // Submenus
-    for (const menu of [metricSubmenu, lmSensorSubmenu, papiSubmenu, intervalHistogramSubmenu]) {
+    for (const menu of [metricSubmenu, lmSensorSubmenu, papiSubmenu]) {
       if (menu.subEntries.length > 0) {
         baseMenu.push(menu);
       }
@@ -214,7 +208,7 @@ class TracedLinkedState extends LinkedState {
    * this.selection to null / deselect if no interval exists at the queried
    * time + location)
    */
-  async selectInterval (timestamp, location) {
+  async selectIntervalByTimeAndLoc (timestamp, location) {
     const url = `/datasets/${this.info.datasetId}/intervals?begin=${timestamp}&end=${timestamp + 1}&location=${location}`;
     const response = await window.fetch(url);
     const intervalList = await response.json();
@@ -222,10 +216,38 @@ class TracedLinkedState extends LinkedState {
       this.selection = null;
     } else {
       this.selection = new IntervalSelection({
-        linkedState: this,
         intervalDetails: intervalList[0]
       });
     }
+  }
+
+  /**
+   * Select an interval based on a timestamp + location (will set
+   * this.selection to null / deselect if no interval exists at the queried
+   * time + location)
+   */
+  async selectIntervalById (intervalId) {
+    const url = `/datasets/${this.info.datasetId}/intervals/${intervalId}`;
+    const response = await window.fetch(url);
+    const intervalDetails = await response.json();
+    if (!intervalDetails) {
+      this.selection = null;
+    } else {
+      this.selection = new IntervalSelection({
+        intervalDetails
+      });
+    }
+  }
+
+  /**
+   * Select an interval duration (i.e. a brush in IntervalHistogramView)
+   */
+  async selectIntervalDuration (intervalDurationSpan, durationLimit, primitiveName) {
+    this.selection = new IntervalDurationSelection({
+      intervalDurationSpan,
+      durationLimit,
+      primitiveName
+    });
   }
 }
 TracedLinkedState.MIN_BRUSH_SIZE = MIN_BRUSH_SIZE;

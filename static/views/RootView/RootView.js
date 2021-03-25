@@ -1,25 +1,22 @@
 /* globals uki */
-import ZoomableTimelineView from '../ZoomableTimelineView/ZoomableTimelineView.js';
 import SelectionInfoView from '../SelectionInfoView/SelectionInfoView.js';
 import TreeView from '../TreeView/TreeView.js';
 import CodeView from '../CodeView/CodeView.js';
 import UtilizationView from '../UtilizationView/UtilizationView.js';
 import GanttView from '../GanttView/GanttView.js';
-/*
+import FunctionalBoxPlotView from '../FunctionalBoxPlotView/FunctionalBoxPlotView.js';
 import LineChartView from '../LineChartView/LineChartView.js';
-import ContourBoxPlotView from '../ContourBoxPlotView/ContourBoxPlotView.js';
 import IntervalHistogramView from '../IntervalHistogramView/IntervalHistogramView.js';
-*/
 
 const viewClassLookup = {
   SelectionInfoView,
   TreeView,
   CodeView,
   UtilizationView,
-  GanttView /* ,
+  GanttView,
+  FunctionalBoxPlotView,
   LineChartView,
-  ContourBoxPlotView,
-  IntervalHistogramView */
+  IntervalHistogramView
 };
 
 class RootView extends uki.ui.GLRootView {
@@ -54,10 +51,6 @@ class RootView extends uki.ui.GLRootView {
 
   openView (datasetId, viewClassName, variant) {
     const helper = () => {
-      if (!window.controller.currentDatasetId) {
-        throw new Error('Can\'t open view when no dataset is loaded');
-      }
-
       // Check if the view is already open
       for (const view of Object.values(this.views)) {
         if (view.constructor.name === viewClassName &&
@@ -85,7 +78,7 @@ class RootView extends uki.ui.GLRootView {
       const timelineBasedView =
         viewClassName === 'UtilizationView' ||
         viewClassName === 'GanttView' ||
-        viewClassName === 'ContourBoxPlotView' ||
+        viewClassName === 'FunctionalBoxPlotView' ||
         viewClassName === 'LineChartView';
 
       this.addView(config, glItem => {

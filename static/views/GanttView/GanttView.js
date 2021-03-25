@@ -110,7 +110,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     if (dragState.dx === 0 && dragState.dy === 0) {
       const timestamp = Math.round(this.xScale.invert(event.x));
       const location = this.yScale.invert(event.y + this.d3el.select('foreignObject').node().scrollTop);
-      this.linkedState.selectInterval(timestamp, location);
+      this.linkedState.selectIntervalByTimeAndLoc(timestamp, location);
     }
   }
 
@@ -187,9 +187,6 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
    * Calculate the visible chart area, whether scrollbars should be showing,
    * update all scales; after accounting for spillover space, figure out how
    * many bins and which locations should be requested from the API
-   * @return {boolean} True if the viewport is inconsistent with the data that
-   * is currently loaded (i.e. it has been resized, scrolled, or zoomed since
-   * the last updateShapeAndDataIfNeeded call)
    */
   getChartShape () {
     const chartShape = super.getChartShape();

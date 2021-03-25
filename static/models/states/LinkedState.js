@@ -337,7 +337,6 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   selectPrimitive (primitiveName) {
     const primitiveDetails = this.getPrimitiveDetails(primitiveName);
     this.selection = new PrimitiveSelection({
-      linkedState: this,
       primitiveName,
       primitiveDetails
     });

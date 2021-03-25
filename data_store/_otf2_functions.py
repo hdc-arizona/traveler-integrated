@@ -298,6 +298,7 @@ async def buildIntervalTree(self, datasetId, log):
 
 async def connectIntervals(self, datasetId, log=logToConsole):
     await log('Connecting intervals with the same GUID (.=2500 intervals)')
+    # set up guids index
     idDir = os.path.join(self.dbDir, datasetId)
     guids = self.datasets[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
 
@@ -361,8 +362,8 @@ async def connectIntervals(self, datasetId, log=logToConsole):
 async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # create allSuls obj
     allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict()}
+    intervalHistograms = {}
     preMetricValue = dict()
-    intervalDuration = dict()
     allLocations = set()
 
     def updateSULForInterval(event, cur_location):
@@ -379,7 +380,7 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     def updateIntervalDuration(event):
         duration = event['leave']['Timestamp'] - event['enter']['Timestamp']
         if 'Primitive' in event:
-            durationCounts = intervalDuration[event['Primitive']] = intervalDuration.get(event['Primitive'], dict())
+            durationCounts = intervalHistograms[event['Primitive']] = intervalHistograms.get(event['Primitive'], dict())
             durationCounts[duration] = durationCounts.get(duration, 0) + 1
 
     # First pass through all the intervals
@@ -420,7 +421,7 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # Do a quick report on any discrepancies between the primitives we saw, and
     # the primitives that we expected to see
     expectedPrimitives = set(self[datasetId]['primitives'].keys())
-    observedPrimitives = set(intervalDuration.keys())
+    observedPrimitives = set(intervalHistograms.keys())
     extraExpected = expectedPrimitives - observedPrimitives
     extraObserved = observedPrimitives - expectedPrimitives
     if len(extraExpected) > 0:
@@ -437,4 +438,4 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     await log('')
 
     self[datasetId]['sparseUtilizationList'] = allSuls
-    self[datasetId]['info']['intervalDuration'] = intervalDuration
+    self[datasetId]['info']['intervalHistograms'] = intervalHistograms

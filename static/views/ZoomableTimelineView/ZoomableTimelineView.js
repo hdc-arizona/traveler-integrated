@@ -217,8 +217,8 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
   }
 
   determineIfShapeNeedsRefresh (lastChartShape, chartShape) {
-    // To be overridden by subclassed (e.g. has the GanttView been vertically
-    // scrolled?)
+    // To be overridden by subclasses when other considerations could indicate a
+    // need to refresh (e.g. has the GanttView been vertically scrolled?)
     return false;
   }
 
@@ -233,7 +233,7 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     if (!this.hasEnoughDataToComputeChartShape()) {
       // We don't have enough information to know what data to ask for (e.g. the
       // server might still be bundling a large dataset); wait for Controller.js
-      // to refreshDatasets()
+      // to refreshDatasets(), which will result in another call here
       return;
     }
     if (!chartShape) {
@@ -283,9 +283,6 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
    * Calculate the visible chart area, whether scrollbars should be showing,
    * update all scales; after accounting for spillover space, figure out how
    * many bins and which locations should be requested from the API
-   * @return {boolean} True if the viewport is inconsistent with the data that
-   * is currently loaded (i.e. it has been resized, scrolled, or zoomed since
-   * the last updateShapeAndDataIfNeeded call)
    */
   getChartShape () {
     // Figure out how much space we have, including whether or not to show the

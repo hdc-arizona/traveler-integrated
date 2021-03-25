@@ -16,6 +16,12 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
 
     this.d3el.html(this.getNamedResource('template'))
       .classed('SelectionInfoView', true);
+
+    this.linkedState.on('selectionChanged', () => {
+      if (this.linkedState.selection?.type === 'IntervalDurationSelection') {
+        this.linkedState.selection.on('intervalDurationSpanChanged', () => { this.render(); });
+      }
+    });
   }
 
   async draw () {
@@ -34,21 +40,49 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
       return;
     }
 
-    let selectionHeader, selectionDetails;
+    let selectionHeader, selectionLinks, selectionDetails;
     if (this.linkedState?.selection) {
       selectionHeader = `<h5>${this.linkedState.selection.humanReadableType}:</h5>
         <strong class="selectionLabel">${this.linkedState.selection.label}</strong>`;
+      selectionLinks = this.linkedState.selection.links;
       selectionDetails = this.linkedState.selection.details;
     } else if (this.linkedState) {
       selectionHeader = `<h5>No current selection</h5>
         <strong class="selectionLabel">${this.linkedState.info.label}</strong> metadata:`;
-      selectionDetails = JSON.stringify(this.linkedState.info, null, 2);
+      selectionLinks = [];
+      // Include all the info about the dataset, except omit the lengthy
+      // intervalHistograms object
+      const temp = Object.assign({}, this.linkedState.info);
+      if (temp.intervalHistograms) {
+        temp.intervalHistograms = [
+          '...',
+          '(large object omitted;',
+          'open the Interval Histogram',
+          'view to see this data)',
+          '...'
+        ];
+      }
+      selectionDetails = JSON.stringify(temp, null, 2);
     } else {
       selectionHeader = '<h5>No current selection or dataset</h5>';
+      selectionLinks = [];
       selectionDetails = null;
     }
+
     this.d3el.select('.selectionHeader').html(selectionHeader);
     this.d3el.select('pre').text(selectionDetails);
+
+    // Populate a list with relevant selections
+    let links = this.d3el.select('.selectionLinks')
+      .selectAll('li').data(selectionLinks);
+    links.exit().remove();
+    const linksEnter = links.enter().append('li');
+    links = links.merge(linksEnter);
+
+    linksEnter.append('a');
+    links.select('a')
+      .text(d => d.label)
+      .on('click', (event, d) => { d.pivot(); });
   }
 }
 export default SelectionInfoView;
