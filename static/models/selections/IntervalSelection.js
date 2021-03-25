@@ -14,7 +14,7 @@ class IntervalSelection extends Selection {
    * can just create a fake utilization histogram containing only one interval
    * (if the location is correct; otherwise, just send back zeros)
    * TODO: if we want to show this interval's primitive's utilization instead,
-   * copy the function from PrimitiveSelection, and use
+   * replace this with getUtilization from PrimitiveSelection, and use
    * this.intervalDetails.primitive instead of this.primitiveName
    */
   async getUtilization (urlArgs) {

@@ -9,6 +9,17 @@ class IntervalDurationSelection extends Selection {
     this.primitiveName = options.primitiveName || null;
   }
 
+  /**
+   * TODO: implement the getUtilization function here to show utilization in
+   * both UtilizationView and highligheted bars in GanttView for a brushed
+   * region in IntervalHistogramView. This will probably require adding
+   * arguments to api/metrics.py's get_utilization_histogram endpoint to accept
+   * this.intervalDurationSpan. I *think* sparseUtilizationList had something
+   * that could do this, but I never quite figured out how it worked; I think
+   * the durationBegin / durationEnd parameters here could be relevant:
+   * https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/serve.py#L736
+   */
+
   get intervalDurationSpan () {
     return this._intervalDurationSpan;
   }

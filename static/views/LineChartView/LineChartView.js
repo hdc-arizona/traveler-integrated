@@ -39,7 +39,11 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
   }
 
   drawCanvas (chartShape) {
-    // TODO
+    // TODO: Need to adapt the original drawing code from
+    // https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/static/views/ProcMetricView/ProcMetricView.js
+    // (yes, that's ProcMetricView, it's really the more standard line chart)
+    // to use this.getNamedResource('data') instead (the data should be in the
+    // same format)
   }
 
   async updateData (chartShape) {
@@ -47,7 +51,7 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
     return this.updateResource({
       name: 'data',
       type: 'json',
-      url: `/datasets/${this.datasetId}/metric/${encodeURIComponent(this.metric)}?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
+      url: `/datasets/${this.datasetId}/metrics/${encodeURIComponent(this.metric)}/raw?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
     });
   }
 
@@ -63,7 +67,7 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
     const chartShape = super.getChartShape();
 
     this.yScale.range([0, chartShape.fullHeight])
-      .domain([]); // TODO
+      .domain([]); // TODO: compute the domain from this.getNamedResource('data')
 
     return chartShape;
   }

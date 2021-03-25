@@ -309,7 +309,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
 
     const bandwidth = this.yScale.bandwidth();
     ctx.strokeStyle = theme['--selection-border-color'];
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
 
     const drawPath = (parent, child) => {
       ctx.beginPath();

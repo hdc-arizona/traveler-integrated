@@ -7,13 +7,16 @@ from . import db, validateDataset
 
 router = APIRouter()
 
-@router.get('/datasets/{datasetId}/procMetrics')
+@router.get('/datasets/{datasetId}/metrics')
 def get_procMetrics(datasetId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'])
     return db[datasetId]['info']['procMetricList']
 
-@router.get('/datasets/{datasetId}/procMetrics/{metric}')
-def get_procMetric_values(datasetId: str, metric: str, begin: float = None, end: float = None):
+@router.get('/datasets/{datasetId}/metrics/{metric}/raw')
+def get_procMetric_values(datasetId: str,
+                          metric: str,
+                          begin: float = None,
+                          end: float = None):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
@@ -34,6 +37,27 @@ def get_procMetric_values(datasetId: str, metric: str, begin: float = None, end:
         yield ']'
 
     return StreamingResponse(procMetricGenerator(), media_type='application/json')
+
+@router.get('/datasets/{datasetId}/metrics/{metric}/summary')
+def newMetricData(datasetId: str,
+                  bins: int = 100,
+                  begin: int = None,
+                  end: int = None,
+                  location: str = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+
+    if begin is None:
+        begin = db[datasetId]['info']['intervalDomain'][0]
+    if end is None:
+        end = db[datasetId]['info']['intervalDomain'][1]
+
+    ret = {}
+    if location is None:
+        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end)
+    else:
+        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end, location)
+    ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
+    return ret
 
 @router.get('/datasets/{datasetId}/utilizationHistogram')
 def get_utilization_histogram(datasetId: str,
@@ -72,41 +96,3 @@ def get_utilization_histogram(datasetId: str,
 
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
-
-
-@router.get('/datasets/{datasetId}/newMetricData')
-def newMetricData(datasetId: str, bins: int = 100, begin: int = None, end: int = None, location: str = None, metric_type: str = None):
-    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
-
-    if begin is None:
-        begin = db[datasetId]['info']['intervalDomain'][0]
-    if end is None:
-        end = db[datasetId]['info']['intervalDomain'][1]
-
-    ret = {}
-    if location is None:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end)
-    else:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end, location)
-    ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
-    return ret
-
-
-@router.get('/datasets/{datasetId}/ganttChartValues')
-def ganttChartValues(datasetId: str, bins: int=100, begin: int=None, end: int=None):
-    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
-
-    if begin is None:
-        begin = db[datasetId]['info']['intervalDomain'][0]
-    if end is None:
-        end = db[datasetId]['info']['intervalDomain'][1]
-
-    ret = {}
-    ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcGanttHistogram(bins, begin, end)
-
-    ret['metadata'] = {}
-    ret['metadata']['begin'] = begin
-    ret['metadata']['end'] = end
-    ret['metadata']['bins'] = bins
-
-    return json.dumps(ret)

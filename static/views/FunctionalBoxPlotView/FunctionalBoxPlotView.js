@@ -39,7 +39,11 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
   }
 
   drawCanvas (chartShape) {
-    // TODO
+    // TODO: Need to adapt the original drawing code from
+    // https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/static/views/LineChartView/LineChartView.js
+    // (yes, that's named LineChartView; it had been edited to render a functional box plot)
+    // to use this.getNamedResource('data') instead (the data should be in the
+    // same format)
   }
 
   async updateData (chartShape) {
@@ -47,7 +51,7 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     return this.updateResource({
       name: 'data',
       type: 'json',
-      url: `/datasets/${this.datasetId}/metric/${encodeURIComponent(this.metric)}?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
+      url: `/datasets/${this.datasetId}/metrics/${encodeURIComponent(this.metric)}/summary?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
     });
   }
 

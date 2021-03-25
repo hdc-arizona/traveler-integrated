@@ -302,7 +302,7 @@ async def connectIntervals(self, datasetId, log=logToConsole):
     guids = {}
     # TODO: using a simple dict piles up GUIDs and intervalIds in memory... if
     # this gets too big, a (REALLY slow) alternative to guids = {}:
-    # 
+    #
     # idDir = os.path.join(self.dbDir, datasetId)
     # guids = self.datasets[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
     #
@@ -373,6 +373,10 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # create allSuls obj
     allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict()}
     intervalHistograms = {}
+    # TODO: intervalHistograms is just attached to db[datasetId]['info'] for now
+    # (and the bars are calculated / draw client-side). If IntervalHistogramView
+    # gets too sluggish, this intervalHistograms object should probably be
+    # ported to a different, disk-serialized structure?
     preMetricValue = dict()
     allLocations = set()
 

@@ -51,9 +51,6 @@ class IntervalHistogramView extends
 
     // Prep local interactive callbacks for updating the brush
     this.setupBrush();
-
-    // Redraw when the selection changes
-    this.linkedState.on('selectionChanged', () => { this.render(); });
   }
 
   async draw () {
@@ -96,6 +93,11 @@ class IntervalHistogramView extends
   }
 
   combineHistograms () {
+    // TODO: this function makes this view a bit slow for larger datasets. It
+    // might be worth putting this in a web worker or converting allBars to a
+    // uki resource, and moving this code server-side behind an API endpoint?
+    // If the latter, see the comment at the end of data_store/otf2_functions.py
+    // about moving the intervalHistograms dict
     const selectedInterval = this.linkedState.selection?.intervalDetails;
     const selectedPrimitive = this.linkedState.selection?.primitiveName;
     const intervalDurationSpan = this.linkedState.selection?.intervalDurationSpan || null;
