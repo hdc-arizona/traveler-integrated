@@ -59,7 +59,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     if (total === null || (total instanceof Error && total.status === 503)) {
       return true;
     }
-    if (this.linkedState.selection?.utilizationParameters) {
+    if (this.linkedState.selection?.getUtilization) {
       const selection = this.getNamedResource('selectionUtilization');
       if (selection === null || (selection instanceof Error && selection.status === 503)) {
         return true;
@@ -134,8 +134,8 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   }
 
   drawCanvas (chartShape) {
-    this.drawTraceLines(chartShape);
     this.drawBars(chartShape);
+    this.drawTraceLines(chartShape);
   }
 
   hasEnoughDataToComputeChartShape () {
@@ -152,19 +152,28 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     const domain = chartShape.spilloverXScale.domain();
 
     // Make the list of locations a URL-friendly comma-separated list
-    const locations = globalThis.encodeURIComponent(chartShape.locations.join(','));
-
-    // Basic URL that both totalUtilization and selectionUtilization will use
-    const baseUrl = `/datasets/${this.datasetId}/utilizationHistogram?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}&locations=${locations}`;
-
-    // Add any additional per-selection parameters
-    const selectionParams = this.linkedState.selection?.utilizationParameters;
+    const locations = chartShape.locations.join(',');
 
     // Send the utilization API requests
-    const totalPromise = this.updateResource({ name: 'totalUtilization', type: 'json', url: baseUrl });
-    const selectionPromise = selectionParams
-      ? this.updateResource({ name: 'selectionUtilization', type: 'json', url: baseUrl + selectionParams })
-      : this.updateResource({ name: 'selectionUtilization', type: 'placeholder', value: null }); // no current selection; replace data with null
+    const totalPromise = this.updateResource({
+      name: 'totalUtilization',
+      type: 'json',
+      url: `/datasets/${this.datasetId}/utilizationHistogram?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}&locations=${locations}`
+    });
+    const selectionPromise = this.updateResource({
+      name: 'selectionUtilization',
+      type: 'derivation',
+      derive: async () => {
+        // Does the current selection have a way of getting selection-specific
+        // utilization data?
+        return this.linkedState.selection?.getUtilization?.({
+          bins: chartShape.bins,
+          begin: domain[0],
+          end: domain[1],
+          locations
+        }) || null; // if not, don't show any selection-specific utilization
+      }
+    });
 
     // Update the traceback data for the selected interval (if there is one)
     const selectedIntervalId = this.linkedState.selection?.intervalDetails?.intervalId;

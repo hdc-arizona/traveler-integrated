@@ -45,14 +45,6 @@ class IntervalDurationSelection extends Selection {
   }
 
   /**
-   * Parameters to add to any /utilizationHistogram API calls
-   */
-  get utilizationParameters () {
-    // TODO: ?
-    return '';
-  }
-
-  /**
    * A short string that identifies the selection
    */
   get label () {

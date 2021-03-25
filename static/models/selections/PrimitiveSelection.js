@@ -9,10 +9,18 @@ class PrimitiveSelection extends Selection {
   }
 
   /**
-   * Parameters to add to any /utilizationHistogram API calls
+   * Add selection-specific arguments to /utilizationHistogram API endpoint,
+   * and fetch the data
    */
-  get utilizationParameters () {
-    return `&primitive=${encodeURIComponent(this.primitiveName)}`;
+  async getUtilization (urlArgs) {
+    urlArgs.primitive = this.primitiveName;
+    const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
+      Object.entries(urlArgs).map(([key, value]) => {
+        return `${key}=${encodeURIComponent(value)}`;
+      }).join('&');
+    const response = await window.fetch(url);
+    const json = await response.json();
+    return json;
   }
 
   /**

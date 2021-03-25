@@ -40,12 +40,21 @@ class UtilizationView extends
     this.yScale.range([this.chartBounds.height, 0]);
     const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
 
-    const baseUrl = `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}`;
-    const selectionParams = this.linkedState.selection?.utilizationParameters;
-    const totalPromise = this.updateResource({ name: 'total', type: 'json', url: baseUrl });
-    const selectionPromise = selectionParams
-      ? this.updateResource({ name: 'selection', type: 'json', url: baseUrl + selectionParams })
-      : this.updateResource({ name: 'selection', type: 'placeholder', value: null });
+    const totalPromise = this.updateResource({
+      name: 'total',
+      type: 'json',
+      url: `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}`
+    });
+    const selectionPromise = this.updateResource({
+      name: 'selection',
+      type: 'derivation',
+      derive: async () => {
+        // Does the current selection have a way of getting selection-specific
+        // utilization data?
+        return this.linkedState.selection?.getUtilization?.({ bins }) || null;
+        // if not, don't show any selection-specific utilization
+      }
+    });
     // Initial render call to show the spinner if waiting for data takes a while
     this.render();
     await Promise.all([totalPromise, selectionPromise]);
