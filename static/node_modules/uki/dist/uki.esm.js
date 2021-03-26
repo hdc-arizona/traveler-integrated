@@ -940,7 +940,7 @@ const { View, ViewMixin } = createMixinAndDefault({
 });
 
 var name = "uki";
-var version = "0.7.8";
+var version$1 = "0.7.9";
 var description = "Minimal, d3-based Model-View library";
 var module = "dist/uki.esm.js";
 var scripts = {
@@ -981,26 +981,26 @@ var eslintConfig = {
 };
 var devDependencies = {
 	"@rollup/plugin-json": "^4.1.0",
-	eslint: "^7.13.0",
+	eslint: "^7.22.0",
 	"eslint-config-semistandard": "^15.0.1",
-	"eslint-config-standard": "^16.0.1",
+	"eslint-config-standard": "^16.0.2",
 	"eslint-plugin-import": "^2.22.1",
 	"eslint-plugin-node": "^11.1.0",
-	"eslint-plugin-promise": "^4.2.1",
-	"eslint-plugin-standard": "^4.1.0",
-	rollup: "^2.33.1",
+	"eslint-plugin-promise": "^4.3.1",
+	"eslint-plugin-standard": "^5.0.0",
+	rollup: "^2.42.4",
 	"rollup-plugin-execute": "^1.1.1",
 	serve: "^11.3.2"
 };
 var peerDependencies = {
-	d3: "^6.2.0"
+	d3: "^6.6.1"
 };
 var optionalDependencies = {
-	less: "^3.12.2"
+	less: "^4.1.1"
 };
 var pkg = {
 	name: name,
-	version: version,
+	version: version$1,
 	description: description,
 	module: module,
 	"jsnext:main": "dist/uki.esm.js",
@@ -1016,7 +1016,7 @@ var pkg = {
 	optionalDependencies: optionalDependencies
 };
 
-const version$1 = pkg.version;
+const version = pkg.version;
 
 globalThis.uki = globalThis.uki || {};
 globalThis.uki.Model = Model;
@@ -1024,7 +1024,7 @@ globalThis.uki.ModelMixin = ModelMixin;
 globalThis.uki.View = View;
 globalThis.uki.ViewMixin = ViewMixin;
 globalThis.uki.utils = utils;
-globalThis.uki.version = version$1;
+globalThis.uki.version = version;
 
 const d3Version = pkg.peerDependencies.d3.match(/[\d.]+/)[0];
 const lessVersion = pkg.optionalDependencies.less.match(/[\d.]+/)[0];
@@ -1034,4 +1034,4 @@ globalThis.uki.dynamicDependencies = {
   less: `https://cdnjs.cloudflare.com/ajax/libs/less.js/${lessVersion}/less.min.js`
 };
 
-export { Model, View, utils, version$1 as version };
+export { Model, View, utils, version };
