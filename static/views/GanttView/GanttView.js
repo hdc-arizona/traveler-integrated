@@ -1,703 +1,343 @@
 /* globals d3 */
-import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import LinkedMixin from '../common/LinkedMixin.js';
-import SvgViewMixin from '../common/SvgViewMixin.js';
-import CursoredViewMixin from '../common/CursoredViewMixin.js';
-import normalizeWheel from '../../utils/normalize-wheel.js';
-import cleanupAxis from '../../utils/cleanupAxis.js';
+import ZoomableTimelineView from '../ZoomableTimelineView/ZoomableTimelineView.js';
 
-class GanttView extends CursoredViewMixin(SvgViewMixin(LinkedMixin(GoldenLayoutView))) {
-  constructor (argObj) {
-    argObj.resources = [
-      { type: 'less', url: 'views/GanttView/style.less' },
-      { type: 'text', url: 'views/GanttView/template.svg' }
-    ];
-    super(argObj);
-    this.localXScale = d3.scaleLinear();
-    this.xScale = d3.scaleLinear();
+// Minimum vertical pixels per row
+const MIN_LOCATION_HEIGHT = 30;
+
+// Fetch and draw 3x the time data than we're actually showing, for smooth
+// scrolling interactions
+const VERTICAL_SPILLOVER_FACTOR = 3;
+
+// Don't show trace lines when we're zoomed out beyond this time limit
+const TRACE_LINE_TIME_LIMIT = Infinity;
+
+class GanttView extends ZoomableTimelineView { // abstracts a lot of common logic for smooth zooming + panning + rendering offscreen + showing scrollbars for timeline-based views
+  constructor (options) {
+    options.resources = (options.resources || []).concat(...[
+      // Placeholder resources that don't actually get updated until later
+      { type: 'placeholder', value: null, name: 'totalUtilization' },
+      { type: 'placeholder', value: null, name: 'selectionUtilization' },
+      { type: 'placeholder', value: null, name: 'selectedIntervalTrace' }
+    ]);
+    super(options);
+
+    // yScale maps the full list of locationNames to the full height of the
+    // canvas
     this.yScale = d3.scaleBand()
       .paddingInner(0.2)
       .paddingOuter(0.1);
-    this.yScale.invert = function(x) { // think about the padding later
-      var domain = this.domain();
-      var range = this.range();
-      var scale = d3.scaleQuantize().domain(range).range(domain);
+    // scaleBand doesn't come with an invert function...
+    this.yScale.invert = function (x) { // think about the padding later
+      const domain = this.domain();
+      const range = this.range();
+      const scale = d3.scaleQuantize().domain(range).range(domain);
       return scale(x);
     };
-
-    // Some things like SVG clipPaths require ids instead of classes...
-    this.uniqueDomId = `GanttView${GanttView.DOM_COUNT}`;
-    GanttView.DOM_COUNT++;
-    this.wasRerendered = false;
-    this.highlightedData = null;
-    this.ClickState = {"background":0, "hover":1, "singleClick":2, "doubleClick":3};
-    this.IntervalListMode = {all: "all", primitive: "primitive", guid: "guid", duration: "duration"};
-    this.isMouseInside = false;
-    this.pendingHighlightRequest = null;
-    this.renderingInProgress = false;
-    this.traceBackLines = null;
-    this.selectedTimestamp = null;
-    this.selectedLocation = null;
+    // Also add a function to scaleBand to get which locations intersect with
+    // a numeric range
+    this.yScale.invertRange = function (low, high) {
+      const domain = this.domain();
+      const result = [];
+      let position = low;
+      let index = domain.indexOf(this.invert(low));
+      while (index < domain.length && position <= high) {
+        result.push(domain[index]);
+        index += 1;
+        position = this(domain[index]);
+      }
+      return result;
+    };
   }
+
   get isLoading () {
-    return super.isLoading || this.linkedState.isLoadingIntervals || this.linkedState.isLoadingTraceback;
-  }
-  get isEmpty () {
-    return this.error || !this.linkedState.isAggBinsLoaded;
-  }
-  getChartBounds () {
-    const bounds = this.getAvailableSpace();
-    const result = {
-      width: bounds.width - this.margin.left - this.margin.right,
-      height: bounds.height - this.margin.top - this.margin.bottom,
-      left: bounds.left + this.margin.left,
-      top: bounds.top + this.margin.top,
-      right: bounds.right - this.margin.right,
-      bottom: bounds.bottom - this.margin.bottom
-    };
-    this.xScale.range([0, result.width]);
-    this.yScale.range([0, result.height]);
-    return result;
-  }
-  getSpilloverWidth(width){
-    return width*3;
-  }
-  setup () {
-    super.setup();
-
-    this.content.html(this.resources[1]);
-
-    this.margin = {
-      top: 20,
-      right: 20,
-      bottom: 40,
-      left: 40
-    };
-    this._bounds = this.getChartBounds();
-    this.content.select('.chart')
-      .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
-
-
-    //add width of gantt chart to model
-    // for leightweight querying and aggregating
-    this.linkedState.setGanttXResolution(this.getSpilloverWidth(this._bounds.width));
-
-
-    // Create a view-specific clipPath id, as there can be more than one
-    // GanttView in the app
-    const clipId = this.uniqueDomId + 'clip';
-    this.content.select('clipPath')
-      .attr('id', clipId);
-    this.content.select('.clippedStuff')
-      .attr('clip-path', `url(#${clipId})`);
-    this.drawClip();
-
-    // Deselect the primitive / interval selections when the user clicks the background
-    this.content.select('.background')
-      .on('click', () => {
-        this.linkedState.selectPrimitive(null);
-        this.linkedState.selectIntervalId(null);
-      });
-
-
-    // Initialize the scales / stream
-    this.xScale.domain(this.linkedState.intervalWindow);
-
-    this.yScale.domain(this.linkedState.metadata.locationNames);
-
-    // Set up zoom / pan interactions
-    this.setupZoomAndPan();
-
-    // // Set up listeners on the model
-    this.linkedState.on('newIntervalWindow', () => {
-      // Update scales whenever something changes the brush
-      this.xScale.domain(this.linkedState.intervalWindow);
-      // Update the axes immediately for smooth dragging responsiveness
-      this.drawAxes();
-      // no need to render here, it will get rendered on update
-    });
-    // const showSpinner = () => { this.drawSpinner(); };
-    // this.linkedState.on('intervalStreamStarted', showSpinner);
-    // this.linkedState.on('tracebackStreamStarted', showSpinner);
-    this.linkedState.on('intervalsUpdated', () => {
-      this.xScale.domain(this.linkedState.intervalWindow);
-      // Update the axes immediately for smooth dragging responsiveness
-      this.drawAxes();
-      // Make sure we render eventually
-      this.render();
-    });
-    this.linkedState.on('newIntervalHistogramWindow', () => {
-        window.clearTimeout(this.intervalHistogramFetchTimeout);
-        this.intervalHistogramFetchTimeout = window.setTimeout(async () => {
-            this.fetchAndDrawHighlightedBars(this.linkedState.intervalHistogramBegin,
-                this.linkedState.intervalHistogramEnd,
-                this.IntervalListMode.duration);
-        }, 300);
-    });
-
-    this.currentClickState = this.ClickState.background;
-    var __self = this;
-    // mouse events
-
-    this.canvasElement = this.content.select('.gantt-canvas')
-        .on('click', function() {
-            __self.clearAllTimer();
-            var dm = d3.mouse(__self.content.select('.canvas-container').node());
-            __self._mouseClickTimeout = window.setTimeout(async () => {
-                __self.selectedTimestamp = __self.localXScale.invert(dm[0]);
-                __self.selectedLocation = __self.yScale.invert(dm[1]);
-                __self.fetchIntervalTraceList();
-            }, 300);
-        })
-        .on('mouseleave', function () {
-            __self.isMouseInside = false;
-            __self.clearAllTimer();
-        })
-        .on('mouseenter',function () {
-            __self.isMouseInside = true;
-        })
-        .on('mousemove', function() {
-            __self.clearAllTimer();
-            if(__self.currentClickState === __self.ClickState.background || __self.currentClickState === __self.ClickState.hover) {
-                var dm = d3.mouse(__self.content.select('.canvas-container').node());
-                this._mouseHoverTimeout = window.setTimeout(async () => {
-                    if(__self.isMouseInside === true) {
-                        var tm = __self.localXScale.invert(dm[0]);
-                        var loc = __self.yScale.invert(dm[1]);
-                        __self.fetchAndDrawHighlightedBars(tm, loc, __self.IntervalListMode.guid);
-                    }
-                }, 100);
-            }
-        })
-        .on('dblclick', function() {
-            __self.clearAllTimer();
-            var dm = d3.mouse(__self.content.select('.canvas-container').node());
-            __self.fetchIntervalInfoAndShowTooltip(dm[0], dm[1]);
-        });
-  }
-  clearAllTimer() {
-      if(this._mouseHoverTimeout) {
-          window.clearTimeout(this._mouseHoverTimeout);
-          this._mouseHoverTimeout = null;
-      }
-      if(this._mouseClickTimeout) {
-          window.clearTimeout(this._mouseClickTimeout);
-          this._mouseClickTimeout = null;
-      }
-  }
-
-  fetchIntervalInfoAndShowTooltip(xx, yy){
-      var __self = this;
-      var tm = __self.localXScale.invert(xx);
-      var loc = __self.yScale.invert(yy);
-      //this function will replace the fetching of intervals
-      window.clearTimeout(this.intervalFetchTimeout);
-      this.intervalFetchTimeout = window.setTimeout(async () => {
-          //*****NetworkError on reload is here somewhere******//
-          const label = encodeURIComponent(this.linkedState.label);
-          var endpt = `/datasets/${label}/getIntervalInfo?timestamp=${Math.floor(tm)}&location=${loc}`;
-          fetch(endpt)
-              .then((response) => {
-                  return response.json();
-              })
-              .then((data) => {
-                  if(data.length > 0) {
-                      data[0].enter.metrics = undefined;
-                      data[0].leave.metrics = undefined;
-                      data[0].intervalId = undefined;
-                      data[0].lastParentInterval = undefined;
-                      var dr = __self.canvasElement.node().getBoundingClientRect();
-                      dr.x = xx - __self._bounds.width + 100;
-                      dr.y = yy;
-
-                      window.controller.tooltip.show({
-                          content: `<pre>${JSON.stringify(data[0], null, 2)}</pre>`,
-                          targetBounds: dr,
-                          hideAfterMs: null
-                      });
-                      __self.currentClickState = __self.ClickState.doubleClick;
-                  } else {
-                      __self.currentClickState = __self.ClickState.background;
-                      window.controller.tooltip.hide();
-                  }
-              })
-              .catch(err => {
-                  err.text.then( errorMessage => {
-                      console.warn(errorMessage);
-                  });
-              });
-      }, 100);
-  }
-  fetchIntervalList(xx, yy, mode){
-      var __self = this;
-      var tm = xx;
-      var loc = yy;
-      // window.clearTimeout(this.primitiveFetchTimeout); dont clear time out here,
-      // we need to call rendering ends in the finally block
-      this.primitiveFetchTimeout = window.setTimeout(async () => {
-          const label = encodeURIComponent(this.linkedState.label);
-          var begin = this.linkedState.intervalWindow[0];
-          var end = this.linkedState.intervalWindow[1];
-          var endpt = `/datasets/${label}/getIntervalList?`;
-          endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}&mode=${mode}`;
-          endpt += `&primitive=${this.linkedState.selectedPrimitiveHistogram}`;
-          if(mode === this.IntervalListMode.duration) {
-              endpt += `&leave=${Math.ceil(loc)}`;// loc in location isnt used if mode is duration
-          }
-          fetch(endpt)
-              .then((response) => {
-                  return response.json();
-              })
-              .then((data) => {
-                  __self.highlightedData = data;
-                  if(mode === __self.IntervalListMode.primitive) {
-                      __self.currentClickState = __self.ClickState.singleClick;
-                  } else if(mode === __self.IntervalListMode.guid) {
-                      __self.currentClickState = __self.ClickState.hover;
-                  } else {
-                      __self.currentClickState = __self.ClickState.background;
-                  }
-                  __self.drawHighlightedBars(mode);
-              })
-              .catch(err => {
-                  err.text.then( errorMessage => {
-                      console.warn(errorMessage);
-                  });
-              }).finally(() => {
-                __self.intervalRenderingEnds();
-          });
-      }, 100);
-  }
-  fetchIntervalTraceList(){
-      var __self = this;
-      if(__self.selectedTimestamp === null || __self.selectedLocation === null)return;
-      var tm = __self.selectedTimestamp;
-      var loc = __self.selectedLocation;
-      window.clearTimeout(this.intervalTraceListTimeout);
-      // we need to call rendering ends in the finally block
-      this.intervalTraceListTimeout = window.setTimeout(async () => {
-          const label = encodeURIComponent(this.linkedState.label);
-          var begin = this.linkedState.intervalWindow[0];
-          var end = this.linkedState.intervalWindow[1];
-          var endpt = `/datasets/${label}/getIntervalTraceList?`;
-          endpt += `enter=${Math.floor(tm)}&location=${loc}&begin=${Math.floor(begin)}&end=${Math.ceil(end)}`;
-          fetch(endpt)
-              .then((response) => {
-                  return response.json();
-              })
-              .then((data) => {
-                  __self.traceBackLines = data;
-                  __self.initialDragState = null;
-                  __self.render();
-                  __self.fetchAndDrawHighlightedBars(__self.selectedTimestamp, __self.selectedLocation, __self.IntervalListMode.primitive);
-              })
-              .catch(err => {
-                  err.text.then( errorMessage => {
-                      console.warn(errorMessage);
-                  });
-              }).finally(() => {
-                  // __self.intervalRenderingEnds();
-          });
-      }, 100);
-  }
-  draw () {
-    super.draw();
-
-    if (this.isHidden) {
-      return;
-    } else if (this.isEmpty) {
-      if (this.error) {
-        this.emptyStateDiv.html(`<p>Error communicating with the server</p>`);
-      } else if (this.linkedState.tooManyIntervals) {
-        this.emptyStateDiv.html('<p>Too much data; scroll to zoom in</p>');
-      } else {
-        this.emptyStateDiv.html('<p>No data in the current view</p>');
+    // Display the spinner + skip most of the draw call if we're still waiting
+    // on utilization data
+    if (super.isLoading) {
+      return true;
+    }
+    const total = this.getNamedResource('totalUtilization');
+    if (total === null || (total instanceof Error && total.status === 503)) {
+      return true;
+    }
+    if (this.linkedState.selection?.getUtilization) {
+      const selection = this.getNamedResource('selectionUtilization');
+      if (selection === null || (selection instanceof Error && selection.status === 503)) {
+        return true;
       }
     }
-
-    // Update the dimensions of the plot in case we were resized
-    // (window.getBoundingClientRect() is semi-expensive, so we DON'T update
-    // this during incremental / immediate draw calls in setup()'s listeners or
-    // zooming / panning that need more responsiveness)
-    this._bounds = this.getChartBounds();
-    // this.linkedState.setGanttXResolution(this.getSpilloverWidth(this._bounds.width));
-
-    // Update whether we're showing the spinner
-    this.drawSpinner();
-    // Update the clip rect
-    this.drawClip();
-    // Update the axes (also updates scales)
-    this.drawAxes();
-
-    // Update the bars
-    this.drawBarsCanvas(this.linkedState.getCurrentGanttAggregrateBins());
-    this.drawTraceLines();
+    if (this.linkedState.selection?.intervalTraceParameters) {
+      const trace = this.getNamedResource('selectedIntervalTrace');
+      if (trace === null || (trace instanceof Error && trace.status === 503)) {
+        return true;
+      }
+    }
+    return false;
   }
-  drawSpinner () {
-    this.content.select('.small.spinner').style('display', this.isLoading ? null : 'none');
-  }
-  drawClip () {
-    this.content.select('clipPath rect')
-      .attr('width', this._bounds.width)
-      .attr('height', this._bounds.height);
-  }
-  drawAxes () {
-    // Update the x axis
-    const xAxisGroup = this.content.select('.xAxis')
-      .attr('transform', `translate(0, ${this._bounds.height})`)
-      .call(d3.axisBottom(this.xScale));
-    cleanupAxis(xAxisGroup);
 
-    // Position the x label
-    this.content.select('.xAxisLabel')
-      .attr('x', this._bounds.width / 2)
-      .attr('y', this._bounds.height + this.margin.bottom - this.emSize / 2);
+  get error () {
+    const err = super.error;
+    if (err?.status === 503) {
+      // We don't want to count 503 errors (still loading data) as actual errors
+      return null;
+    } else {
+      return err;
+    }
+  }
+
+  handlePanningStart (event, dragState) {
+    dragState.y0 = event.y;
+    dragState.dy = 0;
+    dragState.initialYScroll = this.d3el.select('foreignObject').node().scrollTop;
+  }
+
+  handlePanning (event, dragState, newDomain) {
+    dragState.dy = event.y - this._dragState.y0;
+    const scrollTop = dragState.initialYScroll - dragState.dy;
+    const forceQuickDraw = scrollTop !== this.d3el.select('foreignObject').node().scrollTop;
+    this._ignoreYScrollEvents = true;
+    this.d3el.select('foreignObject').node().scrollTop = scrollTop;
+    if (forceQuickDraw &&
+        newDomain[0] === this.linkedState.detailDomain[0] &&
+        newDomain[1] === this.linkedState.detailDomain[1]) {
+      // TracedLinkedState won't otherwise issue a quickDraw in this case,
+      // which can result in some funny effects if there was vertical
+      // panning
+      this.quickDraw();
+    }
+  }
+
+  handlePanningEnd (event, dragState) {
+    if (dragState.dx === 0 && dragState.dy === 0) {
+      const timestamp = Math.round(this.xScale.invert(event.x));
+      const location = this.yScale.invert(event.y + this.d3el.select('foreignObject').node().scrollTop);
+      this.linkedState.selectIntervalByTimeAndLoc(timestamp, location);
+    }
+  }
+
+  setupInteractions () {
+    super.setupInteractions();
+
+    // Make sure the y axis links with scrolling
+    this.d3el.select('foreignObject').on('scroll', () => {
+      if (this._ignoreYScrollEvents) {
+        // suppress false scroll events from setting scrollTop
+        this._ignoreYScrollEvents = false;
+        return;
+      }
+      this.quickDraw();
+      this.render();
+    });
+    // Link wheel events on the y axis back to vertical scrolling
+    this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
+      this.d3el.select('foreignObject').node().scrollTop += event.deltaY;
+    });
+  }
+
+  drawCanvas (chartShape) {
+    this.drawBars(chartShape);
+    this.drawTraceLines(chartShape);
+  }
+
+  hasEnoughDataToComputeChartShape () {
+    return super.hasEnoughDataToComputeChartShape() &&
+      !!this.linkedState.info.locationNames;
+  }
+
+  determineIfShapeNeedsRefresh (lastChartShape, chartShape) {
+    return lastChartShape.locations.length !== chartShape.locations.length ||
+    lastChartShape.locations.some((loc, i) => chartShape.locations[i] !== loc);
+  }
+
+  async updateData (chartShape) {
+    const domain = chartShape.spilloverXScale.domain();
+
+    // Make the list of locations a URL-friendly comma-separated list
+    const locations = chartShape.locations.join(',');
+
+    // Send the utilization API requests
+    const totalPromise = this.updateResource({
+      name: 'totalUtilization',
+      type: 'json',
+      url: `/datasets/${this.datasetId}/utilizationHistogram?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}&locations=${locations}`
+    });
+    const selectionPromise = this.updateResource({
+      name: 'selectionUtilization',
+      type: 'derivation',
+      derive: async () => {
+        // Does the current selection have a way of getting selection-specific
+        // utilization data?
+        return this.linkedState.selection?.getUtilization?.({
+          bins: chartShape.bins,
+          begin: domain[0],
+          end: domain[1],
+          locations
+        }) || null; // if not, don't show any selection-specific utilization
+      }
+    });
+
+    // Update the traceback data for the selected interval (if there is one)
+    const selectedIntervalId = this.linkedState.selection?.intervalDetails?.intervalId;
+    const tracebackPromise = selectedIntervalId
+      ? this.updateResource({
+          name: 'selectedIntervalTrace',
+          type: 'json',
+          url: `/datasets/${this.datasetId}/intervals/${selectedIntervalId}/trace?begin=${domain[0]}&end=${domain[1]}`
+        })
+      : this.updateResource({ name: 'selectedIntervalTrace', type: 'placeholder', value: null });
+
+    return Promise.all([totalPromise, selectionPromise, tracebackPromise]);
+  }
+
+  getRequiredChartHeight () {
+    return MIN_LOCATION_HEIGHT * this.linkedState.info.locationNames.length;
+  }
+
+  /**
+   * Calculate the visible chart area, whether scrollbars should be showing,
+   * update all scales; after accounting for spillover space, figure out how
+   * many bins and which locations should be requested from the API
+   */
+  getChartShape () {
+    const chartShape = super.getChartShape();
+
+    this.yScale.range([0, chartShape.fullHeight])
+      .domain(this.linkedState.info.locationNames);
+
+    // Given the scroll position and size, which locations should be visible?
+    const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
+    let spilloverYRange = [
+      scrollTop,
+      scrollTop + chartShape.chartHeight
+    ];
+    // Add vertical spillover
+    spilloverYRange = this.computeSpillover(spilloverYRange, VERTICAL_SPILLOVER_FACTOR);
+    chartShape.spilloverYRange = spilloverYRange;
+    chartShape.locations = this.yScale.invertRange(...spilloverYRange);
+
+    return chartShape;
+  }
+
+  drawAxes (chartShape) {
+    super.drawAxes(chartShape);
 
     // Update the y axis
-    let yTicks = this.content.select('.yAxis').selectAll('.tick')
+    let yTicks = this.d3el.select('.yAxis').selectAll('.tick')
       .data(this.yScale.domain());
     yTicks.exit().remove();
     const yTicksEnter = yTicks.enter().append('g')
       .classed('tick', true);
     yTicks = yTicks.merge(yTicksEnter);
 
+    // y tick coordinate system in between each row
     yTicks.attr('transform', d => `translate(0,${this.yScale(d) + this.yScale.bandwidth() / 2})`);
 
+    // y ticks span the full width of the chart
     const lineOffset = -this.yScale.step() / 2;
     yTicksEnter.append('line');
     yTicks.select('line')
       .attr('x1', 0)
-      .attr('x2', this._bounds.width)
+      .attr('x2', chartShape.chartWidth)
       .attr('y1', lineOffset)
       .attr('y2', lineOffset);
 
+    // y tick labels
     yTicksEnter.append('text');
     yTicks.select('text')
       .attr('text-anchor', 'end')
       .attr('y', '0.35em')
       .text(d => {
-          var a = BigInt(d);
-          var c = BigInt(32);
-          var node = BigInt(a >> c);
-          var thread = (d & 0x0FFFFFFFF);
-          var aggText = "";
-          aggText += node + " - T";
-          aggText += thread;
-          return aggText;
+        const a = BigInt(d);
+        const c = BigInt(32);
+        const node = BigInt(a >> c);
+        const thread = (d & 0x0FFFFFFFF);
+        let aggText = '';
+        aggText += node + ' - T';
+        aggText += thread;
+        return aggText;
       });
 
-    // Position the y label
-    this.content.select('.yAxisLabel')
-      .attr('transform', `translate(${-this.emSize-12},${this._bounds.height / 2}) rotate(-90)`);
+    // Set the y label
+    this.d3el.select('.yAxisLabel')
+      .text('Location');
   }
-  drawBarsCanvas(aggBins){
-      this.highlightedData = null;
-      var border = 1;
-      this.localXScale.domain(this.xScale.domain());
-      this.localXScale.range([this._bounds.width, this.getSpilloverWidth(this._bounds.width)-this._bounds.width]);
 
-      /***** DONT FORGET TO ADD FLAG FOR IF USING NATIVE OR OVERLOADED VIEW SCALE****/
+  drawBars (chartShape) {
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    const totalUtilization = this.getNamedResource('totalUtilization');
+    const selectionUtilization = this.getNamedResource('selectionUtilization');
 
-      // we need a canvas already
-      // first we focus on moving canvas to the correct place
+    const canvas = this.d3el.select('canvas');
+    const ctx = canvas.node().getContext('2d');
 
-      if (!this.initialDragState) {
-        this.content.select('.canvas-container')
-          .attr('width', this.getSpilloverWidth(this._bounds.width))
-          .attr('height', this._bounds.height)
-          .attr('transform', `translate(${-this._bounds.width}, 0)`);
-
-        this.canvasElement
-                    .attr('width', this.getSpilloverWidth(this._bounds.width))
-                    .attr('height', this._bounds.height);
-
-        var ctx = this.canvasElement.node().getContext("2d");
-
-        ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
-        for (var location in aggBins.data){
-          var loc_offset = this.yScale(parseInt(aggBins.data[location].location));
-          for (var bucket in aggBins.data[location].histogram){
-
-            var bucket_pix_offset = this.localXScale(this.linkedState.getTimeStampFromBin(bucket, aggBins.metadata));
-            var pixel = aggBins.data[location].histogram[bucket];
-            if (pixel === 1){
-              ctx.fillStyle = this.linkedState.contentBorderColor;
-              ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
-              ctx.fillRect(bucket_pix_offset, (loc_offset-border)+this.yScale.bandwidth(), 1, border);
-              ctx.fillStyle = this.linkedState.contentFillColor;
-              ctx.rect(bucket_pix_offset, loc_offset+border, 1, this.yScale.bandwidth()-(2*border));
-            }
-            if (pixel < 1 && pixel > 0){
-              ctx.fillStyle = this.linkedState.contentBorderColor;
-              ctx.fillRect(bucket_pix_offset, loc_offset, border, this.yScale.bandwidth());
-            }
-          }
+    const bandwidth = this.yScale.bandwidth();
+    for (const [location, data] of Object.entries(totalUtilization.locations)) {
+      const y0 = this.yScale(location);
+      for (const [binNo, tUtil] of data.entries()) {
+        const sUtil = selectionUtilization?.locations?.[location]?.[binNo];
+        // Which border to draw (if any)?
+        if (sUtil > 0) {
+          ctx.fillStyle = theme['--selection-border-color'];
+          ctx.fillRect(binNo, y0, 1, bandwidth);
+        } else if (tUtil > 0) {
+          ctx.fillStyle = theme['--text-color-softer'];
+          ctx.fillRect(binNo, y0, 1, bandwidth);
         }
 
-        ctx.fillStyle = this.linkedState.contentFillColor;
-        ctx.fill();
-        this.visibleAggBinsMetadata = aggBins.metadata;
+        // Which fill to draw (if any)?
+        if (sUtil >= 1) {
+          ctx.fillStyle = theme['--selection-color'];
+          ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+        } else if (tUtil >= 1) {
+          ctx.fillStyle = theme['--disabled-color'];
+          ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+        }
       }
-      this.ctx = ctx;
-      this.wasRerendered = true;
+    }
   }
-  intervalRenderingBegins(x, y, mode){
-      if(this.renderingInProgress === true) {
-          this.pendingHighlightRequest = {x: x, y: y, mode: mode};
-          return true;
-      }
-      this.renderingInProgress = true;
-      return false;
-  }
-  intervalRenderingEnds(){
-      this.renderingInProgress = false;
-      if(this.pendingHighlightRequest){
-          let x = this.pendingHighlightRequest.x;
-          let y = this.pendingHighlightRequest.y;
-          let mode = this.pendingHighlightRequest.mode;
-          this.pendingHighlightRequest = null;
-          this.fetchAndDrawHighlightedBars(x, y, mode);
-      }
-  }
-  fetchAndDrawHighlightedBars(x, y, mode) {
-      if((this.linkedState.end - this.linkedState.begin) > 20000000) {
-          return;
-      }
-      if(this.intervalRenderingBegins(x, y, mode) === true) return;
-      this.drawHighlightedBars(this.IntervalListMode.all);
-      this.fetchIntervalList(x, y, mode);
-  }
-  drawHighlightedBars(mode) {
-      if(this.highlightedData) {
-          var border = 1;
-          var fillColor = this.linkedState.contentFillColor;
-          var borderColor = this.linkedState.contentBorderColor;
-          if (mode === this.IntervalListMode.guid) {
-              fillColor = this.linkedState.mouseHoverSelectionColor;
-          } else if (mode === this.IntervalListMode.primitive) {
-              fillColor = this.linkedState.selectionColor;
-          } else if (mode === this.IntervalListMode.duration) {
-              fillColor = this.linkedState.selectionColor;
-          }
-          var ctx = this.canvasElement.node().getContext("2d");
-          var bins = this.getSpilloverWidth(this._bounds.width);
-          var notDrawn = true;
-          for (var loc in this.highlightedData) {
-              var loc_offset = this.yScale(parseInt(loc));
-              if (this.highlightedData[loc].length === 0) continue;
-              notDrawn = false;
-              for (var i = 0; i < bins; i++) {
-                  var thisTime = this.linkedState.getTimeStampFromBin(i, this.visibleAggBinsMetadata);
-                  var bucket_pix_offset = this.localXScale(thisTime);
-                  for (var elm in this.highlightedData[loc]) {
-                      if (thisTime >= this.highlightedData[loc][elm]['enter'] && thisTime <= this.highlightedData[loc][elm]['leave']) {
-                          ctx.fillStyle = borderColor;
-                          ctx.fillRect(bucket_pix_offset, loc_offset, 1, border);
-                          ctx.fillRect(bucket_pix_offset, (loc_offset - border) + this.yScale.bandwidth(), 1, border);
 
-                          ctx.fillStyle = fillColor;
-                          ctx.fillRect(bucket_pix_offset, loc_offset + border, 1, this.yScale.bandwidth() - (2 * border));
-                          break;
-                      }
-                      if (thisTime < this.highlightedData[loc][elm]['enter']) {
-                          break;
-                      }
-                  }
-              }
-          }
-          if (notDrawn) {
-              this.currentClickState = this.ClickState.background;
-          }
-          if(mode === this.IntervalListMode.all) {
-              this.highlightedData = null;
-          }
-      }
-  }
-  getMiddlePointInYScale(point){
-      var p = (this.yScale(point) + this.yScale(point+1)) / 2.0;
-      return Math.floor(p);
-  }
-  drawTraceLines(){
-      var ctx = this.canvasElement.node().getContext("2d");
-      if(this.traceBackLines === null || !this.traceBackLines.length){
-          this.traceBackLines = null;
-      } else {
-          this.traceBackLines.forEach((line) => {
-              if(line.type === "middle") {
-                  ctx.beginPath();
-                  ctx.moveTo(this.localXScale(line.left_timestamp), this.getMiddlePointInYScale(parseInt(line.left_location)));
-                  ctx.lineTo(this.localXScale(line.right_timestamp), this.getMiddlePointInYScale(parseInt(line.right_location)));
-                  ctx.lineWidth = 1;
-                  // ctx.strokeStyle = '#ff0000';
-                  ctx.stroke();
-              }
-          });
-      }
-  }
-  setupZoomAndPan () {
-    this.initialDragState = null;
-    let latentWidth = null;
-    const clampWindow = (begin, end) => {
-      // clamp to the lowest / highest possible values
-      if (begin <= this.linkedState.beginLimit) {
-        const offset = this.linkedState.beginLimit - begin;
-        begin += offset;
-        end += offset;
-      }
-      if (end >= this.linkedState.endLimit) {
-        const offset = end - this.linkedState.endLimit;
-        begin -= offset;
-        end -= offset;
-      }
-      return { begin, end };
+  drawTraceLines (chartShape) {
+    const trace = this.getNamedResource('selectedIntervalTrace');
+    const currentTimespan = this.linkedState.detailDomain[1] -
+      this.linkedState.detailDomain[0];
+    if (trace === null || currentTimespan > TRACE_LINE_TIME_LIMIT) {
+      return;
+    }
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+
+    const canvas = this.d3el.select('canvas');
+    const ctx = canvas.node().getContext('2d');
+
+    const bandwidth = this.yScale.bandwidth();
+    ctx.strokeStyle = theme['--selection-border-color'];
+    ctx.lineWidth = 2;
+
+    const drawPath = (parent, child) => {
+      ctx.beginPath();
+      ctx.moveTo(
+        chartShape.spilloverXScale(parent.leave) - chartShape.leftOffset,
+        this.yScale(parent.location) + bandwidth / 2
+      );
+      ctx.lineTo(
+        chartShape.spilloverXScale(child.enter) - chartShape.leftOffset,
+        this.yScale(child.location) + bandwidth / 2
+      );
+      ctx.stroke();
     };
-    this.content
-      .on('wheel', () => {
 
-          this.initialDragState = null;
-        const zoomFactor = 1.05 ** (normalizeWheel(d3.event).pixelY / 100);
-        const originalWidth = this.linkedState.end - this.linkedState.begin;
-        // Clamp the width to a min of 10ms, and the largest possible size
-        let targetWidth = Math.max(zoomFactor * originalWidth, 10);
-        targetWidth = Math.min(targetWidth, this.linkedState.endLimit - this.linkedState.beginLimit);
-        // Compute the new begin / end points, centered on where the user is mousing
+    for (const parent of Object.values(trace.ancestors)) {
+      const child = trace.ancestors[parent.child];
+      if (child) {
+        drawPath(parent, child);
+      }
+    }
 
-        /****** HACK AND FIX ALSO
-                I need to tie 1 width to an clear value which is realted to the size of our overflow ******/
-        const overflowAdjustedMousedScreenPont = d3.event.clientX - this._bounds.left - this.margin.left + this._bounds.width;
-        /******* HACK FIX ********/
-
-        const mousedScreenPoint = d3.event.clientX - this._bounds.left - this.margin.left;
-        const mousedPosition = this.xScale.invert(mousedScreenPoint);
-        const begin = mousedPosition - (targetWidth / originalWidth) * (mousedPosition - this.linkedState.begin);
-        const end = mousedPosition + (targetWidth / originalWidth) * (this.linkedState.end - mousedPosition);
-        const actualBounds = clampWindow(begin, end);
-
-
-
-        // For responsiveness, draw the axes immediately
-        this.drawAxes();
-
-        // Patch a temporary scale transform to the bars / links layers (this
-        // gets removed by full drawBars() / drawLinks() calls)
-
-        latentWidth = originalWidth;
-        const actualZoomFactor = latentWidth / ((actualBounds.end - actualBounds.begin));
-        const zoomCenter = (1 - actualZoomFactor) * overflowAdjustedMousedScreenPont;
-
-        // There isn't a begin / end wheel event, so trigger the update across
-        // views immediately
-        // window.clearTimeout(this._incrementalIntervalTimeout);
-        // this._incrementalIntervalTimeout = window.setTimeout(() => {
-
-        var ctx = this.canvasElement.node().getContext("2d");
-
-        var buffer = document.createElement("CANVAS");
-        buffer.height = this.canvasElement.attr('height');
-        buffer.width = this.canvasElement.attr('width');
-
-        this.buff = buffer.getContext("2d");
-        this.buff.drawImage(ctx.canvas, 0, 0);
-
-
-        ctx.save();
-        ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
-        ctx.translate(zoomCenter, 0);
-        ctx.scale(actualZoomFactor, 1);
-        ctx.drawImage(this.buff.canvas, 0, 0);
-        ctx.restore();
-
-        this.linkedState.setIntervalWindow(actualBounds);
-
-        // Show the small spinner to indicate that some of the stuff the user
-        // sees may be inaccurate (will be hidden once the full draw() call
-        // happens)
-        this.content.select('.small.spinner').style('display', null);
-        this.currentClickState = this.ClickState.background;
-      }).call(d3.drag()
-        .on('start', () => {
-          this.initialDragState = {
-            begin: this.linkedState.begin,
-            end: this.linkedState.end,
-            x: this.xScale.invert(d3.event.x),
-            scale: d3.scaleLinear()
-              .domain(this.xScale.domain())
-              .range(this.xScale.range())
-          };
-        })
-        .on('drag', () => {
-          if(this.wasRerendered === true){
-            this.initialDragState = {
-              begin: this.linkedState.begin,
-              end: this.linkedState.end,
-              x: this.xScale.invert(d3.event.x),
-              scale: d3.scaleLinear()
-                .domain(this.xScale.domain())
-                .range(this.xScale.range())
-            };
-
-            var ctx = this.canvasElement.node().getContext("2d");
-
-            var buffer = document.createElement("CANVAS");
-            buffer.height = this.canvasElement.attr('height');
-            buffer.width = this.canvasElement.attr('width');
-
-            this.buff = buffer.getContext("2d");
-            this.buff.drawImage(ctx.canvas, 0, 0);
-
-            this.wasRerendered = false;
-          }
-
-          const mousedPosition = this.initialDragState.scale.invert(d3.event.x);
-          const dx = this.initialDragState.x - mousedPosition;
-          const begin = this.initialDragState.begin + dx;
-          const end = this.initialDragState.end + dx;
-          const actualBounds = clampWindow(begin, end);
-
-          // Don't bother triggering a full update mid-drag...
-          // For responsiveness, draw the axes immediately (the debounced, full
-          // render() triggered by changing linkedState may take a while)
-          this.drawAxes();
-
-          // Patch a temporary translation to the bars / links layers (this gets
-          // removed by full drawBars() / drawLinks() calls)
-          const shift = this.initialDragState.scale(this.initialDragState.begin) -
-          this.initialDragState.scale(actualBounds.begin);
-
-          var ctx = this.canvasElement.node().getContext("2d");
-
-          ctx.save();
-          ctx.clearRect(0, 0,  this.getSpilloverWidth(this._bounds.width), this._bounds.height);
-          ctx.translate(shift, 0);
-          ctx.drawImage(this.buff.canvas, 0, 0);
-          ctx.restore();
-
-
-          // Show the small spinner to indicate that some of the stuff the user
-          // sees may be inaccurate (will be hidden once the full draw() call
-          // happens)
-          this.content.select('.small.spinner').style('display', null);
-
-          // d3's drag behavior captures + prevents updating the cursor, so do
-          // that manually
-          this.linkedState.moveCursor(mousedPosition);
-          this.updateCursor();
-          this.linkedState.setIntervalWindow(clampWindow(begin, end));
-        })
-        .on('end', () => {
-          const dx = this.initialDragState.x - this.initialDragState.scale.invert(d3.event.x);
-          if(dx !== 0) {
-              const begin = this.initialDragState.begin + dx;
-              const end = this.initialDragState.end + dx;
-              this.initialDragState = null;
-              this.buff = null;
-
-              this.linkedState.setIntervalWindow(clampWindow(begin, end));
-              this.currentClickState = this.ClickState.background;
-              this.fetchIntervalTraceList();
-          }
-        }));
+    for (const child of Object.values(trace.descendants)) {
+      const parent = trace.descendants[child.parent];
+      if (parent) {
+        drawPath(parent, child);
+      }
+    }
   }
 }
-GanttView.DOM_COUNT = 1;
+
 export default GanttView;

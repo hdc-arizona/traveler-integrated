@@ -1,35 +1,108 @@
-/* globals d3 */
-import GoldenLayoutView from '../common/GoldenLayoutView.js';
-import LinkedMixin from '../common/LinkedMixin.js';
-import SvgViewMixin from '../common/SvgViewMixin.js';
+/* globals uki, d3 */
 import prettyPrintTime from '../../utils/prettyPrintTime.js';
+import LinkedMixin from '../common/LinkedMixin.js';
 
-class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
-  constructor (argObj) {
-    argObj.resources = [
+const GLYPHS = {
+  CIRCLE: r => `
+    M${r},${-r}
+    A${r},${r},0,0,0,${r},${r}
+    A${r},${r},0,0,0,${r},${-r}
+    Z`.replace(/\s/g, ''),
+  DIAMOND: r => {
+    // Keep diamond area the same as the circle,
+    // but center on the original radius
+    const r2 = r * Math.sqrt(Math.PI / 2);
+    return `
+      M${r - r2},0
+      L${r},${-r2}
+      L${r + r2},0
+      L${r},${r2}
+      Z`.replace(/\s/g, '');
+  },
+  SQUARE: r => {
+    // Keep square area the same as the circle,
+    // but center on the original radius
+    const r2 = r * Math.sqrt(Math.PI) / 2;
+    return `
+      M${r - r2},${-r2}
+      L${r + r2},${-r2}
+      L${r + r2},${r2}
+      L${r - r2},${r2}
+      Z`.replace(/\s/g, '');
+  },
+  COLLAPSED_TRIANGLE: r => `
+    M0,0
+    L${2 * r},${r}
+    L0,${2 * r}
+    L${r / 2},${r}
+    Z`.replace(/\s/g, ''),
+  EXPANDED_TRIANGLE: r => `
+    M${2 * r},0
+    L0,${r}
+    L${2 * r},${2 * r}
+    L${3 * r / 2},${r}
+    Z`.replace(/\s/g, '')
+};
+
+function evalTypeGlyph (evalCode, radius) {
+  switch (evalCode) {
+    // Undecided
+    case -1: return GLYPHS.CIRCLE(radius);
+    // Asynchronous
+    case 0: return GLYPHS.DIAMOND(radius);
+    // Synchronous
+    case 1: return GLYPHS.SQUARE(radius);
+    // Missing data; still use the circle for the outline
+    default: return GLYPHS.CIRCLE(radius);
+  }
+}
+
+class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
+  uki.ui.SvgGLView) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
+  constructor (options) {
+    options.resources = options.resources || [];
+    options.resources.push(...[
       { type: 'less', url: 'views/TreeView/style.less' },
-      { type: 'text', url: 'views/TreeView/template.html' },
-      { type: 'text', url: 'views/TreeView/shapeKey.html' }
-    ];
-    super(argObj);
-
-    (async () => {
-      try {
-        this.tree = d3.hierarchy(await d3.json(`/datasets/${encodeURIComponent(this.layoutState.label)}/tree`));
-      } catch (err) {
-        this.tree = err;
+      { type: 'text', url: 'views/TreeView/template.html', name: 'template' },
+      { type: 'text', url: 'views/TreeView/shapeKey.html' },
+      {
+        type: 'json',
+        url: `/datasets/${options.glState.datasetId}/tree`,
+        name: 'tree',
+        then: rawTree => {
+          const tree = d3.hierarchy(rawTree);
+          // Attach details about each primitive to each tree node
+          tree.each(node => {
+            node.details = this.linkedState.getPrimitiveDetails(node.data.name);
+          });
+          // Now that we have details, compute exclusive times
+          tree.each(node => {
+            if (node.details.time !== undefined) {
+              node.details.exclusiveTime = node.details.time;
+              for (const childNode of node.children || []) {
+                if (childNode.details.time !== undefined) {
+                  node.details.exclusiveTime -= childNode.details.time;
+                }
+              }
+            }
+          });
+          return tree;
+        }
       }
-      this.render();
-    })();
+    ]);
+    super(options);
+
+    // In addition to the listeners that LinkedMixin provides, TreeView should
+    // also redraw itself when the colorMode changes
+    this.linkedState.on('colorModeChanged', () => { this.render(); });
   }
-  get isLoading () {
-    return super.isLoading || !this.tree;
+
+  get tree () {
+    return this.getNamedResource('tree');
   }
-  get isEmpty () {
-    return this.tree !== undefined && this.tree instanceof Error;
-  }
-  setup () {
-    super.setup();
+
+  async setup () {
+    await super.setup(...arguments);
 
     this.margin = {
       top: 20,
@@ -38,66 +111,89 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       left: 20
     };
     this.legendWidth = 300;
+    this.legendHeight = 60;
     this.nodeWidth = 50;
     this.wideNodeWidth = 120;
     this.nodeHeight = 20;
     this.nodeSeparation = 1.5; // Factor (not px) for separating nodes vertically
     this.horizontalPadding = 40; // px separation between nodes
     this.mainGlyphRadius = this.nodeHeight / 2;
-    this.expanderRadius = this.mainGlyphRadius / 2;
+    this.expanderRadius = 3 * this.mainGlyphRadius / 4;
 
-    this.content.html(this.resources[1]);
-    // this.content.select('.key').html(this.resources[2]);
-
-    // Redraw when a new primitive is selected
-    // TODO: auto-expand and scroll if the selected primitive is collapsed?
-    this.linkedState.on('primitiveSelected', () => { this.render(); });
+    this.glEl.classed('TreeView', true);
+    this.d3el.html(this.getNamedResource('template'));
+    this.initKey();
 
     // Listen for ctrl+f so that all labels are visible when the user is searching
     this.showAllLabels = false;
-    d3.select('body').on('keydown', () => {
+    const body = d3.select('body');
+    body.on('keydown.TreeViewSearchInterceptor', event => {
       // 17, 91 are cmd+ctrl, 13 is enter, 70 is F
-      if (d3.event.keyCode === 17 || d3.event.keyCode === 91 || d3.event.keyCode === 92) { // ctrl & cmd
+      if (event.keyCode === 17 || event.keyCode === 91 || event.keyCode === 92) { // ctrl & cmd
         this.showAllLabels = true;
         this.render();
+        body.on('click.TreeViewSearchInterceptor', () => {
+          this.showAllLabels = false;
+          body.on('click.TreeViewSearchInterceptor', null);
+          this.render();
+        });
       }
-    }).on('click', () => {
-      this.showAllLabels = false;
-      this.render();
     });
   }
-  draw () {
-    super.draw();
 
-    if (this.isHidden || this.isLoading) {
-      return; // eslint-disable-line no-useless-return
-    } else if (this.histogram instanceof Error) {
-      this.emptyStateDiv.html('<p>Error communicating with the server</p>');
-    } else {
-      const transition = d3.transition()
-        .duration(1000);
-
-      // Compute the new layout
-      this.updateLayout(transition);
-
-      // Draw the legend (note: this also sets up this.currentColorTimeScale)
-      this.drawLegend();
-
-      // Draw the nodes
-      this.drawNodes(transition);
-
-      // Draw the links
-      this.drawLinks(transition);
-
-      // Draw any hovered links
-      this.drawHoveredLinks(transition);
-
-      // Trash any interaction placeholders now that we've used them
-      delete this._expandedParentCoords;
-      delete this._collapsedParent;
-    }
+  initKey () {
+    const self = this;
+    const r = 0.75 * self.mainGlyphRadius;
+    this.d3el.selectAll('[data-eval-type]').each(function () {
+      d3.select(this.parentNode)
+        .attr('height', 3 * r)
+        .attr('width', 3 * r);
+      d3.select(this)
+        .attr('d', evalTypeGlyph(parseInt(this.dataset.evalType), r))
+        .attr('transform', `translate(${0.5 * r},${1.5 * r})`);
+    });
   }
-  updateLayout (transition) {
+
+  async draw () {
+    await super.draw(...arguments);
+
+    if (this.isLoading) {
+      // Don't draw anything if we're still waiting on something; super.draw
+      // will show a spinner. Instead, ensure that another render() call is
+      // fired when we're finally ready
+      this.ready.then(() => { this.render(); });
+      return;
+    } else if (this.error) {
+      // If there's an upstream error, super.draw will already display an error
+      // message. Don't attempt to draw anything (or we'll probably just add to
+      // the noise of whatever is really wrong)
+      return;
+    }
+
+    const transition = d3.transition()
+      .duration(1000);
+
+    // Figure out how big the SVG should be, and compute node positions
+    const nodeList = this.computeLayout(transition);
+
+    // Draw the legend (also sets up this.currentColorTimeScale)
+    this.drawLegend(nodeList);
+
+    // Draw the nodes
+    this.drawNodes(transition, nodeList);
+
+    // Draw the links
+    this.drawLinks(transition);
+
+    // Draw the extra (shown-on-hover-only) links
+    this.drawExtraLinks(nodeList);
+
+    // Trash any interaction placeholders now that we've used them
+    delete this._expandedParentCoords;
+    delete this._collapsedParent;
+  }
+
+  computeLayout (transition) {
     // Compute the minimum VERTICAL layout (mbostock's example / the d3 docs are
     // really confusing about this), with fixed node sizes / separation—we'll
     // rotate this later
@@ -106,48 +202,84 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       .nodeSize([this.nodeHeight, nodeWidth + this.horizontalPadding])
       .separation(() => this.nodeSeparation);
     layoutGenerator(this.tree);
-    const xDomain = d3.extent(this.tree.descendants(), d => d.x);
-    const yDomain = d3.extent(this.tree.descendants(), d => d.y);
 
-    // Figure out how much space we have to work with. Here we need to deal with
-    // space for each node: we want the x coordinate to correspond to the left
+    // Get where each node wants to be based on the minimum layout; we'll
+    // update later if we have more space
+    const nodeList = this.tree.descendants();
+
+    const xDomain = d3.extent(nodeList, d => d.x);
+    const yDomain = d3.extent(nodeList, d => d.y);
+
+    // Before we mess with sizes, preserve the current scroll position
+    const wrapperElement = this.glEl.node();
+    const initialScrollPosition = {
+      x: wrapperElement.scrollLeft,
+      y: wrapperElement.scrollTop
+    };
+
+    // Figure out how much space we have to work with (i.e. we want to fill the
+    // space if it's more than we need). Temporarily set the SVG to size 0,0 so
+    // we can figure out how much space goldenlayout is giving us
+    this.d3el.attr('width', 0).attr('height');
+    const viewBounds = this.glEl.node().getBoundingClientRect();
+    // Now figure out the minimum space we'll need.
+    // For each node: we want the x coordinate to correspond to the left
     // coordinate of the node (text will flow right), and the y coordinate to
-    // correspond with the center of the node. Also, factor in the
-    // scroll bars + margins.
-    const viewBounds = this.getAvailableSpace();
+    // correspond with the center of the node. Also, factor in the margins and
+    // some space for scroll bars.
     const xRange = [this.margin.left, Math.max(
       // The minimum right-most coordinate (remember the original domain is rotated)
       this.margin.left + yDomain[1] - yDomain[0],
       // How far over it could be if we use the available screen space
       viewBounds.width - this.scrollBarSize - this.wideNodeWidth - this.margin.right
     )];
-    const yRange = [this.margin.top + this.nodeHeight / 2, Math.max(
+    const yRange = [this.margin.top + this.legendHeight + this.nodeHeight / 2, Math.max(
       // The minimum bottom-most coordinate (remember the original domain is rotated)
-      this.margin.top + this.nodeHeight / 2 + xDomain[1] - xDomain[0],
+      this.margin.top + this.legendHeight + this.nodeHeight / 2 + xDomain[1] - xDomain[0],
       // How far down it could be if we use the available screen space
       viewBounds.height - this.scrollBarSize - this.nodeHeight / 2 - this.margin.bottom
     )];
 
-    // Update the coordinates
+    // Update the coordinates for each node now that we know how much space we
+    // can use
     const yToX = d3.scaleLinear().domain(yDomain).range(xRange);
     const xToY = d3.scaleLinear().domain(xDomain).range(yRange);
-    for (const node of this.tree.descendants()) {
+    for (const node of nodeList) {
       const temp = node.x;
       node.x = yToX(node.y);
       node.y = xToY(temp);
     }
 
-    // Resize our SVG element to the needed size (overrides the default behavior of SvgViewMixin)
-    this.content.transition(transition)
-      .attr('width', xRange[1] + this.wideNodeWidth + this.margin.right)
-      .attr('height', yRange[1] + this.nodeHeight / 2 + this.margin.bottom);
+    // Resize our SVG element to the needed size
+    const resultingSize = {
+      width: xRange[1] + this.wideNodeWidth + this.margin.right,
+      height: yRange[1] + this.nodeHeight / 2 + this.margin.bottom
+    };
+    this.d3el
+      .attr('width', resultingSize.width)
+      .attr('height', resultingSize.height);
+
+    // Restore the scroll position as best we can
+    if (initialScrollPosition.x + wrapperElement.clientWidth > resultingSize.width) {
+      initialScrollPosition.x = resultingSize.width - wrapperElement.clientWidth;
+    }
+    wrapperElement.scrollLeft = initialScrollPosition.x;
+    if (initialScrollPosition.y + wrapperElement.clientHeight > resultingSize.height) {
+      initialScrollPosition.y = resultingSize.height - wrapperElement.clientHeight;
+    }
+    wrapperElement.scrollTop = initialScrollPosition.y;
+
+    return nodeList;
   }
-  drawLegend () {
+
+  drawLegend (nodeList) {
     // TODO: need to move the color scale stuff to this.linkedState so that
     // other views can use it
-    const colorMap = this.linkedState.timeScale;
-    const times = this.tree.descendants()
-      .map(d => this.linkedState.getPrimitiveDetails(d.data.name).time)
+    const colorMap = this.linkedState.timeScaleColors;
+    const times = nodeList
+      .map(d => this.linkedState.colorMode === 'inclusive'
+        ? d.details.time
+        : d.details.exclusiveTime)
       .filter(d => d !== undefined);
     if (times.length === 0) {
       return; // No time data; don't bother creating the legend
@@ -184,10 +316,23 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       .attr('x', (d, i) => axisScale(windows[i][0]))
       .attr('width', (d, i) => axisScale(windows[i][1]) - axisScale(windows[i][0]))
       .attr('fill', d => d);
+
+    // Update the radio buttons below the legend
+    const self = this;
+    this.d3el.select('.key')
+      .attr('x', this.margin.left)
+      .attr('width', this.legendWidth)
+      .selectAll('input')
+      .on('change.colorModeToggle', function () {
+        self.linkedState.colorMode = this.dataset.mode;
+      }).each(function () {
+        this.checked = this.dataset.mode === self.linkedState.colorMode;
+      });
   }
-  drawNodes (transition) {
-    let nodes = this.content.select('.nodeLayer').selectAll('.node')
-      .data(this.tree.descendants(), d => d.data.name);
+
+  drawNodes (transition, nodeList) {
+    let nodes = this.d3el.select('.nodeLayer').selectAll('.node')
+      .data(nodeList, d => d.data.name);
     const nodesEnter = nodes.enter().append('g').classed('node', true);
     const nodesExit = nodes.exit();
     nodes = nodes.merge(nodesEnter);
@@ -216,8 +361,9 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     nodes.transition(transition)
       .attr('transform', d => `translate(${d.x},${d.y})`)
       .attr('opacity', 1);
+    nodes.classed('selected', d => d.data.name === this.linkedState.selection?.primitiveName);
 
-    // Main glyph (just circles for now)
+    // Main glyph
     const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);
     mainGlyphEnter.append('path').classed('area', true);
     mainGlyphEnter.append('path').classed('outline', true);
@@ -230,24 +376,20 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
     const mainGlyph = nodes.select('.mainGlyph');
     mainGlyph.selectAll('.area')
       .transition(transition)
-      .attr('d', TreeView.GLYPHS.CIRCLE(this.mainGlyphRadius))
-      .attr('fill', d => {
-        const time = this.linkedState.getPrimitiveDetails(d.data.name).time;
-        if (time === undefined) {
-          return 'transparent';
-        } else {
-          return this.currentColorTimeScale(time);
-        }
-      });
+      .attr('d', d => evalTypeGlyph(d.details.eval_direct, this.mainGlyphRadius))
+      .attr('fill', d => d.details.time === undefined
+        ? 'transparent'
+        : this.currentColorTimeScale(this.linkedState.colorMode === 'inclusive'
+          ? d.details.time
+          : d.details.exclusiveTime));
     mainGlyph.selectAll('.outline')
       .transition(transition)
-      .attr('d', TreeView.GLYPHS.CIRCLE(1.25 * this.mainGlyphRadius))
-      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`)
-      .style('stroke', d => this.linkedState.selectedPrimitive === d.data.name ? this.linkedState.selectionColor : null);
+      .attr('d', d => evalTypeGlyph(d.details.eval_direct, 1.25 * this.mainGlyphRadius))
+      .attr('transform', `translate(${-0.25 * this.mainGlyphRadius})`);
     mainGlyph.selectAll('.unknownValue')
       .transition(transition)
       .style('opacity', d => {
-        return this.linkedState.getPrimitiveDetails(d.data.name).time === undefined ? 1 : 0;
+        return d.details.time === undefined ? 1 : 0;
       });
 
     // Node label
@@ -256,9 +398,8 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       .attr('x', 2 * this.mainGlyphRadius)
       .attr('y', this.mainGlyphRadius)
       .text(d => {
-        const details = this.linkedState.getPrimitiveDetails(d.data.name);
         // Use display_name if available, but if not (e.g. we only have trace data), use its full name
-        return details.display_name || details.name;
+        return d.details.display_name || d.data.name;
       });
     nodes.select('.nodeLabel')
       .attr('opacity', d => {
@@ -267,11 +408,11 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
 
     // Collapse / expand glyph
     const expanderGlyphEnter = nodesEnter.append('g').classed('expander', true)
-      .attr('transform', `translate(${2 * this.mainGlyphRadius},${-this.mainGlyphRadius})`);
+      .attr('transform', `translate(${2 * this.mainGlyphRadius},${-2 * this.expanderRadius})`);
     expanderGlyphEnter.append('path').classed('area', true);
     expanderGlyphEnter.append('path').classed('outline', true);
     nodes.select('.expander').selectAll('.area, .outline')
-      .on('click', d => {
+      .on('click', (event, d) => {
         // Hide / show the children
         if (d._children) {
           d.children = d._children;
@@ -288,7 +429,7 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
           this._collapsedParent = d;
         }
         this.render();
-        d3.event.stopPropagation();
+        event.stopPropagation();
       }).transition(transition)
       .attr('d', d => {
         if (d._children) {
@@ -305,34 +446,45 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
 
     // Main interactions
     const self = this;
-    nodes.classed('selected', d => this.linkedState.selectedPrimitive === d.data.name)
-      .on('click', d => {
-        this.linkedState.selectPrimitive(d.data.name);
-      }).on('mouseenter', function (d) {
-        const primitive = self.linkedState.getPrimitiveDetails(d.data.name);
-        if (!primitive) {
-          console.warn(`Can't find primitive of name: ${d.data.name}`);
+    nodes
+      .on('click', (event, d) => {
+        if (this.linkedState.selection?.primitiveName === d.data.name) {
+          // Deselect
+          this.linkedState.selection = null;
         } else {
-          window.controller.tooltip.show({
-            content: `<pre>${d.data.name}: ${JSON.stringify(primitive, null, 2)}</pre>`,
-            targetBounds: this.getBoundingClientRect(),
-            hideAfterMs: null
-          });
-          d3.selectAll('.hoveredLinks').filter(hlink => {
-            if ((d.x == hlink.x) && (d.y == hlink.y)) {
-              return true;
-            }
-            return false;
-          }).style("stroke", "#ffd92f")
-            .style("opacity", 0.75);
+          // Select the clicked primitive
+          this.linkedState.selectPrimitive(d.data.name);
         }
+      }).on('mouseenter', function (event, d) {
+        const label = d.details.display_name || d.data.name;
+        let time = self.linkedState.colorMode === 'inclusive'
+          ? d.details?.time
+          : d.details?.exclusiveTime;
+        if (time === undefined) {
+          time = '(no time data)';
+        } else {
+          time = prettyPrintTime(time);
+        }
+        uki.showTooltip({
+          content: `${label}: ${time}`,
+          targetBounds: this.getBoundingClientRect(),
+          interactive: false,
+          hideAfterMs: 1000,
+          anchor: { x: -1, y: -1 } // if there's space, put tooltips above and to the left
+        });
+        d3.select('.extraLinkLayer').selectAll('.link')
+          .classed('hovered', link => {
+            return link.source.data.name === d.data.name ||
+              link.target.data.name === d.data.name;
+          });
       }).on('mouseleave', () => {
-        window.controller.tooltip.hide();
-        d3.selectAll('.hoveredLinks').style("opacity", 0);
+        d3.select('.extraLinkLayer').selectAll('.link')
+          .classed('hovered', false);
       });
   }
+
   drawLinks (transition) {
-    let links = this.content.select('.linkLayer').selectAll('.link')
+    let links = this.d3el.select('.linkLayer').selectAll('.link')
       .data(this.tree.links(), d => d.source.data.name + d.target.data.name);
     const linksEnter = links.enter().append('path').classed('link', true);
     const linksExit = links.exit();
@@ -344,7 +496,8 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       return `\
         M${source.x + 2 * this.mainGlyphRadius},${source.y}\
         L${source.x + this.nodeWidth},${source.y}\
-        C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`;
+        C${curveX},${source.y},${curveX},${target.y},${target.x},${target.y}`
+        .replace(/\s/g, '');
     };
     linksEnter
       .attr('opacity', 0)
@@ -375,108 +528,46 @@ class TreeView extends SvgViewMixin(LinkedMixin(GoldenLayoutView)) {
       });
   }
 
-  drawHoveredLinks (transition) {
-    var state = this.linkedState;
-    var allNodes = this.tree.descendants();
-
-    d3.selectAll('.hoveredLinks').remove();
-
-    // Find each node's matches and add the coordinates to the list myMatches
-    var allMatches = allNodes.forEach(function(source){
-        source.myMatches = [];
-        var startx = source.x;
-        var starty = source.y; 
-        source.myMatches.push({x: startx, y: starty});
-
-        // Helper function to get important part of the variable/function/primitive's name
-        const getImportantName = displayName => {
-          var name = "";
-          if ((displayName) && (
-            (displayName.includes("define-variable")) ||
-            (displayName.includes("variable")) ||
-            (displayName.includes("access-variable")) ||
-            (displayName.includes("access-argument")) ||
-            (displayName.includes("access-function")))) {
-            name = displayName.split("/")[1].split("(")[0];
-          }
-          return name;
+  drawExtraLinks (nodeList) {
+    // Create links based on common references to variables
+    const allMatches = {};
+    const linkList = [];
+    const variableNameMatcher = /(?:(?:variable)|(?:access-argument)|(?:access-function))\/([^(]*)\(/;
+    for (const node of nodeList) {
+      const referencedVariable = node.details.display_name?.match(variableNameMatcher)?.[1];
+      if (referencedVariable) {
+        allMatches[referencedVariable] = allMatches[referencedVariable] || [];
+        // Add this reference, and any links to any other references
+        for (const priorReferenceNode of allMatches[referencedVariable]) {
+          linkList.push({
+            source: node,
+            target: priorReferenceNode
+          });
         }
-
-        if (source.data.name) {
-
-          var importantName = "";
-          const displayName = state.getPrimitiveDetails(source.data.name).display_name;
-          if (displayName) importantName = getImportantName(displayName);
-
-          // Find the nodes that match my name
-          allNodes.forEach(function(dest){
-
-            var otherImportantName = "";
-            const otherDisplayName = state.getPrimitiveDetails(dest.data.name).display_name;
-            if (otherDisplayName) otherImportantName = getImportantName(otherDisplayName);
-
-            if (importantName && (importantName == otherImportantName) ){
-              var edge_data = {x: dest.x, y: dest.y};
-              source.myMatches.push(edge_data);
-              source.myMatches.push({x: startx, y: starty});
-            }  
-          })
-        }
-        return source.myMatches;
-    });
-
-    // Now any source node in allNodes has the attribute source.myMatches
-    //console.log(allNodes[3].myMatches);
-    
-    let hoveredLinks = this.content.select('.nodeLayer').selectAll('.node')
-      .data(allNodes, d => d.myMatches);
-    const hLinksEnter = hoveredLinks.enter().append('path').classed('hoveredLinks', true);
-    const hLinksExit = hoveredLinks.exit();
-
-    // Helper function for computing the paths
-    const pathToMatches = listOfCoords => {
-      var path = '';
-      for (var i=0; i<listOfCoords.length; i++) {
-        if (i % 2 == 1) path += 'L ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
-        if (i % 2 == 0) path += 'M ' + listOfCoords[i].x + ' ' + listOfCoords[i].y + ' ';
+        allMatches[referencedVariable].push(node);
       }
-      return path;
     }
-    hLinksEnter
-    .attr("class", "hoveredLinks")
-    .style("stroke", "#ffd92f")
-    .style("stroke-width", "3px")
-    .style("opacity", 0)
-    .attr("d", link => {
-      return pathToMatches(link.myMatches);
-    });
+
+    let links = this.d3el.select('.extraLinkLayer').selectAll('.link')
+      .data(linkList, d => d.source.data.name + d.target.data.name);
+    const linksEnter = links.enter().append('path').classed('link', true);
+    links.exit().remove();
+    links = links.merge(linksEnter);
+
+    // Helper function for computing custom paths:
+    const computePath = (source, target) => {
+      return `\
+        M${source.x + this.mainGlyphRadius},${source.y}\
+        L${target.x + this.mainGlyphRadius},${target.y}`
+        .replace(/\s/g, '');
+    };
+    links.classed('hovered', false)
+      .attr('d', link => {
+        // Animate to the correct locations
+        return computePath(link.source, link.target);
+      });
   }
 }
+TreeView.GLYPHS = GLYPHS;
 
-
-
-TreeView.COLOR_MAPS = {
-  INCLUSIVE: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'], // purple
-  EXCLUSIVE: ['#edf8fb', '#b2e2e2', '#66c2a4', '#2ca25f', '#006d2c'], // green
-  DIFFERENCE: ['#ca0020', '#f4a582', '#f7f7f7', '#92c5de', '#0571b0'] // diverging red blue
-};
-TreeView.GLYPHS = {
-  CIRCLE: r => `\
-M${r},${-r}\
-A${r},${r},0,0,0,${r},${r}\
-A${r},${r},0,0,0,${r},${-r}\
-Z`,
-  COLLAPSED_TRIANGLE: r => `\
-M0,0\
-L${2 * r},${r}\
-L0,${2 * r}\
-L${r},${r}\
-Z`,
-  EXPANDED_TRIANGLE: r => `\
-M${2 * r},0\
-L0,${r}\
-L${2 * r},${2 * r}\
-L${r},${r}\
-Z`
-};
 export default TreeView;

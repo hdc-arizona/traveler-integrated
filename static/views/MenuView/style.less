@@ -1,0 +1,252 @@
+.MenuView {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  bottom: 0px;
+
+  padding: 1em;
+
+  width: calc(var(--collapsed-menu-width) - 2em);
+  transition: width 0.5s;
+  &.expanded {
+    width: calc(var(--expanded-menu-width) - 2em);
+  }
+
+  background-color: var(--background-color-richer);
+
+  display: flex;
+  flex-direction: column;
+
+  hr {
+    width: 100%;
+    margin-top: 0.5em;
+    margin-bottom: 1em;
+  }
+
+  .main.button, .toggleExpand.button, hr, .tagHeaderWrapper, .viewMode.button {
+    flex-grow: 0;
+  }
+  .datasetWrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  .tagHeaderWrapper {
+    width: 100%;
+    min-height: 3em;
+    padding-top: 5em;
+    overflow-y: hidden;
+    overflow-x: auto;
+    position: relative;
+
+    .headerOptions {
+      position: absolute;
+      left: 1px;
+      top: 1px;
+      line-height: 1em;
+      height: 2.5em;
+
+      img {
+        width: 1em;
+        height: 1em;
+      }
+    }
+
+    .tagHeader {
+      display: flex;
+      width: fit-content;
+      padding-left: 2em;
+      padding-bottom: 1em;
+      padding-right: calc(var(--collapsed-menu-width) - 3em);
+
+      .tag {
+        margin-left: 0.5em;
+        width: 2.5em;
+        cursor: pointer;
+        position: relative;
+
+        .label {
+          position: absolute;
+          transform-origin: 0% 100%;
+          transform: rotate(-45deg);
+          background-color: var(--text-color);
+          color: var(--background-color);
+          padding: 0 0.5em;
+          border-left: 1px solid var(--text-color);
+          white-space: nowrap;
+          &:before {
+            position: absolute;
+            transform: rotate(45deg);
+            left: -9.75px;
+            top: 3.25px;
+            content: ' ';
+            width: 0;
+            height: 0;
+            border-bottom: 18px solid var(--text-color);
+            border-right: 18px solid transparent;
+          }
+        }
+
+        &:hover .label {
+          background-color: var(--text-color-softer);
+          border-left: 1px solid var(--text-color-softer);
+          color: var(--background-color-softer);
+          &:before {
+            border-bottom: 18px solid var(--text-color-softer);
+          }
+        }
+        &.filtered .label {
+          background-color: var(--background-color);
+          border-left: 1px solid var(--background-color);
+          color: var(--disabled-color);
+          &:before {
+            border-bottom: 18px solid var(--background-color);
+          }
+        }
+        &.filtered:hover .label {
+          background-color: var(--background-color-softer);
+          border-left: 1px solid var(--background-color-softer);
+          color: var(--text-color-softer);
+          &:before {
+            border-bottom: 18px solid var(--background-color-softer);
+          }
+        }
+        &.tagAdder .label {
+          background-color: var(--accent-color);
+          border-left: 1px solid var(--accent-color);
+          color: var(--inverted-shadow-color);
+          &:before {
+            border-bottom: 18px solid var(--accent-color);
+          }
+        }
+        &.tagAdder:hover .label {
+          background-color: var(--accent-color-hover);
+          border-left: 1px solid var(--accent-color-hover);
+          color: var(--inverted-shadow-color);
+          &:before {
+            border-bottom: 18px solid var(--accent-color-hover);
+          }
+        }
+      }
+    }
+  }
+
+  .underlay {
+    position: absolute;
+    max-width: calc(100% - var(--collapsed-menu-width) + 3em);
+    overflow: hidden;
+    svg {
+      position: relative;
+
+      .lines path {
+        stroke: var(--background-color-softer);
+        fill: none;
+      }
+      .circles circle {
+        fill: var(--background-color-richer);
+        stroke: var(--background-color-softer);
+        cursor: pointer;
+
+        &:hover {
+          fill: var(--text-color-softer);
+        }
+
+        &.present {
+          fill: var(--text-color);
+
+          &:hover {
+            fill: var(--background-color-softer);
+          }
+        }
+      }
+    }
+  }
+
+  .datasetList {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: relative;
+    &.enableClickThrough {
+      pointer-events: none;
+    }
+    .dataset {
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 0.5em;
+      .folderStuff {
+        display: flex;
+        pointer-events: all;
+        .opener {
+          display: none;
+          cursor: pointer;
+          height: 0.75em;
+          line-height: 0.75em;
+          width: 0.75em;
+          position: relative;
+          top: 0.3em;
+          padding-top: 0.1em;
+          left: -0.5em;
+          border: 1px solid var(--background-color-softer);
+          background-color: var(--background-color-richer);
+          text-align: center;
+        }
+        .icon {
+          width: 1em;
+          margin-right: 0.5em;
+          filter: url(#recolorImageTo--text-color-softer);
+          cursor: grab;
+        }
+        .label {
+          margin-right: 0.5em;
+        }
+      }
+      &.isFolder {
+        justify-content: flex-start;
+
+        .folderStuff {
+          .opener {
+            display: initial;
+          }
+        }
+      }
+      &.dragTarget {
+        background: var(--text-color-softer);
+        color: var(--background-color-richer);
+        .icon {
+          filter: url(#recolorImageTo--background-color-richer);
+        }
+      }
+      .button {
+        flex-grow: 1;
+        margin: 0;
+        pointer-events: all;
+        &:not(.button-primary):not(.button-disabled) {
+          /* force an opaque background because the button looks weird when the dataset is a drag target */
+          background-color: var(--background-color-richer);
+        }
+      }
+      .spinner {
+        width: 1em;
+        height: 1em;
+        filter: url(#recolorImageTo--inverted-shadow-color);
+        animation-name: spinnerKeyframes;
+        animation-duration: 2000ms;
+        animation-iteration-count: infinite;
+        animation-timing-function: linear;
+      }
+    }
+  }
+  &.expanded .datasetList .dataset .button {
+    flex-grow: 0;
+  }
+}
+
+@keyframes spinnerKeyframes {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

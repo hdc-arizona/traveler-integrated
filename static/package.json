@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "description": "An integrated visualization system for connecting OTF2 stack traces and aggregate expression trees",
   "scripts": {
-    "serve": "serve ."
+    "lint": "eslint '**/*.js' --quiet",
+    "lintFix": "eslint '**/*.js' --fix"
   },
   "repository": {
     "type": "git",
@@ -15,14 +16,43 @@
     "url": "https://github.com/alex-r-bigelow/traveler-integrated/issues"
   },
   "homepage": "https://github.com/alex-r-bigelow/traveler-integrated#readme",
+  "eslintConfig": {
+    "extends": "standard",
+    "rules": {
+      "semi": [
+        2,
+        "always"
+      ],
+      "no-extra-semi": 2,
+      "semi-spacing": [
+        2,
+        {
+          "before": false,
+          "after": true
+        }
+      ]
+    },
+    "globals": {
+      "globalThis": false
+    }
+  },
   "dependencies": {
-    "codemirror": "^5.48.0",
-    "d3": "^5.9.7",
-    "golden-layout": "^1.5.9",
-    "jquery": "^3.4.1",
-    "less": "^3.9.0",
-    "oboe": "^2.1.4",
-    "serve": "^11.0.2",
-    "uki": "^0.3.0"
+    "@ukijs/ui": "^0.2.5",
+    "codemirror": "^5.60.0",
+    "d3": "^6.6.1",
+    "golden-layout": "1.5.9",
+    "jquery": "^3.6.0",
+    "less": "^4.1.1",
+    "oboe": "^2.1.5",
+    "uki": "^0.7.9"
+  },
+  "devDependencies": {
+    "eslint": "^7.22.0",
+    "eslint-config-semistandard": "^15.0.1",
+    "eslint-config-standard": "^16.0.2",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.3.1",
+    "eslint-plugin-standard": "^5.0.0"
   }
 }

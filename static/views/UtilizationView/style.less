@@ -1,8 +1,7 @@
-@import '../../style/colors.less';
-
 .UtilizationView {
   text {
     font: 9px sans-serif;
+    fill: var(--text-color);
   }
   .chart {
     cursor: crosshair;
@@ -10,21 +9,28 @@
   .background rect {
     fill: transparent;
   }
-  .cursor {
-    stroke-width: 1px;
-    stroke: @separatorColor;
-  }
   .outline {
     fill: none;
     stroke-width: 1px;
   }
   .area {
     stroke: none;
-    opacity: 0.25;
   }
-  .overview {
-    .outline { stroke: @overviewColor; }
-    .area { fill: @overviewColor; }
+  .totalUtilization {
+    .outline {
+      stroke: var(--text-color-softer);
+    }
+    .area {
+      fill: var(--disabled-color);
+    }
+  }
+  .selectionUtilization {
+    .outline {
+      stroke: var(--selection-border-color);
+    }
+    .area {
+      fill: var(--selection-color);
+    }
   }
   .brush {
     cursor: grab;
@@ -32,8 +38,13 @@
       cursor: grabbing;
     }
 
-    .outline { stroke: @brushColor; }
-    .area { fill: @brushColor; }
+    .outline {
+      stroke: var(--border-color-richer);
+    }
+    .area {
+      fill: var(--border-color-softer);
+      opacity: 0.25;
+    }
 
     .hoverTarget {
       fill: transparent;

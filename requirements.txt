@@ -1,10 +1,10 @@
 newick>=1.0.0
 blist>=1.3.6
 aiofiles>=0.5.0
-fastapi>=0.60.0
-uvicorn>=0.11.7
+fastapi==0.60.0
+uvicorn==0.11.7
 python-multipart>=0.0.5
 diskcache>=4.1.0
 numpy>=1.19.1
 cffi>=1.14.1
-git+https://github.com/alex-r-bigelow/intervaltree.git@master#egg=intervaltree
+git+git://github.com/alex-r-bigelow/intervaltree@master

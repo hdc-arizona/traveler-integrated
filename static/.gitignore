@@ -12,6 +12,14 @@ node_modules/uki/*
 node_modules/uki/dist/*
 !node_modules/uki/dist/uki.esm.js
 
+!node_modules/@ukijs/
+node_modules/@ukijs/*
+!node_modules/@ukijs/ui/
+node_modules/@ukijs/ui/*
+!node_modules/@ukijs/ui/dist/
+node_modules/@ukijs/ui/dist/*
+!node_modules/@ukijs/ui/dist/uki-ui.esm.js
+
 !node_modules/d3/
 node_modules/d3/*
 !node_modules/d3/dist/
@@ -66,4 +74,5 @@ node_modules/codemirror/addon/selection/*
 !node_modules/codemirror/addon/selection/active-line.js
 !node_modules/codemirror/theme/
 node_modules/codemirror/theme/*
+!node_modules/codemirror/theme/base16-dark.css
 !node_modules/codemirror/theme/base16-light.css

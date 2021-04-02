@@ -1,0 +1,29 @@
+.ZoomableTimelineView {
+  .eventCapturer {
+    cursor: grab;
+    touch-action: none; /* Don't zoom the browser when the user pinches */
+    &:active {
+      cursor: grabbing;
+    }
+  }
+  text {
+    font: 9px sans-serif;
+    fill: var(--text-color);
+  }
+  .yAxis line {
+    stroke-weight: 1px;
+    stroke: var(--border-color);
+  }
+  foreignObject {
+    /* overflow-y set by javascript */
+    overflow-x: hidden;
+    canvas {
+      position: absolute;
+    }
+  }
+}
+.xFakeScroller {
+  position: absolute;
+  overflow-y: hidden;
+  /* overflow-x set by javascript */
+}

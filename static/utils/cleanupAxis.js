@@ -9,7 +9,7 @@ const methods = {
 
 export default function cleanupAxis (container, method = 'parity') {
   method = methods[method];
-  let hiddenLabels = [];
+  const hiddenLabels = [];
   let visibleLabels = container.selectAll('.tick text').nodes()
     .map(element => {
       return {

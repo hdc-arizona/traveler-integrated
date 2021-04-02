@@ -3,7 +3,6 @@ import copy
 
 import numpy as np
 import json
-from .loggers import logToConsole
 from profiling_tools._cCalcBin import ffi, lib
 
 class SparseUtilizationList():
@@ -19,6 +18,29 @@ class SparseUtilizationList():
 
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
+
+    def finalize(self, allLocations):
+        for loc in allLocations:
+            if loc in self.locationDict:
+                self.sortAtLoc(loc)
+            self.locationDict[loc] = np.array(self.locationDict.get(loc, []))
+
+            length = len(self.locationDict[loc])
+            counter = 0
+            for i, criticalPt in enumerate(self.locationDict[loc]):
+                counter += criticalPt['counter']
+                criticalPt['counter'] = counter
+                if i == 0:
+                    criticalPt['util'] = self.calcCurrentUtil(criticalPt['index'], None)
+                else:
+                    criticalPt['util'] = self.calcCurrentUtil(criticalPt['index'], self.locationDict[loc][i-1])
+
+            locStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
+            for i in range(length):
+                locStruct['index'][i] = self.locationDict[loc][i]['index']
+                locStruct['counter'][i] = self.locationDict[loc][i]['counter']
+                locStruct['util'][i] = self.locationDict[loc][i]['util']
+            self.setCLocation(loc, locStruct)
 
     def calcCurrentUtil(self, index, prior):
         if prior is None:
@@ -74,10 +96,6 @@ class SparseUtilizationList():
         maxArray = np.amax(array, axis=0)
         stdArray = np.std(array, axis=0)
         return {"min": minArray.tolist(), "max": maxArray.tolist(), "average": avgArray.tolist(), "std": stdArray.tolist()}
-
-    # Calculates histogram for interval duration
-    def calcIntervalHistogram(self, bins=100, begin=None, end=None):
-        return self.calcUtilizationForLocation(bins, begin, end, 1, False)
 
     # Calculates utilization for one location in a Gantt chart
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart
@@ -172,113 +190,3 @@ class SparseUtilizationList():
 
             preCriticalPts = criticalPts
         return primitiveCountPerBin.tolist()
-
-
-# In charge of loading interval data into our integral list
-# I have no idea how we want to load interval data :/
-async def loadSUL(label, db, log=logToConsole):
-    await log('Loading sparse utilization list.')
-
-    # create sul obj
-    sul = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'intervalDuration': dict()}
-    begin = db[label]['meta']['intervalDomain'][0]
-    end = db[label]['meta']['intervalDomain'][1]
-    preMetricValue = dict()
-    intervalDuration = dict()
-
-    def updateSULForInterval(event, cur_location):
-        if 'metrics' in event:
-            for k, value in event['metrics'].items():
-                if k not in sul['metrics']:
-                    sul['metrics'][k] = SparseUtilizationList()
-                    preMetricValue[k] = {'Timestamp': 0, 'Value': 0}
-                current_rate = (value - preMetricValue[k]['Value']) / (event['Timestamp'] - preMetricValue[k]['Timestamp'])
-                sul['metrics'][k].setIntervalAtLocation({'index': int(event['Timestamp']), 'counter': 0, 'util': current_rate}, cur_location)
-                preMetricValue[k]['Timestamp'] = event['Timestamp']
-                preMetricValue[k]['Value'] = value
-
-    def updateIntervalDuration(event):
-        duration = event['leave']['Timestamp'] - event['enter']['Timestamp']
-        if "Primitive" in event:
-            if event['Primitive'] in intervalDuration:
-                if duration in intervalDuration[event['Primitive']]:
-                    intervalDuration[event['Primitive']][duration] = intervalDuration[event['Primitive']][duration] + 1
-                else:
-                    intervalDuration[event['Primitive']][duration] = 1
-            else:
-                intervalDuration[event['Primitive']] = dict()
-                intervalDuration[event['Primitive']][duration] = 1
-
-    # we extract relevant data from database
-    for loc in db[label]['intervalIndexes']['locations']:
-        counter = 0
-        for i in db[label]['intervalIndexes']['locations'][loc].iterOverlap(begin, end):
-            primitive_name = db[label]['intervals'][i.data]['Primitive']
-            sul['intervals'].setIntervalAtLocation({'index': int(i.begin), 'counter': 1, 'util': 0, 'primitive': primitive_name}, loc)
-            sul['intervals'].setIntervalAtLocation({'index': int(i.end), 'counter': -1, 'util': 0, 'primitive': primitive_name}, loc)
-            updateSULForInterval(db[label]['intervals'][i.data]['enter'], loc)
-            updateSULForInterval(db[label]['intervals'][i.data]['leave'], loc)
-            updateIntervalDuration(db[label]['intervals'][i.data])
-
-        sul['intervals'].sortAtLoc(loc)
-        sul['intervals'].locationDict[loc] = np.array(sul['intervals'].locationDict[loc])
-        for key in sul['metrics']:
-            sul['metrics'][key].sortAtLoc(loc)
-            sul['metrics'][key].locationDict[loc] = np.array(sul['metrics'][key].locationDict[loc])
-
-        length = len(sul['intervals'].locationDict[loc])
-        for i, criticalPt in enumerate(sul['intervals'].locationDict[loc]):
-            counter += criticalPt['counter']
-            criticalPt['counter'] = counter
-            if i is 0:
-                criticalPt['util'] = sul['intervals'].calcCurrentUtil(criticalPt['index'], None)
-            else:
-                criticalPt['util'] = sul['intervals'].calcCurrentUtil(criticalPt['index'], sul['intervals'].locationDict[loc][i-1])
-
-        locStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
-        for i in range(length):
-            locStruct['index'][i] = sul['intervals'].locationDict[loc][i]['index']
-            locStruct['counter'][i] = sul['intervals'].locationDict[loc][i]['counter']
-            locStruct['util'][i] = sul['intervals'].locationDict[loc][i]['util']
-
-        sul['intervals'].setCLocation(loc, locStruct)
-        # print("interval loc struct initiated")
-
-        for key in sul['metrics']:
-            length = len(sul['metrics'][key].locationDict[loc])
-            mlocStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
-            for i in range(length):
-                mlocStruct['index'][i] = sul['metrics'][key].locationDict[loc][i]['index']
-                mlocStruct['counter'][i] = sul['metrics'][key].locationDict[loc][i]['counter']
-                mlocStruct['util'][i] = sul['metrics'][key].locationDict[loc][i]['util']
-
-            sul['metrics'][key].setCLocation(loc, mlocStruct)
-        # print("metric loc struct initiated")
-
-    dummyLocation = 1
-    intervalDurationDomainDict = dict()
-    for primitive in intervalDuration:
-        sul['intervalDuration'][primitive] = SparseUtilizationList()
-        for ind, value in intervalDuration[primitive].items():
-            sul['intervalDuration'][primitive].setIntervalAtLocation({'index': int(ind), 'counter': 0, 'util': value}, dummyLocation)
-
-        sul['intervalDuration'][primitive].sortAtLoc(dummyLocation)
-        length = len(sul['intervalDuration'][primitive].locationDict[dummyLocation])
-        intervalDurationDomainDict[primitive] = [
-            sul['intervalDuration'][primitive].locationDict[dummyLocation][0]['index'],
-            sul['intervalDuration'][primitive].locationDict[dummyLocation][length-1]['index']
-        ]
-        sul['intervalDuration'][primitive].locationDict[dummyLocation] = np.array(sul['intervalDuration'][primitive].locationDict[dummyLocation])
-        LS = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
-        for i in range(length):
-            LS['index'][i] = sul['intervalDuration'][primitive].locationDict[dummyLocation][i]['index']
-            LS['counter'][i] = sul['intervalDuration'][primitive].locationDict[dummyLocation][i]['counter']
-            LS['util'][i] = sul['intervalDuration'][primitive].locationDict[dummyLocation][i]['util']
-            if i > 0:
-                LS['util'][i] = LS['util'][i] + LS['util'][i-1]
-
-        sul['intervalDuration'][primitive].setCLocation(dummyLocation, LS)
-    db[label]['meta']['intervalDurationDomain'] = intervalDurationDomainDict
-    db[label]['sparseUtilizationList'] = sul
-
-    return

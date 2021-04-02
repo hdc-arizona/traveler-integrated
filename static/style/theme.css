@@ -1,0 +1,101 @@
+:root {
+  /* Default UI light theme: light background, dark text, blue accent, red-orange error color */
+	--theme-hue: 0;					/* white */
+	--accent-hue: 266;			/* purple */
+  --error-hue: 329;        /* pink */
+
+	--text-color-richer: hsl(var(--theme-hue), 0%, 5%);
+	--text-color: hsl(var(--theme-hue), 0%, 13%);
+	--text-color-softer: hsl(var(--theme-hue), 0%, 33%);
+
+  --error-color: hsl(var(--error-hue), 86%, 57%);
+
+  --accent-color: hsl(var(--accent-hue), 86%, 57%);
+  --accent-color-hover: hsl(var(--accent-hue), 76%, 49%);
+  --accent-color-disabled: hsl(var(--accent-hue), 90%, 80%);
+
+  --disabled-color: hsl(var(--theme-hue), 0%, 75%);
+
+  --border-color-richer: hsl(var(--theme-hue), 0%, 57%);
+  --border-color: hsl(var(--theme-hue), 0%, 73%);
+	--border-color-softer: hsl(var(--theme-hue), 0%, 82%);
+
+	--background-color: hsl(var(--theme-hue), 0%, 98%);
+	--background-color-softer: hsl(var(--theme-hue), 0%, 95%);
+  --background-color-richer: white;
+
+  --shadow-color: black;
+  --shadow-color-rgb: 0, 0, 0;
+
+	--inverted-shadow-color: white;
+
+  /* Note: Skeleton was based off a 10px font sizing for REM  */
+	/* 62.5% of typical 16px browser default = 10px */
+	--base-font-size: 62.5%;
+
+	/* Some more additions over Skeleton for configurable typography */
+	--base-font-family: "Raleway", "HelveticaNeue", "Helvetica Neue", Helvetica, Arial, sans-serif;
+	--base-font-weight: 400;
+	--heavy-font-weight: 600;
+	--light-font-weight: 300;
+
+  /* Button and input field height, rounded corners */
+  --form-element-height: 38px;
+  --corner-radius: 4px;
+
+  /* Traveler-specific color schemes; TODO: do we need to tweak for dark mode? */
+	--selection-color: #e6ab02; /* yellow */
+	--selection-border-color: #a67b00;
+
+  /* Inclusive mode color scheme: purples scale */
+  --inclusive-color-0: #f2f0f7; /* lighest purple */
+  --inclusive-color-1: #cbc9e2;
+  --inclusive-color-2: #9e9ac8;
+  --inclusive-color-3: #756bb1;
+  --inclusive-color-4: #54278f; /* darkest purple */
+
+  /* Exclusive mode color scheme: greens scale */
+  --exclusive-color-0: #edf8fb; /* lighest green */
+  --exclusive-color-1: #b2e2e2;
+  --exclusive-color-2: #66c2a4;
+  --exclusive-color-3: #2ca25f;
+  --exclusive-color-4: #006d2c; /* darkest green */
+
+  /* Difference mode color scheme: diverging red-blue scale */
+  --diverging-color-0: #ca0020; /* saturated red */
+  --diverging-color-1: #f4a582;
+  --diverging-color-2: #f7f7f7; /* near-white */
+  --diverging-color-3: #92c5de;
+  --diverging-color-4: #0571b0; /* saturated blue */
+}
+
+/* Dark Theme */
+@media screen and (prefers-color-scheme: dark) {
+	:root {
+		/* dark UI theme: override for dark background, light text, slightly adjust accent / error saturation, lightness */
+		--text-color-richer: hsl(var(--theme-hue), 0%, 95%);
+		--text-color: hsl(var(--theme-hue), 0%, 80%);
+		--text-color-softer: hsl(var(--theme-hue), 0%, 67%);
+
+		--error-color: hsl(var(--error-hue), 76%, 49%);
+
+		--accent-color: hsl(var(--accent-hue), 76%, 49%);
+		--accent-color-hover: hsl(var(--accent-hue), 86%, 57%);
+		--accent-color-disabled: hsl(var(--accent-hue), 90%, 80%);
+
+    --disabled-color: hsl(var(--theme-hue), 0%, 35%);
+
+		--border-color-richer: hsl(var(--theme-hue), 0%, 67%);
+		--border-color: hsl(var(--theme-hue), 0%, 27%);
+		--border-color-softer: hsl(var(--theme-hue), 0%, 20%);
+
+		--background-color: hsl(var(--theme-hue), 0%, 12%);
+		--background-color-softer: hsl(var(--theme-hue), 0%, 18%);
+		--background-color-richer: hsl(var(--theme-hue), 0%, 5%);
+
+    --shadow-color: black;
+    --shadow-color-rgb: 0, 0, 0;
+
+		--inverted-shadow-color: white;
+  }
+}

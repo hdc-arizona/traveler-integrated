@@ -1,39 +1,85 @@
-/* globals CodeMirror */
-import GoldenLayoutView from '../common/GoldenLayoutView.js';
+/* globals uki, CodeMirror */
 import LinkedMixin from '../common/LinkedMixin.js';
 
-class CodeView extends LinkedMixin(GoldenLayoutView) {
-  constructor (argObj) {
-    argObj.resources.push({ type: 'less', url: `views/CodeView/style.less` });
-    super(argObj);
-  }
-  get mode () {
-    throw new Error('This function should be overridden to return an appropriate codeMirror mode');
-  }
-  setup () {
-    super.setup();
+class CodeView extends LinkedMixin(uki.ui.GLView) {
+  constructor (options) {
+    options.resources = options.resources || [];
+    options.resources.push(...[
+      { type: 'less', url: 'views/CodeView/style.less' },
+      { type: 'css', url: 'node_modules/codemirror/lib/codemirror.css' },
+      { type: 'css', url: 'node_modules/codemirror/theme/base16-dark.css' },
+      { type: 'css', url: 'node_modules/codemirror/theme/base16-light.css' },
+      { type: 'json', url: `/datasets/${options.glState.datasetId}/${options.glState.variant}`, name: 'code' }
+    ]);
+    super(options);
 
-    this.codeMirror = CodeMirror(this.content.node(), {
-      theme: 'base16-light',
+    this.codeType = options.glState.variant;
+
+    switch (this.codeType) {
+      case 'cpp': this.mode = 'clike'; break;
+      case 'physl': this.mode = 'scheme'; break;
+      case 'python': this.mode = 'python'; break;
+    }
+
+    window.matchMedia?.('(prefers-color-scheme: dark)')
+      ?.addEventListener('change', () => { this.render(); });
+  }
+
+  get title () {
+    return this.codeType[0].toLocaleUpperCase() + this.codeType.slice(1);
+  }
+
+  get isLoading () {
+    return super.isLoading || (this.linkedState?.info?.sourceFiles || [])
+      .find(d => d.fileType === this.codeType)?.stillLoading;
+  }
+
+  setupD3El () {
+    return this.glEl.append('div');
+  }
+
+  async setup () {
+    await super.setup(...arguments);
+
+    this.d3el.classed('CodeView', true);
+
+    this.codeMirror = CodeMirror(this.d3el.node(), {
       mode: this.mode,
       lineNumbers: true,
       styleActiveLine: true,
-      value: this.resources[0]
+      value: this.getNamedResource('code')
     });
 
-    // Move the cursor when a new primitive is selected
-    this.linkedState.on('primitiveSelected', () => {
-      const details = this.linkedState.getPrimitiveDetails();
-      if (details) {
-        /*this.codeMirror.setCursor({
-          line: details.line,
-          ch: details.char
-        });*/
-      }
-    });
+    // CodeMirror uses some z-index magic, so we need to tell our overlay to
+    // display on top of it
+    this.overlayShadowEl.classed('CodeOverlay', true);
+
+    // TODO: linked highlighting
+    /* this.codeMirror.setCursor({
+      line: details.line,
+      ch: details.char
+    }); */
   }
-  draw () {
+
+  async draw () {
+    await super.draw(...arguments);
+
+    if (this.isLoading) {
+      // Don't draw anything if we're still waiting on something; super.draw
+      // will show a spinner
+      return;
+    }
+
+    // Update color mode and size based on the goldenlayout element (using
+    // this.d3el would just calculate the CodeMirror's existing size)
+    const darkMode = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
+    const bounds = this.glEl.node().getBoundingClientRect();
+    this.codeMirror.setOption('theme', darkMode ? 'base16-dark' : 'base16-light');
+    this.codeMirror.setSize(bounds.width, bounds.height);
     this.codeMirror.refresh();
+
+    // TODO: highlight chunks of code based on linkedState.colorMode, and/or
+    // the currently selected primitive
   }
 }
 export default CodeView;
