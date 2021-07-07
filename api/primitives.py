@@ -42,7 +42,7 @@ def getUtilizationForPrimitive(datasetId: str,
 
 @router.get('/datasets/{datasetId}/primitives/{primitive}/intervalHistogram')
 def getIntervalHistogram(datasetId: str,
-                         primitive: str = None):
+                         primitive: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
