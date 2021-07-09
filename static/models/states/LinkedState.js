@@ -341,6 +341,18 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       primitiveDetails
     });
   }
+
+  /**
+   * Change the current selection to the set of named primitives
+   */
+  selectPrimitives (primitiveName) {
+    //online the first primitive details will be shown
+    const primitiveDetails = this.getPrimitiveDetails(primitiveName[0]);
+    this.selection = new PrimitiveSelection({
+      primitiveName,
+      primitiveDetails
+    });
+  }
 }
 LinkedState.VIEW_STATUS = VIEW_STATUS;
 LinkedState.COLOR_MODES = COLOR_MODES;

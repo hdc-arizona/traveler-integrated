@@ -452,8 +452,19 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
           // Deselect
           this.linkedState.selection = null;
         } else {
-          // Select the clicked primitive
-          this.linkedState.selectPrimitive(d.data.name);
+          let primitivesStack = [d];
+          let primitives = [];
+          let currentNode = primitivesStack.pop();
+          while(currentNode) {
+            primitives.push(currentNode.data.name);
+            if(currentNode.children !== undefined) {
+              for(const eachNode of currentNode.children) {
+                primitivesStack.push(eachNode);
+              }
+            }
+            currentNode = primitivesStack.pop();
+          }
+          this.linkedState.selectPrimitives(primitives);
         }
       }).on('mouseenter', function (event, d) {
         const label = d.details.display_name || d.data.name;
