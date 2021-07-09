@@ -26,11 +26,17 @@ class PrimitiveSelection extends Selection {
         if(allJson === undefined) {
           allJson = json;
         } else {
-          Object.keys(json.locations).forEach(function (key){
-            for (let ind in json.locations[key]){
-              allJson.locations[key][ind] = Math.max(json.locations[key][ind], allJson.locations[key][ind]);
+          if(json.locations !== undefined) {
+            Object.keys(json.locations).forEach(function (key) {
+              for (let ind in json.locations[key]) {
+                allJson.locations[key][ind] = Math.max(json.locations[key][ind], allJson.locations[key][ind]);
+              }
+            });
+          } else if(json.data !== undefined) {
+            for (let ind in json.data) {
+              allJson.data[ind] = allJson.data[ind] + json.data[ind];
             }
-          });
+          }
         }
       }
     } else {
