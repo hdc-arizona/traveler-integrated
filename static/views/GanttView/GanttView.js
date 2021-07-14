@@ -352,17 +352,22 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     }
 
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
-    console.log(aggregatedIntervals);
-    ctx.beginPath();
-    ctx.moveTo(
-        chartShape.spilloverXScale(aggregatedIntervals.startTime) - chartShape.leftOffset,
-        this.yScale(1) + bandwidth / 2
-    );
-    ctx.lineTo(
-        chartShape.spilloverXScale(aggregatedIntervals.endTime) - chartShape.leftOffset,
-        this.yScale(1) + bandwidth / 2
-    );
-    ctx.stroke();
+    ctx.fillStyle = theme['--inclusive-color-3'];
+    ctx.fillRect(chartShape.spilloverXScale(aggregatedIntervals.startTime) - chartShape.leftOffset,
+        this.yScale(4294967297) + bandwidth / 2,
+        chartShape.spilloverXScale(aggregatedIntervals.endTime) - chartShape.spilloverXScale(aggregatedIntervals.startTime),
+        bandwidth);
+    // ctx.strokeStyle = theme['--inclusive-color-3'];
+    // ctx.beginPath();
+    // ctx.moveTo(
+    //     chartShape.spilloverXScale(aggregatedIntervals.startTime) - chartShape.leftOffset,
+    //     this.yScale(4294967297) + bandwidth / 2
+    // );
+    // ctx.lineTo(
+    //     chartShape.spilloverXScale(aggregatedIntervals.endTime) - chartShape.leftOffset,
+    //     this.yScale(4294967297) + bandwidth / 2
+    // );
+    // ctx.stroke();
 
   }
 }
