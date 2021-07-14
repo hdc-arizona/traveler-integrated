@@ -188,3 +188,54 @@ def intervalTrace(datasetId: str,
         yield '}}'
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
+
+
+@router.get('/datasets/{datasetId}/intervals/{intervalId}/traceEnd')
+def intervalTraceToEnd(datasetId: str,
+                  intervalId: str,
+                  begin: float = None,
+                  end: float = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+
+    if begin is None:
+        begin = db[datasetId]['info']['intervalDomain'][0]
+    if end is None:
+        end = db[datasetId]['info']['intervalDomain'][1]
+
+    def updateTimes(startTime, endTime, intervalObj):
+        return min(startTime, intervalObj['enter']['Timestamp']), max(endTime, intervalObj['leave']['Timestamp'])
+
+    def startEndTimeFinder():
+        # Start on descendants
+        intervalObj = db[datasetId]['intervals'][intervalId]
+        startTime = intervalObj['enter']['Timestamp']
+        endTime = intervalObj['leave']['Timestamp']
+        childQueue = [intervalId]
+
+        while len(childQueue) > 0:
+            intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
+            # yield any interval where itself or its child (to allow offscreen
+            # lines to the left) is in the queried range
+            yieldThisInterval = False
+            if intervalObj['leave']['Timestamp'] >= begin:
+                yieldThisInterval = True
+            else:
+                for childId in intervalObj['children']:
+                    if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
+                        yieldThisInterval = True
+
+            if yieldThisInterval:
+                startTime, endTime = updateTimes(startTime, endTime, intervalObj)
+
+            # Only add children to the queue if this interval ends before the
+            # queried range does
+            if intervalObj['leave']['Timestamp'] <= end:
+                for childId in intervalObj['children']:
+                    if not childId in childQueue:
+                        childQueue.append(childId)
+
+        # Finished
+        results = {'startTime': startTime, 'endTime': endTime}
+        yield json.dumps(results)
+
+    return StreamingResponse(startEndTimeFinder(), media_type='application/json')
