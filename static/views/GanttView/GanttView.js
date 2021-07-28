@@ -194,7 +194,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
         ? this.updateResource({
           name: 'aggregatedIntervals',
           type: 'json',
-          url: `/datasets/${this.datasetId}/intervals/${selectedIntervalId}/traceEnd?begin=${domain[0]}&end=${domain[1]}`
+          url: `/datasets/${this.datasetId}/intervals/${selectedIntervalId}/primitiveTraceForward?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
         })
         : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
 
@@ -351,23 +351,16 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       }
     }
 
-    const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
     ctx.fillStyle = theme['--inclusive-color-3'];
-    ctx.fillRect(chartShape.spilloverXScale(aggregatedIntervals.startTime) - chartShape.leftOffset,
-        this.yScale(4294967297) + bandwidth / 2,
-        chartShape.spilloverXScale(aggregatedIntervals.endTime) - chartShape.spilloverXScale(aggregatedIntervals.startTime),
-        bandwidth);
-    // ctx.strokeStyle = theme['--inclusive-color-3'];
-    // ctx.beginPath();
-    // ctx.moveTo(
-    //     chartShape.spilloverXScale(aggregatedIntervals.startTime) - chartShape.leftOffset,
-    //     this.yScale(4294967297) + bandwidth / 2
-    // );
-    // ctx.lineTo(
-    //     chartShape.spilloverXScale(aggregatedIntervals.endTime) - chartShape.leftOffset,
-    //     this.yScale(4294967297) + bandwidth / 2
-    // );
-    // ctx.stroke();
+    const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
+    for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals)) {
+      for (let aggTime of aggregatedTimes) {
+        ctx.fillRect(chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
+            this.yScale(location) + bandwidth / 2,
+            chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime),
+            bandwidth/2);
+      }
+    }
 
   }
 }

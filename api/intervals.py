@@ -7,6 +7,7 @@ from . import db, validateDataset
 
 router = APIRouter()
 
+
 @router.get('/datasets/{datasetId}/intervals')
 def get_intervals(datasetId: str, \
                   begin: int = None, \
@@ -58,11 +59,13 @@ def get_intervals(datasetId: str, \
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
+
 @router.get('/datasets/{datasetId}/intervals/{intervalId}')
 def get_interval(datasetId: str, \
                  intervalId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
     return db[datasetId]['intervals'].get(intervalId, None)
+
 
 @router.get('/datasets/{datasetId}/intervals/{intervalId}/trace')
 def intervalTrace(datasetId: str,
@@ -101,7 +104,7 @@ def intervalTrace(datasetId: str,
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
-    def format_interval(intervalObj, childId = None):
+    def format_interval(intervalObj, childId=None):
         result = {
             'enter': intervalObj['enter']['Timestamp'],
             'leave': intervalObj['leave']['Timestamp'],
@@ -190,11 +193,64 @@ def intervalTrace(datasetId: str,
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 
-@router.get('/datasets/{datasetId}/intervals/{intervalId}/traceEnd')
-def intervalTraceToEnd(datasetId: str,
-                  intervalId: str,
-                  begin: float = None,
-                  end: float = None):
+# @router.get('/datasets/{datasetId}/intervals/{intervalId}/traceEnd')
+# def intervalTraceToEnd(datasetId: str,
+#                   intervalId: str,
+#                   begin: float = None,
+#                   end: float = None):
+#     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+#
+#     if begin is None:
+#         begin = db[datasetId]['info']['intervalDomain'][0]
+#     if end is None:
+#         end = db[datasetId]['info']['intervalDomain'][1]
+#
+#     def updateTimes(startTime, endTime, intervalObj):
+#         return min(startTime, intervalObj['enter']['Timestamp']), max(endTime, intervalObj['leave']['Timestamp'])
+#
+#     def startEndTimeFinder():
+#         # Start on descendants
+#         intervalObj = db[datasetId]['intervals'][intervalId]
+#         startTime = intervalObj['enter']['Timestamp']
+#         endTime = intervalObj['leave']['Timestamp']
+#         childQueue = [intervalId]
+#
+#         while len(childQueue) > 0:
+#             intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
+#             # yield any interval where itself or its child (to allow offscreen
+#             # lines to the left) is in the queried range
+#             yieldThisInterval = False
+#             if intervalObj['leave']['Timestamp'] >= begin:
+#                 yieldThisInterval = True
+#             else:
+#                 for childId in intervalObj['children']:
+#                     if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
+#                         yieldThisInterval = True
+#
+#             if yieldThisInterval:
+#                 startTime, endTime = updateTimes(startTime, endTime, intervalObj)
+#
+#             # Only add children to the queue if this interval ends before the
+#             # queried range does
+#             if intervalObj['leave']['Timestamp'] <= end:
+#                 for childId in intervalObj['children']:
+#                     if not childId in childQueue:
+#                         childQueue.append(childId)
+#
+#         # Finished
+#         results = {'startTime': startTime, 'endTime': endTime}
+#         yield json.dumps(results)
+#
+#     return StreamingResponse(startEndTimeFinder(), media_type='application/json')
+
+
+@router.get('/datasets/{datasetId}/intervals/{intervalId}/primitiveTraceForward')
+def primitive_trace_forward(datasetId: str,
+                            intervalId: str,
+                            bins: int = 100,
+                            begin: int = None,
+                            end: int = None,
+                            locations: str = None):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
@@ -202,40 +258,79 @@ def intervalTraceToEnd(datasetId: str,
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
-    def updateTimes(startTime, endTime, intervalObj):
-        return min(startTime, intervalObj['enter']['Timestamp']), max(endTime, intervalObj['leave']['Timestamp'])
+    if locations:
+        locations = locations.split(',')
+    else:
+        locations = db[datasetId]['info']['locationNames']
 
-    def startEndTimeFinder():
-        # Start on descendants
-        intervalObj = db[datasetId]['intervals'][intervalId]
-        startTime = intervalObj['enter']['Timestamp']
-        endTime = intervalObj['leave']['Timestamp']
-        childQueue = [intervalId]
+    def traceForward():
+        intervalData = {}
+        primitive = db[datasetId]['intervals'][intervalId]['Primitive']
 
-        while len(childQueue) > 0:
-            intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
-            # yield any interval where itself or its child (to allow offscreen
-            # lines to the left) is in the queried range
-            yieldThisInterval = False
-            if intervalObj['leave']['Timestamp'] >= begin:
-                yieldThisInterval = True
-            else:
-                for childId in intervalObj['children']:
-                    if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
-                        yieldThisInterval = True
+        if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
+            raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
+        for location in locations:
+            intervalData[location] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
 
-            if yieldThisInterval:
-                startTime, endTime = updateTimes(startTime, endTime, intervalObj)
+        # find all interval of this primitive within a time range (bin)
+        def intervalFinder(enter, leave, location):
+            intervalList = []
+            for i in db[datasetId]['intervalIndex'].iterOverlap(enter, leave):
+                intervalObject = db[datasetId]['intervals'][i.data]
+                if location is not None and intervalObject['Location'] != location:
+                    continue
+                if primitive is not None and intervalObject['Primitive'] != primitive:
+                    continue
+                intervalList.append(intervalObject)
+            return intervalList
 
-            # Only add children to the queue if this interval ends before the
-            # queried range does
-            if intervalObj['leave']['Timestamp'] <= end:
-                for childId in intervalObj['children']:
-                    if not childId in childQueue:
-                        childQueue.append(childId)
+        def updateTimes(startTime, endTime, intervalObject):
+            return min(startTime, intervalObject['enter']['Timestamp']), max(endTime, intervalObject['leave']['Timestamp'])
 
-        # Finished
-        results = {'startTime': startTime, 'endTime': endTime}
-        yield json.dumps(results)
+        def startEndTimeFinder(intervalObject):
+            # Start on descendants
+            startTime = intervalObject['enter']['Timestamp']
+            endTime = intervalObject['leave']['Timestamp']
+            childQueue = [intervalObject['intervalId']]
+            # search over the child subtrees
+            while len(childQueue) > 0:
+                intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
+                # yield any interval where itself or its child (to allow offscreen
+                # lines to the left) is in the queried range
+                yieldThisInterval = False
+                if intervalObj['leave']['Timestamp'] >= begin:
+                    yieldThisInterval = True
+                else:
+                    for childId in intervalObj['children']:
+                        if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
+                            yieldThisInterval = True
+                if yieldThisInterval:
+                    startTime, endTime = updateTimes(startTime, endTime, intervalObj)
+                # Only add children to the queue if this interval ends before the
+                # queried range does
+                if intervalObj['leave']['Timestamp'] <= end:
+                    for childId in intervalObj['children']:
+                        if childId not in childQueue:
+                            childQueue.append(childId)
 
-    return StreamingResponse(startEndTimeFinder(), media_type='application/json')
+            return {'startTime': startTime, 'endTime': endTime}
+
+        traceForwardData = {}
+        step = (end - begin) / bins
+        for location in intervalData:
+            currentTime = begin
+            traceForwardData[location] = []
+            intervalStarted = False
+            for util in intervalData[location]:
+                if (not intervalStarted) and util > 0:
+                    intervalStarted = True
+                    startingInterval = intervalFinder(currentTime, currentTime + step, location)
+                    for intervalObj in startingInterval:
+                        traceForwardData[location].append(startEndTimeFinder(intervalObj))
+                if intervalStarted and (util == 0):
+                    intervalStarted = False
+                currentTime = currentTime + step
+
+        yield json.dumps(traceForwardData)
+
+    return StreamingResponse(traceForward(), media_type='application/json')
