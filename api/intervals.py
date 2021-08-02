@@ -281,7 +281,8 @@ def primitive_trace_forward(datasetId: str,
                     continue
                 if primitive is not None and intervalObject['Primitive'] != primitive:
                     continue
-                intervalList.append(intervalObject)
+                if intervalObject['enter']['Timestamp'] >= enter:
+                    intervalList.append(intervalObject)
             return intervalList
 
         def updateTimes(startTime, endTime, intervalObject):
@@ -320,15 +321,17 @@ def primitive_trace_forward(datasetId: str,
         for location in intervalData:
             currentTime = begin
             traceForwardData[location] = []
-            intervalStarted = False
+            # intervalStarted = False
+            previousIntervalEndTime = currentTime - 1
             for util in intervalData[location]:
-                if (not intervalStarted) and util > 0:
-                    intervalStarted = True
+                if previousIntervalEndTime < currentTime + step and util > 0:
                     startingInterval = intervalFinder(currentTime, currentTime + step, location)
                     for intervalObj in startingInterval:
-                        traceForwardData[location].append(startEndTimeFinder(intervalObj))
-                if intervalStarted and (util == 0):
-                    intervalStarted = False
+                        previousIntervalEndTime = max(previousIntervalEndTime, intervalObj['leave']['Timestamp'])
+                        stEndObj = startEndTimeFinder(intervalObj)
+                        traceForwardData[location].append(stEndObj)
+                        previousIntervalEndTime = max(previousIntervalEndTime, stEndObj['endTime'])
+                        # this is for to make the run faster since we are drawing in a location from the starting interval
                 currentTime = currentTime + step
 
         yield json.dumps(traceForwardData)
