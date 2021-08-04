@@ -17,8 +17,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       // Placeholder resources that don't actually get updated until later
       { type: 'placeholder', value: null, name: 'totalUtilization' },
       { type: 'placeholder', value: null, name: 'selectionUtilization' },
-      { type: 'placeholder', value: null, name: 'selectedIntervalTrace' },
-      { type: 'placeholder', value: null, name: 'aggregatedIntervals' }
+      { type: 'placeholder', value: null, name: 'selectedIntervalTrace' }
     ]);
     super(options);
 
@@ -69,10 +68,6 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     if (this.linkedState.selection?.intervalTraceParameters) {
       const trace = this.getNamedResource('selectedIntervalTrace');
       if (trace === null || (trace instanceof Error && trace.status === 503)) {
-        return true;
-      }
-      const trace2 = this.getNamedResource('aggregatedIntervals');
-      if (trace2 === null || (trace2 instanceof Error && trace2.status === 503)) {
         return true;
       }
     }
@@ -190,15 +185,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
         })
       : this.updateResource({ name: 'selectedIntervalTrace', type: 'placeholder', value: null });
 
-    const aggregatedIntervalsPromise = selectedIntervalId
-        ? this.updateResource({
-          name: 'aggregatedIntervals',
-          type: 'json',
-          url: `/datasets/${this.datasetId}/intervals/${selectedIntervalId}/primitiveTraceForwardOld?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
-        })
-        : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
-
-    return Promise.all([totalPromise, selectionPromise, tracebackPromise, aggregatedIntervalsPromise]);
+    return Promise.all([totalPromise, selectionPromise, tracebackPromise]);
   }
 
   getRequiredChartHeight () {
@@ -348,17 +335,6 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       const parent = trace.descendants[child.parent];
       if (parent) {
         drawPath(parent, child);
-      }
-    }
-
-    ctx.fillStyle = theme['--inclusive-color-3'];
-    const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
-    for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals)) {
-      for (let aggTime of aggregatedTimes) {
-        ctx.fillRect(chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
-            this.yScale(location) + bandwidth / 2,
-            chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime),
-            bandwidth/2);
       }
     }
 
