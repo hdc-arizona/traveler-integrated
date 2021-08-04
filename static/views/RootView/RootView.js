@@ -7,6 +7,7 @@ import GanttView from '../GanttView/GanttView.js';
 import FunctionalBoxPlotView from '../FunctionalBoxPlotView/FunctionalBoxPlotView.js';
 import LineChartView from '../LineChartView/LineChartView.js';
 import IntervalHistogramView from '../IntervalHistogramView/IntervalHistogramView.js';
+import AggregatedGanttView from "../AggregatedGanttView/AggregatedGanttView.js";
 
 const viewClassLookup = {
   SelectionInfoView,
@@ -14,6 +15,7 @@ const viewClassLookup = {
   CodeView,
   UtilizationView,
   GanttView,
+  AggregatedGanttView,
   FunctionalBoxPlotView,
   LineChartView,
   IntervalHistogramView
@@ -78,6 +80,7 @@ class RootView extends uki.ui.GLRootView {
       const timelineBasedView =
         viewClassName === 'UtilizationView' ||
         viewClassName === 'GanttView' ||
+        viewClassName === 'AggregatedGanttView' ||
         viewClassName === 'FunctionalBoxPlotView' ||
         viewClassName === 'LineChartView';
 

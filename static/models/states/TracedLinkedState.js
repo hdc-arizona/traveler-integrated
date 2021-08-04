@@ -101,6 +101,7 @@ class TracedLinkedState extends LinkedState {
       : VIEW_STATUS.AVAILABLE;
 
     views.GanttView = { status: otf2Status };
+    views.AggregatedGanttView = { status: otf2Status };
     views.UtilizationView = { status: otf2Status };
     views.IntervalHistogramView = {
       status: otf2Status,
@@ -127,7 +128,7 @@ class TracedLinkedState extends LinkedState {
     const availableViews = await this.getAvailableViews();
 
     // Starting views are only UtilizationView and GanttView
-    const traceColumnLayout = ['UtilizationView', 'GanttView']
+    const traceColumnLayout = ['UtilizationView', 'GanttView', 'AggregatedGanttView']
       .filter(componentName => {
         return availableViews?.[componentName]?.status !== VIEW_STATUS.UNAVAILABLE;
       })
