@@ -151,7 +151,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   }
 
   getRequiredChartHeight () {
-    return MIN_LOCATION_HEIGHT * this.linkedState.info.locationNames.length;
+    return MIN_LOCATION_HEIGHT;
   }
 
   /**
@@ -164,7 +164,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
     if(aggregatedIntervals === null) {
       this.yScale.range([0, chartShape.fullHeight])
-          .domain(this.linkedState.info.locationNames);
+          .domain([0]);
     } else {
       this.yScale.range([0, chartShape.fullHeight])
           .domain(Object.keys(aggregatedIntervals));
