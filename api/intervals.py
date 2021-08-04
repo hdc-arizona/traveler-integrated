@@ -244,9 +244,9 @@ def intervalTrace(datasetId: str,
 #     return StreamingResponse(startEndTimeFinder(), media_type='application/json')
 
 
-@router.get('/datasets/{datasetId}/intervals/{intervalId}/primitiveTraceForward')
+@router.get('/datasets/{datasetId}/primitives/primitiveTraceForward')
 def primitive_trace_forward(datasetId: str,
-                            intervalId: str,
+                            primitive: str,
                             bins: int = 100,
                             begin: int = None,
                             end: int = None,
@@ -262,10 +262,9 @@ def primitive_trace_forward(datasetId: str,
         locations = locations.split(',')
     else:
         locations = db[datasetId]['info']['locationNames']
-    print("hnai")
+
     def traceForward():
         intervalData = {}
-        primitive = db[datasetId]['intervals'][intervalId]['Primitive']
 
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
             raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
@@ -366,9 +365,7 @@ def primitive_trace_forward(datasetId: str,
                         previousIntervalEndTime = max(previousIntervalEndTime, stEndObj['endTime'])
                         # this is for to make the run faster since we are drawing in a location from the starting interval
                 currentTime = currentTime + step
-        print("hello from here in aggreaged vals")
         results = greedyIntervalAssignment(traceForwardList)
-        print(len(results))
         yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')

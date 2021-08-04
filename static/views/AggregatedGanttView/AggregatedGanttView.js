@@ -53,9 +53,10 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     if (super.isLoading) {
       return true;
     }
-    if (this.linkedState.selection?.intervalDetails?.intervalId) {
+    if (this.linkedState.selection?.primitiveName) {
       const trace2 = this.getNamedResource('aggregatedIntervals');
-      if (trace2 === null || (trace2 instanceof Error && trace2.status === 503)) {
+      if (trace2 === null || (trace2 instanceof Error && trace2.status === 503) ||
+          Object.keys(trace2).length === 0) {
         return true;
       }
     }
@@ -138,12 +139,12 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
-    const selectedIntervalId = this.linkedState.selection?.intervalDetails?.intervalId;
-    const aggregatedIntervalsPromise = selectedIntervalId
+    const selectedPrimitiveName = this.linkedState.selection?.primitiveName;
+    const aggregatedIntervalsPromise = selectedPrimitiveName
         ? this.updateResource({
           name: 'aggregatedIntervals',
           type: 'json',
-          url: `/datasets/${this.datasetId}/intervals/${selectedIntervalId}/primitiveTraceForward?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
+          url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?primitive=${selectedPrimitiveName}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
         })
         : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
     return Promise.all([aggregatedIntervalsPromise]);
@@ -242,7 +243,9 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
     const currentTimespan = this.linkedState.detailDomain[1] -
         this.linkedState.detailDomain[0];
-    if (aggregatedIntervals === null || currentTimespan > TRACE_LINE_TIME_LIMIT) {
+    if (aggregatedIntervals === null ||
+        Object.keys(aggregatedIntervals).length === 0 ||
+        currentTimespan > TRACE_LINE_TIME_LIMIT) {
       return;
     }
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;
