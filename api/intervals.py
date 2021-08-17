@@ -258,6 +258,7 @@ def primitive_trace_forward(datasetId: str,
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
+    primitiveSet = set()
     if locations:
         locations = locations.split(',')
     else:
@@ -306,6 +307,7 @@ def primitive_trace_forward(datasetId: str,
                             yieldThisInterval = True
                 if yieldThisInterval:
                     startTime, endTime = updateTimes(startTime, endTime, intervalObj)
+                    primitiveSet.add(intervalObj['Primitive'])
                 # Only add children to the queue if this interval ends before the
                 # queried range does
                 if intervalObj['leave']['Timestamp'] <= end:
@@ -365,7 +367,8 @@ def primitive_trace_forward(datasetId: str,
                         previousIntervalEndTime = max(previousIntervalEndTime, stEndObj['endTime'])
                         # this is for to make the run faster since we are drawing in a location from the starting interval
                 currentTime = currentTime + step
-        results = greedyIntervalAssignment(traceForwardList)
+        # primitiveSet.discard('async_launch_policy_dispatch') # safely remove some primitive
+        results = {'primitives': list(primitiveSet), 'data': greedyIntervalAssignment(traceForwardList)}
         yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')

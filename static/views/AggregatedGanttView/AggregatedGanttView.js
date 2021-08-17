@@ -56,7 +56,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     if (this.linkedState.selection?.primitiveName) {
       const trace2 = this.getNamedResource('aggregatedIntervals');
       if (trace2 === null || (trace2 instanceof Error && trace2.status === 503) ||
-          Object.keys(trace2).length === 0) {
+          Object.keys(trace2.data).length === 0) {
         return true;
       }
     }
@@ -136,6 +136,39 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     lastChartShape.locations.some((loc, i) => chartShape.locations[i] !== loc);
   }
 
+  async getUtilizationForAggregatedPrimitives (urlArgs, primitiveList) {
+    let allJson = undefined;
+    if(Array.isArray(primitiveList)) {
+      for (const eachPrimitiveName of primitiveList) {
+        urlArgs.primitive = eachPrimitiveName;
+        const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
+            Object.entries(urlArgs).map(([key, value]) => {
+              return `${key}=${encodeURIComponent(value)}`;
+            }).join('&');
+        const response = await window.fetch(url);
+        const json = await response.json();
+        if(allJson === undefined) {
+          allJson = json;
+        } else {
+          if(json.locations !== undefined) {
+            Object.keys(json.locations).forEach(function (key) {
+              for (let ind in json.locations[key]) {
+                allJson.locations[key][ind] = Math.max(json.locations[key][ind], allJson.locations[key][ind]);
+              }
+            });
+          } else if(json.data !== undefined) {
+            for (let ind in json.data) {
+              allJson.data[ind] = allJson.data[ind] + json.data[ind];
+            }
+          }
+        }
+      }
+    } else {
+      console.log("Primitive List should be an array");
+    }
+    return allJson;
+  }
+
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
@@ -147,6 +180,20 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
           url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?primitive=${selectedPrimitiveName}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
         })
         : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
+    // const primitiveUtilPromise = this.updateResource({
+    //   name: 'selectionUtilization',
+    //   type: 'derivation',
+    //   derive: async () => {
+    //     // Does the current selection have a way of getting selection-specific
+    //     // utilization data?
+    //     return this.linkedState.selection?.getUtilization?.({
+    //       bins: chartShape.bins,
+    //       begin: domain[0],
+    //       end: domain[1],
+    //       locations
+    //     }) || null; // if not, don't show any selection-specific utilization
+    //   }
+    // });
     return Promise.all([aggregatedIntervalsPromise]);
   }
 
@@ -167,7 +214,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
           .domain([0]);
     } else {
       this.yScale.range([0, chartShape.fullHeight])
-          .domain(Object.keys(aggregatedIntervals));
+          .domain(Object.keys(aggregatedIntervals.data));
     }
 
 
@@ -239,12 +286,62 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     return aggText;
   }
 
+  getBinSize(metadata) {
+    return (metadata.end - metadata.begin) / metadata.bins;
+  }
+
+  drawUtilLines(primitiveData, chartShape, location) {
+    console.log("drawing primitive util data");
+    const domain = chartShape.spilloverXScale.domain();
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+
+    const canvas = this.d3el.select('canvas');
+    const ctx = canvas.node().getContext('2d');
+
+    const bandwidth = this.yScale.bandwidth();
+    let binSize = this.getBinSize(primitiveData.metadata);
+    const maxUtil = this.linkedState.info.locationNames.length + 1;
+    console.log(maxUtil);
+
+    const outlinePathGenerator = d3.area()
+        .x((d, i) => {
+          let actualTime = primitiveData.metadata.begin + (i * binSize);
+          return chartShape.spilloverXScale(actualTime) - chartShape.leftOffset;
+        }) // bin number corresponds to screen coordinate
+        .y1(d => {
+          return this.yScale(location) + bandwidth * (1 - d/maxUtil);
+        })
+        .y0(d => {
+          return this.yScale(location) + bandwidth;
+        }).context(ctx);
+    ctx.fillStyle = theme['--selection-color'];
+    ctx.beginPath();
+    outlinePathGenerator(primitiveData.data);
+    ctx.fill();
+    ctx.closePath();
+
+    // const outlinePathGenerator = d3.line()
+    //     .x((d, i) => {
+    //       let actualTime = primitiveData.metadata.begin + (i * binSize);
+    //       return chartShape.spilloverXScale(actualTime) - chartShape.leftOffset;
+    //     }) // bin number corresponds to screen coordinate
+    //     .y(d => {
+    //       return this.yScale(location) + bandwidth * (1 - d/9);
+    //     }).context(ctx);
+    // ctx.strokeStyle = theme['--selection-color'];
+    // ctx.beginPath();
+    // outlinePathGenerator(primitiveData.data);
+    // ctx.stroke();
+    // ctx.closePath();
+  }
+
   drawAggregatedBars (chartShape) {
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
+    const domain = chartShape.spilloverXScale.domain();
     const currentTimespan = this.linkedState.detailDomain[1] -
         this.linkedState.detailDomain[0];
     if (aggregatedIntervals === null ||
-        Object.keys(aggregatedIntervals).length === 0 ||
+        Object.keys(aggregatedIntervals.data).length === 0 ||
         currentTimespan > TRACE_LINE_TIME_LIMIT) {
       return;
     }
@@ -258,7 +355,10 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     ctx.lineWidth = 2;
     ctx.fillStyle = theme['--inclusive-color-3'];
 
-    for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals)) {
+    var __self = this;
+    var binSize = 1;
+    let promiseForPrimitiveUtil = [];
+    for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals.data)) {
       for (let aggTime of aggregatedTimes) {
         ctx.fillStyle = theme['--inclusive-color-3'];
         ctx.fillRect(chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
@@ -269,9 +369,27 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
         ctx.font = "10px Arial";
         ctx.fillText(this.buildLocationText(aggTime.location), chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
             this.yScale(location) + bandwidth/2);
+
+        binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
+        if((aggTime.endTime - aggTime.startTime) > binSize*5) { // at least five bins exist
+          var urlArgs = {
+            bins: Math.floor((aggTime.endTime - aggTime.startTime) / binSize),
+            begin: aggTime.startTime,
+            end: aggTime.endTime
+          };
+          let promise = new Promise(function(resolve, reject) {
+            var primitiveData = __self.getUtilizationForAggregatedPrimitives(urlArgs, aggregatedIntervals.primitives);
+            resolve(primitiveData);
+          });
+          promise.then(function(primitiveData){
+            __self.drawUtilLines(primitiveData, chartShape, location);
+          });
+          promiseForPrimitiveUtil.push(promise);
+        }
+
       }
     }
-
+    Promise.all(promiseForPrimitiveUtil);
   }
 }
 
