@@ -226,3 +226,16 @@ I haven't tested this thoroughly. Likely hiccups:
 - On non-Linux systems, you'll probably need to rebuild the
   [C dependencies](#building-c-dependencies) inside the docker
   container
+
+## Related Papers
+
+K. Williams, A. Bigelow, and K. Isaacs. [Visualizing a Moving Target: A Design Study on Task Parallel Programs in the Presence of Evolving Data and Concerns](https://arxiv.org/abs/1905.13135v4). IEEE Transactions on Visualization and Computer Graphics, Proceedings of InfoVis '19. 26(1):1118-1128, 2020.
+
+
+S. R. Brandt, A. Bigelow, S. A. Sakin, K. Willliams, K. E. Isaacs, K. Huck, R. Tohid, B. Wagle, S. Shirzad, and H. Kaiser. [JetLag: An Interactive, Asynchronous Array Computing Environment](https://dl.acm.org/doi/abs/10.1145/3311790.3396657). In PEARC '20: Practice and Experience in Advanced Research Computing. July 2020.
+
+S. R. Brandt, B. Hasheminezhad, N. Wu, S. A. Sakin, A. R. Bigelow, K. E. Isaacs, K. Huck, H. Kaiser. Distributed Asynchronous Array Computing with the Jetlag Environment. Proceedings of the 9th Workshop on Python for High-Perforrmance and Scientific Computing (PyHPC). November 2020.
+
+## Acknowledgements
+
+This work was supported by the United States Department of Defense through DTIC Contract FA8075-14-D-0002-0007, the National Science Foundation under NSF III-1656958, and the Department of Energy under DE-SC0022044.
