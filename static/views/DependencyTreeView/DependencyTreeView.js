@@ -67,7 +67,11 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
       { type: 'text', url: 'views/DependencyTreeView/shapeKey.html' },
       {
         type: 'json',
-        url: `/datasets/${options.glState.datasetId}/getDependencyTree?intervalId=3843`,// 3843 468 3849`,
+        url: `/datasets/${options.glState.datasetId}/getDependencyTree?intervalId=3843`,
+        // 3843 cannon
+        // 468 3849
+        // 3497 load_component_action`
+        // 0 run_helper
         name: 'tree',
         then: rawTree => {
           const tree = d3.hierarchy(rawTree);

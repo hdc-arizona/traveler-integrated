@@ -367,7 +367,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
             bandwidth);
         ctx.fillStyle = "white";
         ctx.font = "10px Arial";
-        ctx.fillText(this.buildLocationText(aggTime.location), chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
+        ctx.fillText(aggregatedIntervals.primitives[0], chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
             this.yScale(location) + bandwidth/2);
 
         binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
