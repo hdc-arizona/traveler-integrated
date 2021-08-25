@@ -378,30 +378,35 @@ def primitive_trace_forward(datasetId: str,
 def get_dependency_tree(datasetId: str,
                         intervalId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
-    print("hi form get dependency tree")
 
     def generateTree():
 
+        def mergeChildList(childrenList):
+            flag = [False] * len(childrenList)
+            compactList = list()
+            for ind, child in enumerate(childrenList):
+                if flag[ind] is True:
+                    continue
+                flag[ind] = True
+                compactList.append(child)
+                for otherInd, otherChild in enumerate(childrenList[ind+1:], start=ind+1):
+                    if otherChild['name'] == child['name']:
+                        flag[otherInd] = True
+                        combinedChild = child['children'] + otherChild['children']
+                        # child['children'].extend(otherChild['children'])
+                        child['children'] = mergeChildList(combinedChild)
+            return compactList
+
         def getChildren(id):
-            thisNode = {}
+            thisNode = dict()
             intervalObj = db[datasetId]['intervals'][id]
             thisNode['name'] = intervalObj['Primitive']
-            childrenList = []
+            childrenList = list()
             for childId in intervalObj['children']:
                 childrenList.append(getChildren(childId))
-            thisNode['children'] = childrenList
+            thisNode['children'] = mergeChildList(childrenList)
             return thisNode
         results = getChildren(intervalId)
         yield json.dumps(results)
-    #
-    # def generateTree():
-    #     results = {}
-    #     results['name'] = "first node"
-    #     results['children'] = []
-    #     child = {}
-    #     child['name'] = "only child"
-    #     child['children'] = []
-    #     results['children'].append(child)
-    #     yield json.dumps(results)
 
     return StreamingResponse(generateTree(), media_type='application/json')
