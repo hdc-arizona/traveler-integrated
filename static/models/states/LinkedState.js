@@ -3,6 +3,8 @@
 import PrimitiveSelection from '../selections/PrimitiveSelection.js';
 
 import RenameModal from '../../views/RenameModal/RenameModal.js';
+import TreeView from "../../views/TreeView/TreeView.js";
+import DependencyTreeView from "../../views/DependencyTreeView/DependencyTreeView.js";
 
 const VIEW_STATUS = {
   UNAVAILABLE: 'UNAVAILABLE',
@@ -94,12 +96,14 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   async getAvailableViews () {
     const views = {
       SelectionInfoView: { status: VIEW_STATUS.AVAILABLE },
+      DependencyTreeView: { status: VIEW_STATUS.UNAVAILABLE },
       TreeView: { status: VIEW_STATUS.UNAVAILABLE },
       CodeView: { status: VIEW_STATUS.UNAVAILABLE, variants: [] }
     };
     for (const { fileType, stillLoading } of this.info.sourceFiles) {
       if (fileType === 'log' || fileType === 'newick') {
         views.TreeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
+        views.DependencyTreeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
       } else if (fileType === 'cpp' || fileType === 'python' || fileType === 'physl') {
         if (views.CodeView.status !== VIEW_STATUS.LOADING) {
           views.CodeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
@@ -155,7 +159,13 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
         componentState: { datasetId: this.info.datasetId }
       });
     }
-
+    if (availableViews.DependencyTreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
+      layout.content.push({
+        type: 'component',
+        componentName: 'DependencyTreeView',
+        componentState: { datasetId: this.info.datasetId }
+      });
+    }
     return layout;
   }
 
@@ -281,6 +291,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
     return [
       this.createViewMenuEntry('Selection Info', 'SelectionInfoView', null, availableViews, openViews),
+      this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews),
       this.createViewMenuEntry('Tree', 'TreeView', null, availableViews, openViews),
       // Submenu for code views
       {

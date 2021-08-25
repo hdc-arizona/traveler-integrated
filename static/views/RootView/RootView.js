@@ -8,6 +8,7 @@ import FunctionalBoxPlotView from '../FunctionalBoxPlotView/FunctionalBoxPlotVie
 import LineChartView from '../LineChartView/LineChartView.js';
 import IntervalHistogramView from '../IntervalHistogramView/IntervalHistogramView.js';
 import AggregatedGanttView from "../AggregatedGanttView/AggregatedGanttView.js";
+import DependencyTreeView from "../DependencyTreeView/DependencyTreeView.js";
 
 const viewClassLookup = {
   SelectionInfoView,
@@ -16,6 +17,7 @@ const viewClassLookup = {
   UtilizationView,
   GanttView,
   AggregatedGanttView,
+  DependencyTreeView,
   FunctionalBoxPlotView,
   LineChartView,
   IntervalHistogramView
