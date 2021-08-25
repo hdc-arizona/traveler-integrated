@@ -67,23 +67,23 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
       { type: 'text', url: 'views/DependencyTreeView/shapeKey.html' },
       {
         type: 'json',
-        url: `/datasets/${options.glState.datasetId}/tree`,
+        url: `/datasets/${options.glState.datasetId}/getDependencyTree?intervalId=3843`,
         name: 'tree',
         then: rawTree => {
           const tree = d3.hierarchy(rawTree);
           // Attach details about each primitive to each tree node
           tree.each(node => {
-            node.details = this.linkedState.getPrimitiveDetails(node.data.name);
+            node.details = node.data.name;//this.linkedState.getPrimitiveDetails(node.data.name);
           });
           // Now that we have details, compute exclusive times
           tree.each(node => {
             if (node.details.time !== undefined) {
-              node.details.exclusiveTime = node.details.time;
-              for (const childNode of node.children || []) {
-                if (childNode.details.time !== undefined) {
-                  node.details.exclusiveTime -= childNode.details.time;
-                }
-              }
+              node.details.exclusiveTime = 10;//node.details.time;
+              // for (const childNode of node.children || []) {
+              //   if (childNode.details.time !== undefined) {
+              //     node.details.exclusiveTime -= childNode.details.time;
+              //   }
+              // }
             }
           });
           return tree;

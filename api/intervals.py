@@ -372,3 +372,36 @@ def primitive_trace_forward(datasetId: str,
         yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')
+
+
+@router.get('/datasets/{datasetId}/getDependencyTree')
+def get_dependency_tree(datasetId: str,
+                        intervalId: str):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+    print("hi form get dependency tree")
+
+    def generateTree():
+
+        def getChildren(id):
+            thisNode = {}
+            intervalObj = db[datasetId]['intervals'][id]
+            thisNode['name'] = intervalObj['Primitive']
+            childrenList = []
+            for childId in intervalObj['children']:
+                childrenList.append(getChildren(childId))
+            thisNode['children'] = childrenList
+            return thisNode
+        results = getChildren(intervalId)
+        yield json.dumps(results)
+    #
+    # def generateTree():
+    #     results = {}
+    #     results['name'] = "first node"
+    #     results['children'] = []
+    #     child = {}
+    #     child['name'] = "only child"
+    #     child['children'] = []
+    #     results['children'].append(child)
+    #     yield json.dumps(results)
+
+    return StreamingResponse(generateTree(), media_type='application/json')

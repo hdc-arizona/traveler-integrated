@@ -102,7 +102,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     };
     for (const { fileType, stillLoading } of this.info.sourceFiles) {
       if (fileType === 'log' || fileType === 'newick') {
-        views.TreeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
+        // views.TreeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
         views.DependencyTreeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
       } else if (fileType === 'cpp' || fileType === 'python' || fileType === 'physl') {
         if (views.CodeView.status !== VIEW_STATUS.LOADING) {
@@ -152,13 +152,13 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     }
 
     // Put the tree view at the bottom
-    if (availableViews.TreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
-      layout.content.push({
-        type: 'component',
-        componentName: 'TreeView',
-        componentState: { datasetId: this.info.datasetId }
-      });
-    }
+    // if (availableViews.TreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
+    //   layout.content.push({
+    //     type: 'component',
+    //     componentName: 'TreeView',
+    //     componentState: { datasetId: this.info.datasetId }
+    //   });
+    // }
     if (availableViews.DependencyTreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
       layout.content.push({
         type: 'component',
