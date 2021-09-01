@@ -6,7 +6,7 @@ from starlette.responses import StreamingResponse
 from . import db, validateDataset
 
 router = APIRouter()
-
+ignoredPrimitiveList = ['async_launch_policy_dispatch', 'phylanx_primitive_eval_action']
 
 @router.get('/datasets/{datasetId}/intervals')
 def get_intervals(datasetId: str, \
@@ -299,11 +299,11 @@ def primitive_trace_forward(datasetId: str,
                 # yield any interval where itself or its child (to allow offscreen
                 # lines to the left) is in the queried range
                 yieldThisInterval = False
-                if intervalObj['leave']['Timestamp'] >= begin:
+                if intervalObj['leave']['Timestamp'] >= begin and intervalObj['Primitive'] not in ignoredPrimitiveList:
                     yieldThisInterval = True
                 else:
                     for childId in intervalObj['children']:
-                        if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
+                        if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin and intervalObj['Primitive'] not in ignoredPrimitiveList:
                             yieldThisInterval = True
                 if yieldThisInterval:
                     startTime, endTime = updateTimes(startTime, endTime, intervalObj)
@@ -403,7 +403,8 @@ def get_dependency_tree(datasetId: str,
             thisNode['name'] = intervalObj['Primitive']
             childrenList = list()
             for childId in intervalObj['children']:
-                childrenList.append(getChildren(childId))
+                if db[datasetId]['intervals'][childId]['Primitive'] not in ignoredPrimitiveList:
+                    childrenList.append(getChildren(childId))
             thisNode['children'] = mergeChildList(childrenList)
             return thisNode
         results = getChildren(intervalId)

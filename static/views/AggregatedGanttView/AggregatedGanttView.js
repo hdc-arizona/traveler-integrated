@@ -137,6 +137,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   }
 
   async getUtilizationForAggregatedPrimitives (urlArgs, primitiveList) {
+    console.log(primitiveList);
     let allJson = undefined;
     if(Array.isArray(primitiveList)) {
       for (const eachPrimitiveName of primitiveList) {
@@ -172,7 +173,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
-    const selectedPrimitiveName = this.linkedState.selection?.primitiveName;
+    const selectedPrimitiveName = this.linkedState.selection?.primitiveName[0];
     const aggregatedIntervalsPromise = selectedPrimitiveName
         ? this.updateResource({
           name: 'aggregatedIntervals',
@@ -272,7 +273,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
 
     // Set the y label
     this.d3el.select('.yAxisLabel')
-      .text('Location');
+      .text('');
   }
 
   buildLocationText(d) {
@@ -301,7 +302,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     const bandwidth = this.yScale.bandwidth();
     let binSize = this.getBinSize(primitiveData.metadata);
     const maxUtil = this.linkedState.info.locationNames.length + 1;
-    console.log(maxUtil);
 
     const outlinePathGenerator = d3.area()
         .x((d, i) => {

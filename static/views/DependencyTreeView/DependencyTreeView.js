@@ -456,19 +456,22 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
           // Deselect
           this.linkedState.selection = null;
         } else {
-          // let primitivesStack = [d];
-          // let primitives = [];
-          // let currentNode = primitivesStack.pop();
-          // while(currentNode) {
-          //   primitives.push(currentNode.data.name);
-          //   if(currentNode.children !== undefined) {
-          //     for(const eachNode of currentNode.children) {
-          //       primitivesStack.push(eachNode);
-          //     }
-          //   }
-          //   currentNode = primitivesStack.pop();
-          // }
-          this.linkedState.selectPrimitive(d.data.name);
+          let primitivesStack = [d];
+          let primitives = [];
+          let currentNode = primitivesStack.pop();
+          while(currentNode) {
+            if(primitives.indexOf(currentNode.data.name) === -1) {
+              primitives.push(currentNode.data.name);
+            }
+            if(currentNode.children !== undefined) {
+              for(const eachNode of currentNode.children) {
+                primitivesStack.push(eachNode);
+              }
+            }
+            currentNode = primitivesStack.pop();
+          }
+          // this.linkedState.selectPrimitive(d.data.name);
+          this.linkedState.selectPrimitives(primitives);
         }
       }).on('mouseenter', function (event, d) {
         const label = d.details.display_name || d.data.name;
