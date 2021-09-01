@@ -6,7 +6,8 @@ from starlette.responses import StreamingResponse
 from . import db, validateDataset
 
 router = APIRouter()
-ignoredPrimitiveList = ['async_launch_policy_dispatch', 'phylanx_primitive_eval_action']
+# ignoredPrimitiveList = ['async_launch_policy_dispatch', 'phylanx_primitive_eval_action']
+ignoredPrimitiveList = []
 
 @router.get('/datasets/{datasetId}/intervals')
 def get_intervals(datasetId: str, \
@@ -265,7 +266,7 @@ def primitive_trace_forward(datasetId: str,
         locations = db[datasetId]['info']['locationNames']
 
     def traceForward():
-        intervalData = {}
+        intervalData = dict()
 
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
             raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
@@ -290,6 +291,7 @@ def primitive_trace_forward(datasetId: str,
 
         def startEndTimeFinder(intervalObject):
             # Start on descendants
+            childList = list()
             startTime = intervalObject['enter']['Timestamp']
             endTime = intervalObject['leave']['Timestamp']
             childQueue = [intervalObject['intervalId']]
@@ -308,6 +310,9 @@ def primitive_trace_forward(datasetId: str,
                 if yieldThisInterval:
                     startTime, endTime = updateTimes(startTime, endTime, intervalObj)
                     primitiveSet.add(intervalObj['Primitive'])
+                    childList.append({'enter': intervalObj['enter']['Timestamp'],
+                                      'leave': intervalObj['leave']['Timestamp'],
+                                      'location': intervalObj['Location']})
                 # Only add children to the queue if this interval ends before the
                 # queried range does
                 if intervalObj['leave']['Timestamp'] <= end:
@@ -315,11 +320,11 @@ def primitive_trace_forward(datasetId: str,
                         if childId not in childQueue:
                             childQueue.append(childId)
 
-            return {'startTime': startTime, 'endTime': endTime}
+            return {'totalTime': {'startTime': startTime, 'endTime': endTime}, 'childList': childList}
 
         def updateMinAmongLocation(locationEndTime):
             isFirstElement = True
-            minAmongLocation = {}
+            minAmongLocation = dict()
             for dLocation in locationEndTime:
                 if isFirstElement or minAmongLocation['time'] > locationEndTime[dLocation]:
                     minAmongLocation = {'time': locationEndTime[dLocation], 'location': dLocation}
@@ -327,10 +332,10 @@ def primitive_trace_forward(datasetId: str,
             return minAmongLocation
 
         def greedyIntervalAssignment(intervalList):
-            intervalsCompacted = {}
+            intervalsCompacted = dict()
             if not intervalList:
                 return intervalsCompacted
-            locationEndTime = {}
+            locationEndTime = dict()
             minAmongLocation = {'time': intervalList[0]['startTime'] + 1, 'location': 0}  # making sure to force into else in the for loop
             intervalList.sort(key=lambda x: x['startTime'])
 
@@ -341,34 +346,34 @@ def primitive_trace_forward(datasetId: str,
                     locationEndTime[minAmongLocation['location']] = interval['endTime']
                     minAmongLocation = updateMinAmongLocation(locationEndTime)
                 else:
-                    intervalsCompacted[dummyLocation] = []
+                    intervalsCompacted[dummyLocation] = list()
                     intervalsCompacted[dummyLocation].append(interval)
                     locationEndTime[dummyLocation] = interval['endTime']
                     minAmongLocation = updateMinAmongLocation(locationEndTime)
                     dummyLocation = dummyLocation + 1
             return intervalsCompacted
 
-        traceForwardData = {}
-        traceForwardList = []
+        traceForwardList = list()
+        childrenList = list()
         step = (end - begin) / bins
         for location in intervalData:
             currentTime = begin
-            traceForwardData[location] = []
             previousIntervalEndTime = currentTime - 1
             for util in intervalData[location]:
                 if previousIntervalEndTime < currentTime + step and util > 0:
                     startingInterval = intervalFinder(currentTime, currentTime + step, location)
                     for intervalObj in startingInterval:
                         previousIntervalEndTime = max(previousIntervalEndTime, intervalObj['leave']['Timestamp'])
-                        stEndObj = startEndTimeFinder(intervalObj)
+                        stEndFinderObj = startEndTimeFinder(intervalObj)
+                        stEndObj = stEndFinderObj['totalTime']
+                        childrenList.extend(stEndFinderObj['childList'])
                         stEndObj['location'] = location
-                        traceForwardData[location].append(stEndObj)
                         traceForwardList.append(stEndObj)
                         previousIntervalEndTime = max(previousIntervalEndTime, stEndObj['endTime'])
                         # this is for to make the run faster since we are drawing in a location from the starting interval
                 currentTime = currentTime + step
         # primitiveSet.discard('async_launch_policy_dispatch') # safely remove some primitive
-        results = {'primitives': list(primitiveSet), 'data': greedyIntervalAssignment(traceForwardList)}
+        results = {'primitives': list(primitiveSet), 'data': greedyIntervalAssignment(traceForwardList), 'childList': childrenList}
         yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')

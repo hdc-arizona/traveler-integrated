@@ -19,6 +19,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     ]);
     super(options);
 
+    this.linkedState.aggregatedIntervalsSelection = null;
     // yScale maps the full list of locationNames to the full height of the
     // canvas
     this.yScale = d3.scaleBand()
@@ -96,11 +97,11 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   }
 
   handlePanningEnd (event, dragState) {
-    if (dragState.dx === 0 && dragState.dy === 0) {
-      const timestamp = Math.round(this.xScale.invert(event.x));
-      const location = this.yScale.invert(event.y + this.d3el.select('foreignObject').node().scrollTop);
-      this.linkedState.selectIntervalByTimeAndLoc(timestamp, location);
-    }
+    // if (dragState.dx === 0 && dragState.dy === 0) {
+    //   const timestamp = Math.round(this.xScale.invert(event.x));
+    //   const location = this.yScale.invert(event.y + this.d3el.select('foreignObject').node().scrollTop);
+    //   this.linkedState.selectIntervalByTimeAndLoc(timestamp, location);
+    // }
   }
 
   setupInteractions () {
@@ -137,7 +138,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   }
 
   async getUtilizationForAggregatedPrimitives (urlArgs, primitiveList) {
-    console.log(primitiveList);
     let allJson = undefined;
     if(Array.isArray(primitiveList)) {
       for (const eachPrimitiveName of primitiveList) {
@@ -173,7 +173,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
-    const selectedPrimitiveName = this.linkedState.selection?.primitiveName[0];
+    const selectedPrimitiveName = this.linkedState.selection?.primitiveName;
     const aggregatedIntervalsPromise = selectedPrimitiveName
         ? this.updateResource({
           name: 'aggregatedIntervals',
@@ -292,7 +292,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   }
 
   drawUtilLines(primitiveData, chartShape, location) {
-    console.log("drawing primitive util data");
+    // console.log("drawing primitive util data");
     const domain = chartShape.spilloverXScale.domain();
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;
 
@@ -337,6 +337,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
 
   drawAggregatedBars (chartShape) {
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
+    this.linkedState.aggregatedIntervalsSelection = aggregatedIntervals;
     const domain = chartShape.spilloverXScale.domain();
     const currentTimespan = this.linkedState.detailDomain[1] -
         this.linkedState.detailDomain[0];
@@ -367,7 +368,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
             bandwidth);
         ctx.fillStyle = "white";
         ctx.font = "10px Arial";
-        ctx.fillText(aggregatedIntervals.primitives[0], chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
+        ctx.fillText(this.linkedState.selection.primitiveName, chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
             this.yScale(location) + bandwidth/2);
 
         binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
