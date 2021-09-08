@@ -6,8 +6,21 @@ from starlette.responses import StreamingResponse
 from . import db, validateDataset
 
 router = APIRouter()
-# ignoredPrimitiveList = ['async_launch_policy_dispatch', 'phylanx_primitive_eval_action']
-ignoredPrimitiveList = []
+ignoredPrimitiveList = ['output_stream_write_async_action',
+                        'symbol_namespace_bind_action',
+                        'symbol_namespace_on_event_action',
+                        'symbol_namespace_unbind_action',
+                        'async',
+                        'async_launch_policy_dispatch',
+                        'run_helper',
+                        'primary_namespace_route_action',
+                        'primary_namespace_colocate_action',
+                        'background_work',
+                        'update_agas_cache_action',
+                        'locality_namespace_free_action',
+                        'dijkstra_termination_action',
+                        'phylanx_primitive_eval_action']
+# ignoredPrimitiveList = []
 
 @router.get('/datasets/{datasetId}/intervals')
 def get_intervals(datasetId: str, \
@@ -384,6 +397,19 @@ def get_dependency_tree(datasetId: str,
                         intervalId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
+    primitive_set = dict()
+    last_interval_id = 14113
+    for id in range(last_interval_id):
+        if str(id) in db[datasetId]['intervals']:
+            intervalObj = db[datasetId]['intervals'][str(id)]
+            if intervalObj['parent'] is None:
+                if '$' in intervalObj['Primitive']:
+                    if intervalObj['Primitive'] not in primitive_set:
+                        primitive_set[intervalObj['Primitive']] = list()
+                    primitive_set[intervalObj['Primitive']].append(str(id))
+    # print(len(primitive_set))
+    # print(primitive_set.keys())
+
     def generateTree():
 
         def mergeChildList(childrenList):
@@ -405,14 +431,40 @@ def get_dependency_tree(datasetId: str,
         def getChildren(id):
             thisNode = dict()
             intervalObj = db[datasetId]['intervals'][id]
-            thisNode['name'] = intervalObj['Primitive']
+            thisNode['name'] = intervalObj['Primitive'][11:]
             childrenList = list()
             for childId in intervalObj['children']:
-                if db[datasetId]['intervals'][childId]['Primitive'] not in ignoredPrimitiveList:
+                if '$' in db[datasetId]['intervals'][childId]['Primitive']:
                     childrenList.append(getChildren(childId))
             thisNode['children'] = mergeChildList(childrenList)
             return thisNode
-        results = getChildren(intervalId)
+
+        def mergeTwoTrees(tree1, tree2):
+            thisNode = dict()
+            if tree1['name'] != tree2['name']:
+                print("returning from here")
+                return
+            thisNode['name'] = tree1['name']
+            childrenList = tree1['children'] + tree2['children']
+            thisNode['children'] = mergeChildList(childrenList)
+            return thisNode
+
+        pre_c = None
+        current_c = None
+        checked_primitive_list = ['/phylanx$0/function$0$cannon/0$49$0',
+                                  '/phylanx$1/function$0$cannon/0$49$0',
+                                  '/phylanx$2/function$0$cannon/0$49$0',
+                                  '/phylanx$3/function$0$cannon/0$49$0']
+        for prim in checked_primitive_list:
+            for each_interval_id in primitive_set[prim]:
+                current_c = getChildren(each_interval_id)
+                if pre_c is None:
+                    pre_c = current_c
+                else:
+                    pre_c = mergeTwoTrees(pre_c, current_c)
+
+        results = pre_c
+        # results = getChildren(intervalId)
         yield json.dumps(results)
 
     return StreamingResponse(generateTree(), media_type='application/json')
