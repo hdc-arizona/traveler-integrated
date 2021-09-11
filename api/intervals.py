@@ -407,8 +407,6 @@ def get_dependency_tree(datasetId: str,
                     if intervalObj['Primitive'] not in primitive_set:
                         primitive_set[intervalObj['Primitive']] = list()
                     primitive_set[intervalObj['Primitive']].append(str(id))
-    # print(len(primitive_set))
-    # print(primitive_set.keys())
 
     def generateTree():
 
@@ -424,7 +422,6 @@ def get_dependency_tree(datasetId: str,
                     if otherChild['name'] == child['name']:
                         flag[otherInd] = True
                         combinedChild = child['children'] + otherChild['children']
-                        # child['children'].extend(otherChild['children'])
                         child['children'] = mergeChildList(combinedChild)
             return compactList
 
@@ -451,20 +448,19 @@ def get_dependency_tree(datasetId: str,
 
         pre_c = None
         current_c = None
-        checked_primitive_list = ['/phylanx$0/function$0$cannon/0$49$0',
-                                  '/phylanx$1/function$0$cannon/0$49$0',
-                                  '/phylanx$2/function$0$cannon/0$49$0',
-                                  '/phylanx$3/function$0$cannon/0$49$0']
-        for prim in checked_primitive_list:
+        for prim in primitive_set:
             for each_interval_id in primitive_set[prim]:
-                current_c = getChildren(each_interval_id)
+                thisNode = dict()
+                thisNode['name'] = 'phylanx'
+                thisNode['children'] = list()
+                thisNode['children'].append(getChildren(each_interval_id))
+                current_c = thisNode
                 if pre_c is None:
                     pre_c = current_c
                 else:
                     pre_c = mergeTwoTrees(pre_c, current_c)
 
         results = pre_c
-        # results = getChildren(intervalId)
         yield json.dumps(results)
 
     return StreamingResponse(generateTree(), media_type='application/json')
