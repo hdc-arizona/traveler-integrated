@@ -6,21 +6,6 @@ from starlette.responses import StreamingResponse
 from . import db, validateDataset
 
 router = APIRouter()
-ignoredPrimitiveList = ['output_stream_write_async_action',
-                        'symbol_namespace_bind_action',
-                        'symbol_namespace_on_event_action',
-                        'symbol_namespace_unbind_action',
-                        'async',
-                        'async_launch_policy_dispatch',
-                        'run_helper',
-                        'primary_namespace_route_action',
-                        'primary_namespace_colocate_action',
-                        'background_work',
-                        'update_agas_cache_action',
-                        'locality_namespace_free_action',
-                        'dijkstra_termination_action',
-                        'phylanx_primitive_eval_action']
-# ignoredPrimitiveList = []
 
 @router.get('/datasets/{datasetId}/intervals')
 def get_intervals(datasetId: str, \
@@ -207,55 +192,10 @@ def intervalTrace(datasetId: str,
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 
-# @router.get('/datasets/{datasetId}/intervals/{intervalId}/traceEnd')
-# def intervalTraceToEnd(datasetId: str,
-#                   intervalId: str,
-#                   begin: float = None,
-#                   end: float = None):
-#     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
-#
-#     if begin is None:
-#         begin = db[datasetId]['info']['intervalDomain'][0]
-#     if end is None:
-#         end = db[datasetId]['info']['intervalDomain'][1]
-#
-#     def updateTimes(startTime, endTime, intervalObj):
-#         return min(startTime, intervalObj['enter']['Timestamp']), max(endTime, intervalObj['leave']['Timestamp'])
-#
-#     def startEndTimeFinder():
-#         # Start on descendants
-#         intervalObj = db[datasetId]['intervals'][intervalId]
-#         startTime = intervalObj['enter']['Timestamp']
-#         endTime = intervalObj['leave']['Timestamp']
-#         childQueue = [intervalId]
-#
-#         while len(childQueue) > 0:
-#             intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
-#             # yield any interval where itself or its child (to allow offscreen
-#             # lines to the left) is in the queried range
-#             yieldThisInterval = False
-#             if intervalObj['leave']['Timestamp'] >= begin:
-#                 yieldThisInterval = True
-#             else:
-#                 for childId in intervalObj['children']:
-#                     if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
-#                         yieldThisInterval = True
-#
-#             if yieldThisInterval:
-#                 startTime, endTime = updateTimes(startTime, endTime, intervalObj)
-#
-#             # Only add children to the queue if this interval ends before the
-#             # queried range does
-#             if intervalObj['leave']['Timestamp'] <= end:
-#                 for childId in intervalObj['children']:
-#                     if not childId in childQueue:
-#                         childQueue.append(childId)
-#
-#         # Finished
-#         results = {'startTime': startTime, 'endTime': endTime}
-#         yield json.dumps(results)
-#
-#     return StreamingResponse(startEndTimeFinder(), media_type='application/json')
+def is_include_primitive_name(primitive: str):
+    if '$' in primitive:
+        return True
+    return False
 
 
 @router.get('/datasets/{datasetId}/primitives/primitiveTraceForward')
@@ -314,11 +254,11 @@ def primitive_trace_forward(datasetId: str,
                 # yield any interval where itself or its child (to allow offscreen
                 # lines to the left) is in the queried range
                 yieldThisInterval = False
-                if intervalObj['leave']['Timestamp'] >= begin and intervalObj['Primitive'] not in ignoredPrimitiveList:
+                if intervalObj['leave']['Timestamp'] >= begin and is_include_primitive_name(intervalObj['Primitive']):
                     yieldThisInterval = True
                 else:
                     for childId in intervalObj['children']:
-                        if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin and intervalObj['Primitive'] not in ignoredPrimitiveList:
+                        if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin and is_include_primitive_name(intervalObj['Primitive']):
                             yieldThisInterval = True
                 if yieldThisInterval:
                     startTime, endTime = updateTimes(startTime, endTime, intervalObj)
@@ -393,8 +333,7 @@ def primitive_trace_forward(datasetId: str,
 
 
 @router.get('/datasets/{datasetId}/getDependencyTree')
-def get_dependency_tree(datasetId: str,
-                        intervalId: str):
+def get_dependency_tree(datasetId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     primitive_set = dict()
@@ -403,7 +342,7 @@ def get_dependency_tree(datasetId: str,
         if str(id) in db[datasetId]['intervals']:
             intervalObj = db[datasetId]['intervals'][str(id)]
             if intervalObj['parent'] is None:
-                if '$' in intervalObj['Primitive']:
+                if is_include_primitive_name(intervalObj['Primitive']):
                     if intervalObj['Primitive'] not in primitive_set:
                         primitive_set[intervalObj['Primitive']] = list()
                     primitive_set[intervalObj['Primitive']].append(str(id))
@@ -431,7 +370,7 @@ def get_dependency_tree(datasetId: str,
             thisNode['name'] = intervalObj['Primitive'][11:]
             childrenList = list()
             for childId in intervalObj['children']:
-                if '$' in db[datasetId]['intervals'][childId]['Primitive']:
+                if is_include_primitive_name(db[datasetId]['intervals'][childId]['Primitive']):
                     childrenList.append(getChildren(childId))
             thisNode['children'] = mergeChildList(childrenList)
             return thisNode
