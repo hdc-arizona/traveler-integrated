@@ -207,7 +207,7 @@ def get_primitive_pretty_name_with_prefix(primitive: str):
 
 @router.get('/datasets/{datasetId}/primitives/primitiveTraceForward')
 def primitive_trace_forward(datasetId: str,
-                            primitive: str,
+                            primitives: str,
                             bins: int = 100,
                             begin: int = None,
                             end: int = None,
@@ -219,6 +219,7 @@ def primitive_trace_forward(datasetId: str,
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
+    primitives = primitives.split(",")
     primitiveSet = set()
     if locations:
         locations = locations.split(',')
@@ -228,19 +229,25 @@ def primitive_trace_forward(datasetId: str,
     def traceForward():
         intervalData = dict()
 
-        if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
-            raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
         for location in locations:
-            intervalData[location] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
+            for primitive in primitives:
+                if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
+                    raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
+                currentData = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
+                if location not in intervalData:
+                    intervalData[location] = currentData
+                else:
+                    for i in range(bins):
+                        intervalData[location][i] = intervalData[location][i] + currentData[i]
 
         # find all interval of this primitive within a time range (bin)
-        def intervalFinder(enter, leave, location):
+        def intervalFinder(enter, leave, loc):
             intervalList = []
             for i in db[datasetId]['intervalIndex'].iterOverlap(enter, leave):
                 intervalObject = db[datasetId]['intervals'][i.data]
-                if location is not None and intervalObject['Location'] != location:
+                if loc is not None and intervalObject['Location'] != loc:
                     continue
-                if primitive is not None and intervalObject['Primitive'] != primitive:
+                if primitive is not None and intervalObject['Primitive'] not in primitives:
                     continue
                 if intervalObject['enter']['Timestamp'] >= enter:
                     intervalList.append(intervalObject)
@@ -272,6 +279,7 @@ def primitive_trace_forward(datasetId: str,
                     primitiveSet.add(intervalObj['Primitive'])
                     childList.append({'enter': intervalObj['enter']['Timestamp'],
                                       'leave': intervalObj['leave']['Timestamp'],
+                                      'name': intervalObj['Primitive'],
                                       'location': intervalObj['Location']})
                 # Only add children to the queue if this interval ends before the
                 # queried range does
@@ -280,7 +288,7 @@ def primitive_trace_forward(datasetId: str,
                         if childId not in childQueue:
                             childQueue.append(childId)
 
-            return {'totalTime': {'startTime': startTime, 'endTime': endTime}, 'childList': childList}
+            return {'totalTime': {'startTime': startTime, 'endTime': endTime, 'name': intervalObject['Primitive']}, 'childList': childList}
 
         def updateMinAmongLocation(locationEndTime):
             isFirstElement = True
@@ -332,7 +340,7 @@ def primitive_trace_forward(datasetId: str,
                         previousIntervalEndTime = max(previousIntervalEndTime, stEndObj['endTime'])
                         # this is for to make the run faster since we are drawing in a location from the starting interval
                 currentTime = currentTime + step
-        # primitiveSet.discard('async_launch_policy_dispatch') # safely remove some primitive
+
         results = {'primitives': list(primitiveSet), 'data': greedyIntervalAssignment(traceForwardList), 'childList': childrenList}
         yield json.dumps(results)
 

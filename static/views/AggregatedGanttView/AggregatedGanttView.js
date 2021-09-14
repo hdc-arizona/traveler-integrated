@@ -56,8 +56,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     }
     if (this.linkedState.selection?.primitiveName) {
       const trace2 = this.getNamedResource('aggregatedIntervals');
-      if (trace2 === null || (trace2 instanceof Error && trace2.status === 503) ||
-          Object.keys(trace2.data).length === 0) {
+      if (trace2 === null || (trace2 instanceof Error && trace2.status === 503)) {
         return true;
       }
     }
@@ -173,12 +172,12 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
-    const selectedPrimitiveName = this.linkedState.selection?.primitiveName;
-    const aggregatedIntervalsPromise = selectedPrimitiveName
+    const selectedPrimitiveNames = this.linkedState.selection?.primitiveName;
+    const aggregatedIntervalsPromise = selectedPrimitiveNames
         ? this.updateResource({
           name: 'aggregatedIntervals',
           type: 'json',
-          url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?primitive=${selectedPrimitiveName}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
+          url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?primitives=${selectedPrimitiveNames.join()}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
         })
         : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
     // const primitiveUtilPromise = this.updateResource({
@@ -210,7 +209,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   getChartShape () {
     const chartShape = super.getChartShape();
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
-    if(aggregatedIntervals === null) {
+    if(aggregatedIntervals === null || Object.keys(aggregatedIntervals.data).length === 0) {
       this.yScale.range([0, chartShape.fullHeight])
           .domain([0]);
     } else {
@@ -368,7 +367,8 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
             bandwidth);
         ctx.fillStyle = "white";
         ctx.font = "10px Arial";
-        ctx.fillText(this.linkedState.selection.primitiveName, chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
+        ctx.fillText(aggTime.name,
+            chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
             this.yScale(location) + bandwidth/2);
 
         binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
