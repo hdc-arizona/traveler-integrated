@@ -198,6 +198,13 @@ def is_include_primitive_name(primitive: str):
     return False
 
 
+def get_primitive_pretty_name_with_prefix(primitive: str):
+    delimiter = '/'
+    start = primitive.find(delimiter)
+    start = primitive.find(delimiter, start+len(delimiter))
+    return primitive[:start+1], primitive[start+1:]
+
+
 @router.get('/datasets/{datasetId}/primitives/primitiveTraceForward')
 def primitive_trace_forward(datasetId: str,
                             primitive: str,
@@ -361,13 +368,20 @@ def get_dependency_tree(datasetId: str):
                     if otherChild['name'] == child['name']:
                         flag[otherInd] = True
                         combinedChild = child['children'] + otherChild['children']
+                        new_prefixes = list()
+                        for pre in otherChild['prefixList']:
+                            if pre not in child['prefixList']:
+                                new_prefixes.append(pre)
                         child['children'] = mergeChildList(combinedChild)
+                        child['prefixList'].extend(new_prefixes)
             return compactList
 
         def getChildren(id):
             thisNode = dict()
             intervalObj = db[datasetId]['intervals'][id]
-            thisNode['name'] = intervalObj['Primitive'][11:]
+            pref, thisNode['name'] = get_primitive_pretty_name_with_prefix(intervalObj['Primitive'])
+            thisNode['prefixList'] = list()
+            thisNode['prefixList'].append(pref)
             childrenList = list()
             for childId in intervalObj['children']:
                 if is_include_primitive_name(db[datasetId]['intervals'][childId]['Primitive']):
