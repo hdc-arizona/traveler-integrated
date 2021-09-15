@@ -361,15 +361,15 @@ def get_dependency_tree(datasetId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     primitive_set = dict()
-    last_interval_id = 14113
-    for id in range(last_interval_id):
-        if str(id) in db[datasetId]['intervals']:
-            intervalObj = db[datasetId]['intervals'][str(id)]
-            if intervalObj['parent'] is None:
-                if is_include_primitive_name(intervalObj['Primitive']):
-                    if intervalObj['Primitive'] not in primitive_set:
-                        primitive_set[intervalObj['Primitive']] = list()
-                    primitive_set[intervalObj['Primitive']].append(str(id))
+    id = 0
+    while str(id) in db[datasetId]['intervals']:
+        intervalObj = db[datasetId]['intervals'][str(id)]
+        if intervalObj['parent'] is None:
+            if is_include_primitive_name(intervalObj['Primitive']):
+                if intervalObj['Primitive'] not in primitive_set:
+                    primitive_set[intervalObj['Primitive']] = list()
+                primitive_set[intervalObj['Primitive']].append(str(id))
+        id = id + 1
 
     def generateTree():
 
