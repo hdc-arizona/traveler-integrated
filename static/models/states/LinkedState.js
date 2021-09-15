@@ -165,13 +165,13 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     }
 
     // Put the tree view at the bottom
-    if (availableViews.TreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
-      layout.content.push({
-        type: 'component',
-        componentName: 'TreeView',
-        componentState: { datasetId: this.info.datasetId }
-      });
-    }
+    // if (availableViews.TreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
+    //   layout.content.push({
+    //     type: 'component',
+    //     componentName: 'TreeView',
+    //     componentState: { datasetId: this.info.datasetId }
+    //   });
+    // }
     if (availableViews.DependencyTreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
       layout.content.push({
         type: 'component',
@@ -305,7 +305,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     return [
       this.createViewMenuEntry('Selection Info', 'SelectionInfoView', null, availableViews, openViews),
       this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews),
-      this.createViewMenuEntry('Tree', 'TreeView', null, availableViews, openViews),
+      // this.createViewMenuEntry('Tree', 'TreeView', null, availableViews, openViews),
       // Submenu for code views
       {
         label: 'Code',
