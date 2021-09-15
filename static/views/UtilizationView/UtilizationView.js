@@ -51,7 +51,11 @@ class UtilizationView extends
       derive: async () => {
         // Does the current selection have a way of getting selection-specific
         // utilization data?
-        return this.linkedState.selection?.getUtilization?.({ bins }) || null;
+        const selectedPrimitiveNames = this.linkedState.selection?.primitiveName.join();
+        if(!(selectedPrimitiveNames in this.linkedState.cachedUtilizationData)) {
+          this.linkedState.cachedUtilizationData[selectedPrimitiveNames] = this.linkedState.selection?.getUtilization?.({ bins }) || null;
+        }
+        return this.linkedState.cachedUtilizationData[selectedPrimitiveNames];
         // if not, don't show any selection-specific utilization
       }
     });

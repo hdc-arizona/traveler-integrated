@@ -33,6 +33,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     this._aggregatedIntervalsSelection = null;
     this._colorMode = COLOR_MODES.INCLUSIVE;
     this._viewLayout = options.priorLinkedState?._viewLayout || null;
+    this.cachedUtilizationData = {};
     this._viewLayoutPromise = this._viewLayout
       ? Promise.resolve(this._viewLayout)
       : this.ready.then(() => this.getDefaultLayout());
