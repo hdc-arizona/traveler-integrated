@@ -254,7 +254,7 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     if (needsRefresh) {
       // Cache the shape and selection ids that are currently relevant, so we
       // know if something changed since last time
-      this._lastChartShape = chartShape;
+
       this._lastSelectionId = this.linkedState.selection?.id;
 
       // Initial render call to show the spinner if waiting for data takes a while
@@ -262,6 +262,7 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
       // is fast)
       this.render();
       await this.updateData(chartShape);
+      this._lastChartShape = this.getChartShape();
       // Ensure that everything is updated with the new data
       this.render();
     }
