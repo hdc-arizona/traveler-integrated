@@ -148,7 +148,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     const domain = chartShape.spilloverXScale.domain();
     if(Array.isArray(aggTime.childList)) {
       for (const eachChild of aggTime.childList) {
-        if(allJson === undefined || !(eachChild.name in allJson)) {
+        if(!(eachChild.name in allJson)) {
           urlArgs.primitive = eachChild.name;
           urlArgs.locations = aggTime.locationList.join();
           const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
@@ -354,14 +354,15 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
             this.yScale(location),
             chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime),
             bandwidth);
-        ctx.fillStyle = "white";
-        ctx.font = "10px Arial";
-        ctx.fillText(aggTime.name,
-            chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
-            this.yScale(location) + bandwidth/2);
 
         binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
-        if((aggTime.endTime - aggTime.startTime) > binSize*5) { // at least five bins exist
+        if((aggTime.endTime - aggTime.startTime) > binSize*10) { // at least ten bins exist
+          ctx.fillStyle = "white";
+          ctx.font = "10px Arial";
+          ctx.fillText(aggTime.name,
+              chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
+              this.yScale(location) + bandwidth/2);
+
           // var urlArgs = {
           //   bins: Math.floor((Math.min(domain[1], aggTime.endTime) - Math.max(domain[0], aggTime.startTime)) / binSize),
           //   begin: aggTime.startTime,
@@ -385,6 +386,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
       }
     }
     Promise.all(promiseForPrimitiveUtil);
+
   }
 }
 

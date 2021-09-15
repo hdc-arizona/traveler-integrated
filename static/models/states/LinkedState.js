@@ -47,7 +47,9 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
   set aggregatedIntervalsSelection (selection) {
     this._aggregatedIntervalsSelection = selection;
-    // this.trigger('aggregatedIntervalsSelectionChanged');
+    if(selection !== null) {
+      this.trigger('aggregatedIntervalsSelectionChanged');
+    }
   }
 
   get selection () {
