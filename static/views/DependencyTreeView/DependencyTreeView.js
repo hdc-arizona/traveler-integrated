@@ -448,9 +448,17 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     const self = this;
     nodes
       .on('click', (event, d) => {
-        let primitives = []
-        for(let prefix of d.data.prefixList) {
-          primitives.push(prefix.concat(d.data.name));
+        let primitives = [];
+        if(d.data.name === 'phylanx') {
+          for(let child of d.data.children){
+            for(let prefix of child.prefixList) {
+              primitives.push(prefix.concat(child.name));
+            }
+          }
+        } else {
+          for (let prefix of d.data.prefixList) {
+            primitives.push(prefix.concat(d.data.name));
+          }
         }
         if (this.linkedState.selection?.primitiveName.join() === primitives.join()) {
           // Deselect
