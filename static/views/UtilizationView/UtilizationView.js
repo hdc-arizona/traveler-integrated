@@ -90,7 +90,6 @@ class UtilizationView extends
     this.d3el.select('.chart')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
-    this.linkedState.on('aggregatedIntervalsSelectionChanged', () => { this.updateResolution(); });
     // Ask for new data whenever the selection changes
     this.linkedState.on('selectionChanged', () => { this.updateResolution(); });
     // Update the brush immediately whenever any view changes it
