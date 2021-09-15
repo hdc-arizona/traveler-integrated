@@ -136,37 +136,39 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     lastChartShape.locations.some((loc, i) => chartShape.locations[i] !== loc);
   }
 
-  async getUtilizationForAggregatedPrimitives (urlArgs, primitiveList) {
-    let allJson = undefined;
-    if(Array.isArray(primitiveList)) {
-      for (const eachPrimitiveName of primitiveList) {
-        urlArgs.primitive = eachPrimitiveName;
-        const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
-            Object.entries(urlArgs).map(([key, value]) => {
-              return `${key}=${encodeURIComponent(value)}`;
-            }).join('&');
-        const response = await window.fetch(url);
-        const json = await response.json();
-        if(allJson === undefined) {
-          allJson = json;
-        } else {
-          if(json.locations !== undefined) {
-            Object.keys(json.locations).forEach(function (key) {
-              for (let ind in json.locations[key]) {
-                allJson.locations[key][ind] = Math.max(json.locations[key][ind], allJson.locations[key][ind]);
-              }
-            });
-          } else if(json.data !== undefined) {
-            for (let ind in json.data) {
-              allJson.data[ind] = allJson.data[ind] + json.data[ind];
-            }
-          }
+  getBinNumber(cTime, chartShape) {
+    const domain = chartShape.spilloverXScale.domain();
+    const binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins})
+    return Math.floor((cTime - domain[0]) / binSize);
+  }
+
+  async getUtilizationForAggregatedPrimitives (urlArgs, aggTime, chartShape) {
+    var allJson = {};
+    var utilization = new Array(chartShape.bins).fill(0);
+    const domain = chartShape.spilloverXScale.domain();
+    if(Array.isArray(aggTime.childList)) {
+      for (const eachChild of aggTime.childList) {
+        if(allJson === undefined || !(eachChild.name in allJson)) {
+          urlArgs.primitive = eachChild.name;
+          urlArgs.locations = aggTime.locationList.join();
+          const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
+              Object.entries(urlArgs).map(([key, value]) => {
+                return `${key}=${encodeURIComponent(value)}`;
+              }).join('&');
+          const response = await window.fetch(url);
+          const json = await response.json();
+          allJson[eachChild.name] = json.locations;
+        }
+        let startingBin = this.getBinNumber(Math.max(domain[0], eachChild.enter), chartShape);
+        let endingBin = this.getBinNumber(Math.min(domain[1], eachChild.leave), chartShape);
+        for(var i = startingBin; i <= Math.min(endingBin, chartShape.bins-1); i++) {
+          utilization[i] = utilization[i] + allJson[eachChild.name][eachChild.location][i];
         }
       }
     } else {
       console.log("Primitive List should be an array");
     }
-    return allJson;
+    return utilization;
   }
 
   async updateData (chartShape) {
@@ -299,12 +301,13 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     const ctx = canvas.node().getContext('2d');
 
     const bandwidth = this.yScale.bandwidth();
-    let binSize = this.getBinSize(primitiveData.metadata);
-    const maxUtil = this.linkedState.info.locationNames.length + 1;
 
+    let binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
+    const maxUtil = this.linkedState.info.locationNames.length;
+    // const maxUtil = Math.ceil(Math.max(...primitiveData));
     const outlinePathGenerator = d3.area()
         .x((d, i) => {
-          let actualTime = primitiveData.metadata.begin + (i * binSize);
+          let actualTime = domain[0] + (i * binSize);
           return chartShape.spilloverXScale(actualTime) - chartShape.leftOffset;
         }) // bin number corresponds to screen coordinate
         .y1(d => {
@@ -315,23 +318,9 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
         }).context(ctx);
     ctx.fillStyle = theme['--selection-color'];
     ctx.beginPath();
-    outlinePathGenerator(primitiveData.data);
+    outlinePathGenerator(primitiveData);
     ctx.fill();
     ctx.closePath();
-
-    // const outlinePathGenerator = d3.line()
-    //     .x((d, i) => {
-    //       let actualTime = primitiveData.metadata.begin + (i * binSize);
-    //       return chartShape.spilloverXScale(actualTime) - chartShape.leftOffset;
-    //     }) // bin number corresponds to screen coordinate
-    //     .y(d => {
-    //       return this.yScale(location) + bandwidth * (1 - d/9);
-    //     }).context(ctx);
-    // ctx.strokeStyle = theme['--selection-color'];
-    // ctx.beginPath();
-    // outlinePathGenerator(primitiveData.data);
-    // ctx.stroke();
-    // ctx.closePath();
   }
 
   drawAggregatedBars (chartShape) {
@@ -373,13 +362,18 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
 
         binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
         if((aggTime.endTime - aggTime.startTime) > binSize*5) { // at least five bins exist
+          // var urlArgs = {
+          //   bins: Math.floor((Math.min(domain[1], aggTime.endTime) - Math.max(domain[0], aggTime.startTime)) / binSize),
+          //   begin: aggTime.startTime,
+          //   end: aggTime.endTime
+          // };
           var urlArgs = {
-            bins: Math.floor((aggTime.endTime - aggTime.startTime) / binSize),
-            begin: aggTime.startTime,
-            end: aggTime.endTime
+            bins: chartShape.bins,
+            begin: domain[0],
+            end: domain[1]
           };
           let promise = new Promise(function(resolve, reject) {
-            var primitiveData = __self.getUtilizationForAggregatedPrimitives(urlArgs, aggregatedIntervals.primitives);
+            var primitiveData = __self.getUtilizationForAggregatedPrimitives(urlArgs, aggTime, chartShape);
             resolve(primitiveData);
           });
           promise.then(function(primitiveData){

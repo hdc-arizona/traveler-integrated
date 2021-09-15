@@ -1,4 +1,5 @@
 import json
+import math
 
 from fastapi import APIRouter
 from starlette.responses import StreamingResponse
@@ -259,6 +260,7 @@ def primitive_trace_forward(datasetId: str,
         def startEndTimeFinder(intervalObject):
             # Start on descendants
             childList = list()
+            locationSet = set()
             startTime = intervalObject['enter']['Timestamp']
             endTime = intervalObject['leave']['Timestamp']
             childQueue = [intervalObject['intervalId']]
@@ -275,12 +277,14 @@ def primitive_trace_forward(datasetId: str,
                         if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin and is_include_primitive_name(intervalObj['Primitive']):
                             yieldThisInterval = True
                 if yieldThisInterval:
+                    currentPrimitive = intervalObj['Primitive']
                     startTime, endTime = updateTimes(startTime, endTime, intervalObj)
                     primitiveSet.add(intervalObj['Primitive'])
                     childList.append({'enter': intervalObj['enter']['Timestamp'],
                                       'leave': intervalObj['leave']['Timestamp'],
-                                      'name': intervalObj['Primitive'],
+                                      'name': currentPrimitive,
                                       'location': intervalObj['Location']})
+                    locationSet.add(intervalObj['Location'])
                 # Only add children to the queue if this interval ends before the
                 # queried range does
                 if intervalObj['leave']['Timestamp'] <= end:
@@ -288,7 +292,11 @@ def primitive_trace_forward(datasetId: str,
                         if childId not in childQueue:
                             childQueue.append(childId)
 
-            return {'totalTime': {'startTime': startTime, 'endTime': endTime, 'name': intervalObject['Primitive']}, 'childList': childList}
+            return {'startTime': startTime,
+                    'endTime': endTime,
+                    'name': intervalObject['Primitive'],
+                    'childList': childList,
+                    'locationList': list(locationSet)}
 
         def updateMinAmongLocation(locationEndTime):
             isFirstElement = True
@@ -333,15 +341,16 @@ def primitive_trace_forward(datasetId: str,
                     for intervalObj in startingInterval:
                         previousIntervalEndTime = max(previousIntervalEndTime, intervalObj['leave']['Timestamp'])
                         stEndFinderObj = startEndTimeFinder(intervalObj)
-                        stEndObj = stEndFinderObj['totalTime']
                         childrenList.extend(stEndFinderObj['childList'])
-                        stEndObj['location'] = location
-                        traceForwardList.append(stEndObj)
-                        previousIntervalEndTime = max(previousIntervalEndTime, stEndObj['endTime'])
+                        stEndFinderObj['location'] = location
+                        traceForwardList.append(stEndFinderObj)
+                        previousIntervalEndTime = max(previousIntervalEndTime, stEndFinderObj['endTime'])
                         # this is for to make the run faster since we are drawing in a location from the starting interval
                 currentTime = currentTime + step
 
-        results = {'primitives': list(primitiveSet), 'data': greedyIntervalAssignment(traceForwardList), 'childList': childrenList}
+        results = {'primitives': list(primitiveSet),
+                   'data': greedyIntervalAssignment(traceForwardList),
+                   'childList': childrenList}
         yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')
