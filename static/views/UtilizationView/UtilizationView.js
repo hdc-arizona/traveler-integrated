@@ -51,7 +51,7 @@ class UtilizationView extends
       derive: async () => {
         // Does the current selection have a way of getting selection-specific
         // utilization data?
-        return this.linkedState.selection?.getUtilization?.({ bins }, this.linkedState.aggregatedIntervalsSelection) || null;
+        return this.linkedState.selection?.getUtilization?.({ bins }) || null;
         // if not, don't show any selection-specific utilization
       }
     });

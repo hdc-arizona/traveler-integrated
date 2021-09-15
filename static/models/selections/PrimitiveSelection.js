@@ -29,13 +29,23 @@ class PrimitiveSelection extends Selection {
    * Add selection-specific arguments to /utilizationHistogram API endpoint,
    * and fetch the data
    */
-  async getUtilization (urlArgs, aggregatedIntervals) {
+  async getUtilization (urlArgs) {
     var allJson = {};
     var utilization = new Array(urlArgs.bins).fill(0);
     var results = {};
     var flag = {};
+    var aggregatedIntervals = undefined;
 
-    if(aggregatedIntervals !== undefined && 'data' in aggregatedIntervals) {
+    if(Array.isArray(this.primitiveName)) {
+      urlArgs.primitive = undefined;
+      urlArgs.primitives = this.primitiveName.join();
+      const url = `/datasets/${window.controller.currentDatasetId}/primitives/primitiveTraceForward?` +
+          Object.entries(urlArgs).map(([key, value]) => {
+            return `${key}=${encodeURIComponent(value)}`;
+          }).join('&');
+      const response = await window.fetch(url);
+      aggregatedIntervals = await response.json();
+
       for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals.data)) {
         for (let aggTime of aggregatedTimes) {
           for (const eachChild of aggTime.childList) {
@@ -74,38 +84,7 @@ class PrimitiveSelection extends Selection {
       }
       results = {}
       results['data'] = utilization;
-      console.log("max util: ", Math.max(...utilization));
     } else if(!Array.isArray(this.primitiveName)) {
-    //   console.log("Primitive List should be an array");
-    // }
-    //
-    // let allJson = undefined;
-    // if(Array.isArray(this.primitiveName)) {
-    //   for (const eachPrimitiveName of this.primitiveName) {
-    //     urlArgs.primitive = eachPrimitiveName;
-    //     const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
-    //         Object.entries(urlArgs).map(([key, value]) => {
-    //           return `${key}=${encodeURIComponent(value)}`;
-    //         }).join('&');
-    //     const response = await window.fetch(url);
-    //     const json = await response.json();
-    //     if(allJson === undefined) {
-    //       allJson = json;
-    //     } else {
-    //       if(json.locations !== undefined) {
-    //         Object.keys(json.locations).forEach(function (key) {
-    //           for (let ind in json.locations[key]) {
-    //             allJson.locations[key][ind] = Math.max(json.locations[key][ind], allJson.locations[key][ind]);
-    //           }
-    //         });
-    //       } else if(json.data !== undefined) {
-    //         for (let ind in json.data) {
-    //           allJson.data[ind] = allJson.data[ind] + json.data[ind];
-    //         }
-    //       }
-    //     }
-    //   }
-    // } else {
       urlArgs.primitive = this.primitiveName;
       const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
           Object.entries(urlArgs).map(([key, value]) => {
