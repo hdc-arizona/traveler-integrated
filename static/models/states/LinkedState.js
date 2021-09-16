@@ -110,7 +110,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   async getAvailableViews () {
     const views = {
       SelectionInfoView: { status: VIEW_STATUS.AVAILABLE },
-      DependencyTreeView: { status: VIEW_STATUS.UNAVAILABLE },
+      DependencyTreeView: { status: VIEW_STATUS.AVAILABLE },
       TreeView: { status: VIEW_STATUS.UNAVAILABLE },
       CodeView: { status: VIEW_STATUS.UNAVAILABLE, variants: [] }
     };
