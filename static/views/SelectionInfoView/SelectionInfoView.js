@@ -43,7 +43,7 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
     let selectionHeader, selectionLinks, selectionDetails;
     if (this.linkedState?.selection) {
       let customizedLabel = this.linkedState.selection.label;
-      if(Array.isArray(this.primitiveName)) {
+      if(Array.isArray(customizedLabel)) {
         customizedLabel = this.linkedState.selection.label.join("<br>");
       }
       selectionHeader = `<h5>${this.linkedState.selection.humanReadableType}:</h5>
