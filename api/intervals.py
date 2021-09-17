@@ -360,77 +360,7 @@ def primitive_trace_forward(datasetId: str,
 def get_dependency_tree(datasetId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
-    primitive_set = dict()
-    id = 0
-    while str(id) in db[datasetId]['intervals']:
-        intervalObj = db[datasetId]['intervals'][str(id)]
-        if intervalObj['parent'] is None:
-            if is_include_primitive_name(intervalObj['Primitive']):
-                if intervalObj['Primitive'] not in primitive_set:
-                    primitive_set[intervalObj['Primitive']] = list()
-                primitive_set[intervalObj['Primitive']].append(str(id))
-        id = id + 1
-
     def generateTree():
-
-        def mergeChildList(childrenList):
-            flag = [False] * len(childrenList)
-            compactList = list()
-            for ind, child in enumerate(childrenList):
-                if flag[ind] is True:
-                    continue
-                flag[ind] = True
-                compactList.append(child)
-                for otherInd, otherChild in enumerate(childrenList[ind+1:], start=ind+1):
-                    if otherChild['name'] == child['name']:
-                        flag[otherInd] = True
-                        combinedChild = child['children'] + otherChild['children']
-                        new_prefixes = list()
-                        for pre in otherChild['prefixList']:
-                            if pre not in child['prefixList']:
-                                new_prefixes.append(pre)
-                        child['children'] = mergeChildList(combinedChild)
-                        child['prefixList'].extend(new_prefixes)
-            return compactList
-
-        def getChildren(id):
-            thisNode = dict()
-            intervalObj = db[datasetId]['intervals'][id]
-            pref, thisNode['name'] = get_primitive_pretty_name_with_prefix(intervalObj['Primitive'])
-            thisNode['prefixList'] = list()
-            thisNode['prefixList'].append(pref)
-            childrenList = list()
-            for childId in intervalObj['children']:
-                if is_include_primitive_name(db[datasetId]['intervals'][childId]['Primitive']):
-                    childrenList.append(getChildren(childId))
-            thisNode['children'] = mergeChildList(childrenList)
-            return thisNode
-
-        def mergeTwoTrees(tree1, tree2):
-            thisNode = dict()
-            if tree1['name'] != tree2['name']:
-                print("returning from here")
-                return
-            thisNode['name'] = tree1['name']
-            childrenList = tree1['children'] + tree2['children']
-            thisNode['children'] = mergeChildList(childrenList)
-            return thisNode
-
-        pre_c = None
-        current_c = None
-        for prim in primitive_set:
-            for each_interval_id in primitive_set[prim]:
-                thisNode = dict()
-                thisNode['name'] = 'phylanx'
-                thisNode['children'] = list()
-                thisNode['children'].append(getChildren(each_interval_id))
-                current_c = thisNode
-                if pre_c is None:
-                    pre_c = current_c
-                else:
-                    pre_c = mergeTwoTrees(pre_c, current_c)
-
-        results = pre_c
-        yield json.dumps(results)
+        yield json.dumps(db[datasetId]['dependencyTree'])
 
     return StreamingResponse(generateTree(), media_type='application/json')
