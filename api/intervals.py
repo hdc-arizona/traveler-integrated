@@ -361,6 +361,6 @@ def get_dependency_tree(datasetId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     def generateTree():
-        yield json.dumps(db[datasetId]['dependencyTree'])
+        yield json.dumps(db[datasetId]['dependencyTree'].getTheTree())
 
     return StreamingResponse(generateTree(), media_type='application/json')

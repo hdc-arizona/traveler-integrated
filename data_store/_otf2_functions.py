@@ -7,6 +7,7 @@ import numpy as np
 from blist import sortedlist
 from intervaltree import Interval, IntervalTree
 from .sparseUtilizationList import SparseUtilizationList
+from .dependencyTree import DependencyTreeNode
 from . import logToConsole
 
 # Helper function from https://stackoverflow.com/a/4836734/1058935 for
@@ -489,48 +490,45 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
             flag[ind] = True
             compactList.append(child)
             for otherInd, otherChild in enumerate(childrenList[ind+1:], start=ind+1):
-                if otherChild['name'] == child['name']:
+                if otherChild.name == child.name:
                     flag[otherInd] = True
-                    combinedChild = child['children'] + otherChild['children']
+                    combinedChild = child.children + otherChild.children
                     new_prefixes = list()
-                    for pre in otherChild['prefixList']:
-                        if pre not in child['prefixList']:
+                    for pre in otherChild.prefixList:
+                        if pre not in child.prefixList:
                             new_prefixes.append(pre)
-                    child['children'] = mergeChildList(combinedChild)
-                    child['prefixList'].extend(new_prefixes)
+                    child.resetChildrenList(mergeChildList(combinedChild))
+                    child.addPrefixList(new_prefixes)
         return compactList
 
     def getChildren(id):
-        thisNode = dict()
+        thisNode = DependencyTreeNode()
         intervalObj = self[datasetId]['intervals'][id]
-        pref, thisNode['name'] = get_primitive_pretty_name_with_prefix(intervalObj['Primitive'])
-        thisNode['prefixList'] = list()
-        thisNode['prefixList'].append(pref)
+        thisNode.setName(intervalObj['Primitive'])
         childrenList = list()
         for childId in intervalObj['children']:
             if is_include_primitive_name(self[datasetId]['intervals'][childId]['Primitive']):
                 childrenList.append(getChildren(childId))
-        thisNode['children'] = mergeChildList(childrenList)
+                # thisNode.addChildren(getChildren(childId))
+        # thisNode.mergeChildren()
+        thisNode.resetChildrenList(childrenList)
         return thisNode
 
     def mergeTwoTrees(tree1, tree2):
-        thisNode = dict()
-        if tree1['name'] != tree2['name']:
+        thisNode = DependencyTreeNode()
+        if tree1.name != tree2.name:
             print("returning from here")
             return
-        thisNode['name'] = tree1['name']
-        childrenList = tree1['children'] + tree2['children']
-        thisNode['children'] = mergeChildList(childrenList)
+        thisNode.name = tree1.name
+        thisNode.resetChildrenList(mergeChildList(tree1.children + tree2.children))
         return thisNode
 
     pre_c = None
     current_c = None
     for prim in primitive_set:
         for each_interval_id in primitive_set[prim]:
-            thisNode = dict()
-            thisNode['name'] = 'phylanx'
-            thisNode['children'] = list()
-            thisNode['children'].append(getChildren(each_interval_id))
+            thisNode = DependencyTreeNode()
+            thisNode.addChildren(getChildren(each_interval_id))
             current_c = thisNode
             if pre_c is None:
                 pre_c = current_c
