@@ -464,12 +464,6 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
             return True
         return False
 
-    def get_primitive_pretty_name_with_prefix(primitive: str):
-        delimiter = '/'
-        start = primitive.find(delimiter)
-        start = primitive.find(delimiter, start+len(delimiter))
-        return primitive[:start+1], primitive[start+1:]
-
     primitive_set = dict()
     id = 0
     while str(id) in self[datasetId]['intervals']:
@@ -481,37 +475,14 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
                 primitive_set[intervalObj['Primitive']].append(str(id))
         id = id + 1
 
-    def mergeChildList(childrenList):
-        flag = [False] * len(childrenList)
-        compactList = list()
-        for ind, child in enumerate(childrenList):
-            if flag[ind] is True:
-                continue
-            flag[ind] = True
-            compactList.append(child)
-            for otherInd, otherChild in enumerate(childrenList[ind+1:], start=ind+1):
-                if otherChild.name == child.name:
-                    flag[otherInd] = True
-                    combinedChild = child.children + otherChild.children
-                    new_prefixes = list()
-                    for pre in otherChild.prefixList:
-                        if pre not in child.prefixList:
-                            new_prefixes.append(pre)
-                    child.resetChildrenList(mergeChildList(combinedChild))
-                    child.addPrefixList(new_prefixes)
-        return compactList
-
     def getChildren(id):
         thisNode = DependencyTreeNode()
         intervalObj = self[datasetId]['intervals'][id]
         thisNode.setName(intervalObj['Primitive'])
-        childrenList = list()
         for childId in intervalObj['children']:
             if is_include_primitive_name(self[datasetId]['intervals'][childId]['Primitive']):
-                childrenList.append(getChildren(childId))
-                # thisNode.addChildren(getChildren(childId))
-        # thisNode.mergeChildren()
-        thisNode.resetChildrenList(childrenList)
+                thisNode.addChildren(getChildren(childId))
+        thisNode.mergeChildren()
         return thisNode
 
     def mergeTwoTrees(tree1, tree2):
@@ -520,7 +491,8 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
             print("returning from here")
             return
         thisNode.name = tree1.name
-        thisNode.resetChildrenList(mergeChildList(tree1.children + tree2.children))
+        thisNode.resetChildrenList(tree1.children + tree2.children)
+        thisNode.mergeChildren()
         return thisNode
 
     pre_c = None

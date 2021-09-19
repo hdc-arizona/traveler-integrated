@@ -44,7 +44,6 @@ class DependencyTreeNode():
         return thisNode
 
     def mergeChildren(self):
-        print('looping in here ', self.name)
         flag = [False] * len(self.children)
         compactList = list()
         for ind, child in enumerate(self.children):
@@ -55,10 +54,11 @@ class DependencyTreeNode():
             for otherInd, otherChild in enumerate(self.children[ind+1:], start=ind+1):
                 if otherChild.name == child.name:
                     flag[otherInd] = True
-                    child.addChildrenList(otherChild.children)
+                    child.resetChildrenList(child.children + otherChild.children)
                     new_prefixes = list()
                     for pre in otherChild.prefixList:
                         if pre not in child.prefixList:
                             new_prefixes.append(pre)
                     child.mergeChildren()
                     child.addPrefixList(new_prefixes)
+        self.resetChildrenList(compactList)
