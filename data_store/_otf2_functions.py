@@ -485,15 +485,11 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
         return thisNode
 
     def mergeTwoTrees(tree1, tree2):
-        thisNode = DependencyTreeNode()
         if tree1.name != tree2.name:
             print("returning from here")
             return
-        thisNode.name = tree1.name
-        thisNode.resetChildrenList(tree1.children)
         for eachTree2Child in tree2.children:
-            thisNode.addChildren(eachTree2Child)  # add children to merge safely
-        return thisNode
+            tree1.addChildren(eachTree2Child)  # call add children instead of list.append to merge safely
 
     pre_c = None
     current_c = None
@@ -505,7 +501,7 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
             if pre_c is None:
                 pre_c = current_c
             else:
-                pre_c = mergeTwoTrees(pre_c, current_c)
+                mergeTwoTrees(pre_c, current_c)
 
     results = pre_c
     self[datasetId]['dependencyTree'] = results
