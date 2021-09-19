@@ -482,6 +482,7 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
         for childId in intervalObj['children']:
             if is_include_primitive_name(self[datasetId]['intervals'][childId]['Primitive']):
                 thisNode.addChildren(getChildren(childId))
+        thisNode.updateAggregatedListFromIntervalList(intervalObj['enter']['Timestamp'], intervalObj['leave']['Timestamp'])
         return thisNode
 
     def mergeTwoTrees(tree1, tree2):
@@ -490,13 +491,22 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
             return
         for eachTree2Child in tree2.children:
             tree1.addChildren(eachTree2Child)  # call add children instead of list.append to merge safely
+        tree1.intervalList.extend(tree2.intervalList)
+        tree1.aggregatedBlockList.extend(tree2.aggregatedBlockList)
 
     pre_c = None
     current_c = None
+    educatedCount = dict()
     for prim in primitive_set:
+        if prim[11:] not in educatedCount:
+            educatedCount[prim[11:]] = 0
+        educatedCount[prim[11:]] = educatedCount[prim[11:]] + len(primitive_set[prim])
         for each_interval_id in primitive_set[prim]:
             thisNode = DependencyTreeNode()
-            thisNode.addChildren(getChildren(each_interval_id))
+            newChild = getChildren(each_interval_id)
+            thisNode.addChildren(newChild)
+            thisNode.aggregatedBlockList.extend(newChild.aggregatedBlockList)
+            thisNode.intervalList.extend(newChild.intervalList)
             current_c = thisNode
             if pre_c is None:
                 pre_c = current_c

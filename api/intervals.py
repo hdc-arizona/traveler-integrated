@@ -344,13 +344,14 @@ def primitive_trace_forward(datasetId: str,
                         childrenList.extend(stEndFinderObj['childList'])
                         stEndFinderObj['location'] = location
                         traceForwardList.append(stEndFinderObj)
-                        previousIntervalEndTime = max(previousIntervalEndTime, stEndFinderObj['endTime'])
+                        # previousIntervalEndTime = max(previousIntervalEndTime, stEndFinderObj['endTime'])
                         # this is for to make the run faster since we are drawing in a location from the starting interval
                 currentTime = currentTime + step
 
         results = {'primitives': list(primitiveSet),
                    'data': greedyIntervalAssignment(traceForwardList),
-                   'childList': childrenList}
+                   'childList': childrenList,
+                   'aggList': db[datasetId]['dependencyTree'].getTheTree()}
         yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')

@@ -14,6 +14,7 @@ class DependencyTreeNode():
         self.children = list()  # list of DependencyTreeNode
         self.prefixList = list()  # list of string
         self.aggregatedBlockList = list()  # list of dictionary (start time, end time), convert it to (event, time) list later
+        self.intervalList = list()  # containing just the enter and leave time of this interval, helper for creating aggreatedBlockList
         self.utilization = SparseUtilizationList()
 
     def setName(self, primitiveName):
@@ -32,6 +33,11 @@ class DependencyTreeNode():
                 for pre in child.prefixList:
                     if pre not in myChild.prefixList:
                         myChild.prefixList.append(pre)
+                # update aggregatedBlockList
+                myChild.aggregatedBlockList.extend(child.aggregatedBlockList)
+                myChild.intervalList.extend(child.intervalList)
+                break
+
         if notFound:
             self.children.append(child)
 
@@ -53,4 +59,19 @@ class DependencyTreeNode():
         for child in self.children:
             cList.append(child.getTheTree())
         thisNode['children'] = cList
+        thisNode['aggregatedList'] = self.aggregatedBlockList
+        thisNode['intervalList'] = self.intervalList
         return thisNode
+
+    def addIntervalToIntervalList(self, startTime, endTime):
+        self.intervalList.append({'enter': startTime, 'leave': endTime})
+
+    def updateAggregatedListFromIntervalList(self, startTime, endTime):
+        self.intervalList.append({'enter': startTime, 'leave': endTime})
+        self.aggregatedBlockList.append({'time': startTime, 'event': 'enter'})
+        maxTime = endTime
+        for eachChild in self.children:
+            for eachAgg in eachChild.aggregatedBlockList:
+                if eachAgg['event'] == 'leave':
+                    maxTime = max(maxTime, eachAgg['time'])
+        self.aggregatedBlockList.append({'time': maxTime, 'event': 'leave'})
