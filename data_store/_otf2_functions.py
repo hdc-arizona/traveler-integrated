@@ -482,7 +482,6 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
         for childId in intervalObj['children']:
             if is_include_primitive_name(self[datasetId]['intervals'][childId]['Primitive']):
                 thisNode.addChildren(getChildren(childId))
-        thisNode.mergeChildren()
         return thisNode
 
     def mergeTwoTrees(tree1, tree2):
@@ -491,8 +490,9 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
             print("returning from here")
             return
         thisNode.name = tree1.name
-        thisNode.resetChildrenList(tree1.children + tree2.children)
-        thisNode.mergeChildren()
+        thisNode.resetChildrenList(tree1.children)
+        for eachTree2Child in tree2.children:
+            thisNode.addChildren(eachTree2Child)  # add children to merge safely
         return thisNode
 
     pre_c = None

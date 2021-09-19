@@ -21,7 +21,19 @@ class DependencyTreeNode():
         self.prefixList.append(pref)
 
     def addChildren(self, child):
-        self.children.append(child)
+        notFound = True
+        for myChild in self.children:
+            if myChild.name == child.name:
+                notFound = False
+                # update the children
+                for otherSubChild in child.children:
+                    myChild.addChildren(otherSubChild)
+                # update prefixList
+                for pre in child.prefixList:
+                    if pre not in myChild.prefixList:
+                        myChild.prefixList.append(pre)
+        if notFound:
+            self.children.append(child)
 
     def addChildrenList(self, childrenList):
         self.children.extend(childrenList)
@@ -42,23 +54,3 @@ class DependencyTreeNode():
             cList.append(child.getTheTree())
         thisNode['children'] = cList
         return thisNode
-
-    def mergeChildren(self):
-        flag = [False] * len(self.children)
-        compactList = list()
-        for ind, child in enumerate(self.children):
-            if flag[ind] is True:
-                continue
-            flag[ind] = True
-            compactList.append(child)
-            for otherInd, otherChild in enumerate(self.children[ind+1:], start=ind+1):
-                if otherChild.name == child.name:
-                    flag[otherInd] = True
-                    child.resetChildrenList(child.children + otherChild.children)
-                    new_prefixes = list()
-                    for pre in otherChild.prefixList:
-                        if pre not in child.prefixList:
-                            new_prefixes.append(pre)
-                    child.mergeChildren()
-                    child.addPrefixList(new_prefixes)
-        self.resetChildrenList(compactList)
