@@ -1,9 +1,11 @@
+import bisect
 import json
 import math
 
 from fastapi import APIRouter
 from starlette.responses import StreamingResponse
 
+from data_store.dependencyTree import find_node_in_dependency_tree
 from . import db, validateDataset
 
 router = APIRouter()
@@ -208,7 +210,7 @@ def get_primitive_pretty_name_with_prefix(primitive: str):
 
 @router.get('/datasets/{datasetId}/primitives/primitiveTraceForward')
 def primitive_trace_forward(datasetId: str,
-                            primitives: str,
+                            nodeId: str,
                             bins: int = 100,
                             begin: int = None,
                             end: int = None,
@@ -220,83 +222,19 @@ def primitive_trace_forward(datasetId: str,
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
-    primitives = primitives.split(",")
-    primitiveSet = set()
     if locations:
         locations = locations.split(',')
     else:
         locations = db[datasetId]['info']['locationNames']
 
     def traceForward():
-        intervalData = dict()
-
-        for location in locations:
-            for primitive in primitives:
-                if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
-                    raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
-                currentData = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
-                if location not in intervalData:
-                    intervalData[location] = currentData
-                else:
-                    for i in range(bins):
-                        intervalData[location][i] = intervalData[location][i] + currentData[i]
-
-        # find all interval of this primitive within a time range (bin)
-        def intervalFinder(enter, leave, loc):
-            intervalList = []
-            for i in db[datasetId]['intervalIndex'].iterOverlap(enter, leave):
-                intervalObject = db[datasetId]['intervals'][i.data]
-                if loc is not None and intervalObject['Location'] != loc:
-                    continue
-                if primitive is not None and intervalObject['Primitive'] not in primitives:
-                    continue
-                if intervalObject['enter']['Timestamp'] >= enter:
-                    intervalList.append(intervalObject)
-            return intervalList
-
-        def updateTimes(startTime, endTime, intervalObject):
-            return min(startTime, intervalObject['enter']['Timestamp']), max(endTime, intervalObject['leave']['Timestamp'])
-
-        def startEndTimeFinder(intervalObject):
-            # Start on descendants
-            childList = list()
-            locationSet = set()
-            startTime = intervalObject['enter']['Timestamp']
-            endTime = intervalObject['leave']['Timestamp']
-            childQueue = [intervalObject['intervalId']]
-            # search over the child subtrees
-            while len(childQueue) > 0:
-                intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
-                # yield any interval where itself or its child (to allow offscreen
-                # lines to the left) is in the queried range
-                yieldThisInterval = False
-                if intervalObj['leave']['Timestamp'] >= begin and is_include_primitive_name(intervalObj['Primitive']):
-                    yieldThisInterval = True
-                else:
-                    for childId in intervalObj['children']:
-                        if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin and is_include_primitive_name(intervalObj['Primitive']):
-                            yieldThisInterval = True
-                if yieldThisInterval:
-                    currentPrimitive = intervalObj['Primitive']
-                    startTime, endTime = updateTimes(startTime, endTime, intervalObj)
-                    primitiveSet.add(intervalObj['Primitive'])
-                    childList.append({'enter': intervalObj['enter']['Timestamp'],
-                                      'leave': intervalObj['leave']['Timestamp'],
-                                      'name': currentPrimitive,
-                                      'location': intervalObj['Location']})
-                    locationSet.add(intervalObj['Location'])
-                # Only add children to the queue if this interval ends before the
-                # queried range does
-                if intervalObj['leave']['Timestamp'] <= end:
-                    for childId in intervalObj['children']:
-                        if childId not in childQueue:
-                            childQueue.append(childId)
-
-            return {'startTime': startTime,
-                    'endTime': endTime,
-                    'name': intervalObject['Primitive'],
-                    'childList': childList,
-                    'locationList': list(locationSet)}
+        dependencyTree = db[datasetId]['dependencyTree']
+        currentNode = find_node_in_dependency_tree(dependencyTree, nodeId)
+        if currentNode is None:
+            print('Node in dependency tree not found')
+            yield ''
+            return
+        print('found node ', currentNode.name)
 
         def updateMinAmongLocation(locationEndTime):
             isFirstElement = True
@@ -329,30 +267,167 @@ def primitive_trace_forward(datasetId: str,
                     dummyLocation = dummyLocation + 1
             return intervalsCompacted
 
-        traceForwardList = list()
-        childrenList = list()
-        step = (end - begin) / bins
-        for location in intervalData:
-            currentTime = begin
-            previousIntervalEndTime = currentTime - 1
-            for util in intervalData[location]:
-                if previousIntervalEndTime < currentTime + step and util > 0:
-                    startingInterval = intervalFinder(currentTime, currentTime + step, location)
-                    for intervalObj in startingInterval:
-                        previousIntervalEndTime = max(previousIntervalEndTime, intervalObj['leave']['Timestamp'])
-                        stEndFinderObj = startEndTimeFinder(intervalObj)
-                        childrenList.extend(stEndFinderObj['childList'])
-                        stEndFinderObj['location'] = location
-                        traceForwardList.append(stEndFinderObj)
-                        # previousIntervalEndTime = max(previousIntervalEndTime, stEndFinderObj['endTime'])
-                        # this is for to make the run faster since we are drawing in a location from the starting interval
-                currentTime = currentTime + step
-
-        results = {'primitives': list(primitiveSet),
-                   'data': greedyIntervalAssignment(traceForwardList),
-                   'childList': childrenList,
-                   'aggList': db[datasetId]['dependencyTree'].getTheTree()}
+        left_index = bisect.bisect_left(currentNode.timeOnlyList, begin)
+        right_index = bisect.bisect_right(currentNode.timeOnlyList, end)  # not inclusive
+        isFirstLeave = True
+        traceForwardList = []
+        for ind in range(left_index, right_index):
+            if currentNode.fastSearchInAggBlock[ind]['event'] == 'enter':
+                isFirstLeave = False
+                traceForwardList.append({'startTime': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime,
+                                     'endTime': min(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime, end),
+                                      'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName})
+            elif isFirstLeave and currentNode.fastSearchInAggBlock[ind]['event'] == 'leave':
+                traceForwardList.append({'startTime': max(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime, begin),
+                                         'endTime': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime,
+                                         'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName})
+        results = {'data': greedyIntervalAssignment(traceForwardList)}
         yield json.dumps(results)
+        # intervalsCompacted = dict()
+        # if not intervalList:
+        #     return intervalsCompacted
+        # locationEndTime = dict()
+        # minAmongLocation = {'time': intervalList[0]['startTime'] + 1, 'location': 0}  # making sure to force into else in the for loop
+        #
+        # dummyLocation = 1
+        # for interval in intervalList:
+        #     if minAmongLocation['time'] < interval['startTime']:
+        #         intervalsCompacted[minAmongLocation['location']].append(interval)
+        #         locationEndTime[minAmongLocation['location']] = interval['endTime']
+        #         minAmongLocation = updateMinAmongLocation(locationEndTime)
+        #     else:
+        #         intervalsCompacted[dummyLocation] = list()
+        #         intervalsCompacted[dummyLocation].append(interval)
+        #         locationEndTime[dummyLocation] = interval['endTime']
+        #         minAmongLocation = updateMinAmongLocation(locationEndTime)
+        #         dummyLocation = dummyLocation + 1
+
+    # def traceForward1():
+    #     intervalData = dict()
+    #
+    #     for location in locations:
+    #         for primitive in primitives:
+    #             if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
+    #                 raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
+    #             currentData = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
+    #             if location not in intervalData:
+    #                 intervalData[location] = currentData
+    #             else:
+    #                 for i in range(bins):
+    #                     intervalData[location][i] = intervalData[location][i] + currentData[i]
+    #
+    #     # find all interval of this primitive within a time range (bin)
+    #     def intervalFinder(enter, leave, loc):
+    #         intervalList = []
+    #         for i in db[datasetId]['intervalIndex'].iterOverlap(enter, leave):
+    #             intervalObject = db[datasetId]['intervals'][i.data]
+    #             if loc is not None and intervalObject['Location'] != loc:
+    #                 continue
+    #             if primitive is not None and intervalObject['Primitive'] not in primitives:
+    #                 continue
+    #             if intervalObject['enter']['Timestamp'] >= enter:
+    #                 intervalList.append(intervalObject)
+    #         return intervalList
+    #
+    #     def updateTimes(startTime, endTime, intervalObject):
+    #         return min(startTime, intervalObject['enter']['Timestamp']), max(endTime, intervalObject['leave']['Timestamp'])
+    #
+    #     def startEndTimeFinder(intervalObject):
+    #         # Start on descendants
+    #         childList = list()
+    #         locationSet = set()
+    #         startTime = intervalObject['enter']['Timestamp']
+    #         endTime = intervalObject['leave']['Timestamp']
+    #         childQueue = [intervalObject['intervalId']]
+    #         # search over the child subtrees
+    #         while len(childQueue) > 0:
+    #             intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
+    #             # yield any interval where itself or its child (to allow offscreen
+    #             # lines to the left) is in the queried range
+    #             yieldThisInterval = False
+    #             if intervalObj['leave']['Timestamp'] >= begin and is_include_primitive_name(intervalObj['Primitive']):
+    #                 yieldThisInterval = True
+    #             else:
+    #                 for childId in intervalObj['children']:
+    #                     if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin and is_include_primitive_name(intervalObj['Primitive']):
+    #                         yieldThisInterval = True
+    #             if yieldThisInterval:
+    #                 currentPrimitive = intervalObj['Primitive']
+    #                 startTime, endTime = updateTimes(startTime, endTime, intervalObj)
+    #                 primitiveSet.add(intervalObj['Primitive'])
+    #                 childList.append({'enter': intervalObj['enter']['Timestamp'],
+    #                                   'leave': intervalObj['leave']['Timestamp'],
+    #                                   'name': currentPrimitive,
+    #                                   'location': intervalObj['Location']})
+    #                 locationSet.add(intervalObj['Location'])
+    #             # Only add children to the queue if this interval ends before the
+    #             # queried range does
+    #             if intervalObj['leave']['Timestamp'] <= end:
+    #                 for childId in intervalObj['children']:
+    #                     if childId not in childQueue:
+    #                         childQueue.append(childId)
+    #
+            # return {'startTime': startTime,
+            #         'endTime': endTime,
+            #         'name': intervalObject['Primitive'],
+            #         'childList': childList,
+            #         'locationList': list(locationSet)}
+    #
+        # def updateMinAmongLocation(locationEndTime):
+        #     isFirstElement = True
+        #     minAmongLocation = dict()
+        #     for dLocation in locationEndTime:
+        #         if isFirstElement or minAmongLocation['time'] > locationEndTime[dLocation]:
+        #             minAmongLocation = {'time': locationEndTime[dLocation], 'location': dLocation}
+        #             isFirstElement = False
+        #     return minAmongLocation
+        #
+        # def greedyIntervalAssignment(intervalList):
+        #     intervalsCompacted = dict()
+        #     if not intervalList:
+        #         return intervalsCompacted
+        #     locationEndTime = dict()
+        #     minAmongLocation = {'time': intervalList[0]['startTime'] + 1, 'location': 0}  # making sure to force into else in the for loop
+        #     intervalList.sort(key=lambda x: x['startTime'])
+        #
+        #     dummyLocation = 1
+        #     for interval in intervalList:
+        #         if minAmongLocation['time'] < interval['startTime']:
+        #             intervalsCompacted[minAmongLocation['location']].append(interval)
+        #             locationEndTime[minAmongLocation['location']] = interval['endTime']
+        #             minAmongLocation = updateMinAmongLocation(locationEndTime)
+        #         else:
+        #             intervalsCompacted[dummyLocation] = list()
+        #             intervalsCompacted[dummyLocation].append(interval)
+        #             locationEndTime[dummyLocation] = interval['endTime']
+        #             minAmongLocation = updateMinAmongLocation(locationEndTime)
+        #             dummyLocation = dummyLocation + 1
+        #     return intervalsCompacted
+    #
+    #     traceForwardList = list()
+    #     childrenList = list()
+    #     step = (end - begin) / bins
+    #     for location in intervalData:
+    #         currentTime = begin
+    #         previousIntervalEndTime = currentTime - 1
+    #         for util in intervalData[location]:
+    #             if previousIntervalEndTime < currentTime + step and util > 0:
+    #                 startingInterval = intervalFinder(currentTime, currentTime + step, location)
+    #                 for intervalObj in startingInterval:
+    #                     previousIntervalEndTime = max(previousIntervalEndTime, intervalObj['leave']['Timestamp'])
+    #                     stEndFinderObj = startEndTimeFinder(intervalObj)
+    #                     childrenList.extend(stEndFinderObj['childList'])
+    #                     stEndFinderObj['location'] = location
+    #                     traceForwardList.append(stEndFinderObj)
+    #                     # previousIntervalEndTime = max(previousIntervalEndTime, stEndFinderObj['endTime'])
+    #                     # this is for to make the run faster since we are drawing in a location from the starting interval
+    #             currentTime = currentTime + step
+    #
+        # results = {'primitives': list(primitiveSet),
+        #            'data': greedyIntervalAssignment(traceForwardList),
+        #            'childList': childrenList,
+        #            'aggList': db[datasetId]['dependencyTree'].getTheTree()}
+        # yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')
 

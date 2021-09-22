@@ -464,7 +464,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
           // Deselect
           this.linkedState.selection = null;
         } else {
-          this.linkedState.selectPrimitives(primitives);
+          this.linkedState.selectPrimitives(primitives, d.data.nodeId);
         }
       }).on('mouseenter', function (event, d) {
         const label = d.details.display_name || d.data.name;

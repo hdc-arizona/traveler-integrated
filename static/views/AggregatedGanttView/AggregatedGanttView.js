@@ -174,12 +174,12 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
-    const selectedPrimitiveNames = this.linkedState.selection?.primitiveName;
-    const aggregatedIntervalsPromise = selectedPrimitiveNames
+    const selectedNodeId = this.linkedState.selection?.primitiveDetails;
+    const aggregatedIntervalsPromise = selectedNodeId
         ? this.updateResource({
           name: 'aggregatedIntervals',
           type: 'json',
-          url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?primitives=${selectedPrimitiveNames.join()}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
+          url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?nodeId=${selectedNodeId}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
         })
         : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
     // const primitiveUtilPromise = this.updateResource({

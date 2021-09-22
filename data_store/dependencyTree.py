@@ -1,3 +1,5 @@
+import uuid
+
 from .sparseUtilizationList import SparseUtilizationList
 
 
@@ -8,14 +10,30 @@ def get_primitive_pretty_name_with_prefix(primitive: str):
     return primitive[:start+1], primitive[start+1:]
 
 
-class DependencyTreeNode():
+class AggregatedBlock:
+    def __init__(self, start, end):
+        self.utilization = SparseUtilizationList()
+        self.startTime = start
+        self.endTime = end
+        self.firstPrimitiveName = ''
+
+    def updateStartTime(self, start):
+        self.startTime = start
+
+    def updateEndTime(self, end):
+        self.endTime = end
+
+
+class DependencyTreeNode:
     def __init__(self):
+        self.nodeId = str(uuid.uuid4())
         self.name = 'phylanx'
         self.children = list()  # list of DependencyTreeNode
         self.prefixList = list()  # list of string
         self.aggregatedBlockList = list()  # list of dictionary (start time, end time), convert it to (event, time) list later
         self.intervalList = list()  # containing just the enter and leave time of this interval, helper for creating aggreatedBlockList
-        self.utilization = SparseUtilizationList()
+        self.fastSearchInAggBlock = list()
+        self.timeOnlyList = list()
 
     def setName(self, primitiveName):
         pref, self.name = get_primitive_pretty_name_with_prefix(primitiveName)
@@ -53,25 +71,45 @@ class DependencyTreeNode():
 
     def getTheTree(self):
         thisNode = dict()
+        thisNode['nodeId'] = self.nodeId
         thisNode['name'] = self.name
         thisNode['prefixList'] = self.prefixList
         cList = list()
         for child in self.children:
             cList.append(child.getTheTree())
         thisNode['children'] = cList
-        thisNode['aggregatedList'] = self.aggregatedBlockList
-        thisNode['intervalList'] = self.intervalList
         return thisNode
 
     def addIntervalToIntervalList(self, startTime, endTime):
         self.intervalList.append({'enter': startTime, 'leave': endTime})
 
-    def updateAggregatedListFromIntervalList(self, startTime, endTime):
+    def addIntervalToAggregatedList(self, startTime, endTime):
         self.intervalList.append({'enter': startTime, 'leave': endTime})
-        self.aggregatedBlockList.append({'time': startTime, 'event': 'enter'})
         maxTime = endTime
         for eachChild in self.children:
             for eachAgg in eachChild.aggregatedBlockList:
-                if eachAgg['event'] == 'leave':
-                    maxTime = max(maxTime, eachAgg['time'])
-        self.aggregatedBlockList.append({'time': maxTime, 'event': 'leave'})
+                maxTime = max(maxTime, eachAgg.endTime)
+        self.aggregatedBlockList.append(AggregatedBlock(startTime, maxTime))
+
+    def finalizeTreeNode(self):
+        # self.aggregatedBlockList.sort(key=lambda x: x.startTime)
+        self.fastSearchInAggBlock.clear()
+        self.timeOnlyList.clear()
+        for ind, eachBlock in enumerate(self.aggregatedBlockList):
+            self.fastSearchInAggBlock.append({'time': eachBlock.startTime, 'event': 'enter', 'index': ind})
+            self.fastSearchInAggBlock.append({'time': eachBlock.endTime, 'event': 'leave', 'index': ind})
+        self.fastSearchInAggBlock.sort(key=lambda x: x['time'])
+        self.timeOnlyList = [d['time'] for d in self.fastSearchInAggBlock]
+        for child in self.children:
+            child.finalizeTreeNode()
+
+
+def find_node_in_dependency_tree(currentNode, nodeId):
+    for eachChild in currentNode.children:
+        if eachChild.nodeId == nodeId:
+            return eachChild
+        else:
+            ret = find_node_in_dependency_tree(eachChild, nodeId)
+            if ret is not None:
+                return ret
+    return None

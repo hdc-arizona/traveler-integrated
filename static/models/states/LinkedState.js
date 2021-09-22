@@ -370,9 +370,8 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   /**
    * Change the current selection to the set of named primitives
    */
-  selectPrimitives (primitiveName) {
+  selectPrimitives (primitiveName, primitiveDetails) {
     //online the first primitive details will be shown
-    const primitiveDetails = this.getPrimitiveDetails(primitiveName[0]);
     this.selection = new PrimitiveSelection({
       primitiveName,
       primitiveDetails
