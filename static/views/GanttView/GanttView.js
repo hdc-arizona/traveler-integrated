@@ -342,26 +342,26 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   }
 
   drawAggregatedSelection (chartShape) {
-    const trace = this.linkedState.aggregatedIntervalsSelection;
-    const currentTimespan = this.linkedState.detailDomain[1] - this.linkedState.detailDomain[0];
-    if (trace === null ||
-        Object.keys(trace.childList).length === 0 ||
-        currentTimespan > TRACE_LINE_TIME_LIMIT) {
-      return;
-    }
-    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
-
-    const canvas = this.d3el.select('canvas');
-    const ctx = canvas.node().getContext('2d');
-    ctx.fillStyle = theme['--inclusive-color-3'];
-    const bandwidth = this.yScale.bandwidth();
-    const __self = this;
-    trace.childList.forEach(function (interval){
-      ctx.fillRect(chartShape.spilloverXScale(interval.enter) - chartShape.leftOffset,
-          __self.yScale(interval.location),
-          chartShape.spilloverXScale(interval.leave) - chartShape.spilloverXScale(interval.enter),
-          bandwidth);
-    });
+    // const trace = this.linkedState.aggregatedIntervalsSelection;
+    // const currentTimespan = this.linkedState.detailDomain[1] - this.linkedState.detailDomain[0];
+    // if (trace === null ||
+    //     Object.keys(trace.childList).length === 0 ||
+    //     currentTimespan > TRACE_LINE_TIME_LIMIT) {
+    //   return;
+    // }
+    // const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    //
+    // const canvas = this.d3el.select('canvas');
+    // const ctx = canvas.node().getContext('2d');
+    // ctx.fillStyle = theme['--inclusive-color-3'];
+    // const bandwidth = this.yScale.bandwidth();
+    // const __self = this;
+    // trace.childList.forEach(function (interval){
+    //   ctx.fillRect(chartShape.spilloverXScale(interval.enter) - chartShape.leftOffset,
+    //       __self.yScale(interval.location),
+    //       chartShape.spilloverXScale(interval.leave) - chartShape.spilloverXScale(interval.enter),
+    //       bandwidth);
+    // });
   }
 }
 

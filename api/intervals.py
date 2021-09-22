@@ -234,7 +234,6 @@ def primitive_trace_forward(datasetId: str,
             print('Node in dependency tree not found')
             yield ''
             return
-        print('found node ', currentNode.name)
 
         def updateMinAmongLocation(locationEndTime):
             isFirstElement = True
@@ -271,16 +270,24 @@ def primitive_trace_forward(datasetId: str,
         right_index = bisect.bisect_right(currentNode.timeOnlyList, end)  # not inclusive
         isFirstLeave = True
         traceForwardList = []
+        binSize = int(math.floor((end - begin) / bins))
+        minBinCheck = 10
         for ind in range(left_index, right_index):
-            if currentNode.fastSearchInAggBlock[ind]['event'] == 'enter':
+            e = currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime
+            s = currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime
+            if (e-s) > (binSize*minBinCheck) and currentNode.fastSearchInAggBlock[ind]['event'] == 'enter':
                 isFirstLeave = False
-                traceForwardList.append({'startTime': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime,
-                                     'endTime': min(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime, end),
-                                      'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName})
-            elif isFirstLeave and currentNode.fastSearchInAggBlock[ind]['event'] == 'leave':
-                traceForwardList.append({'startTime': max(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime, begin),
-                                         'endTime': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime,
-                                         'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName})
+                traceForwardList.append({
+                    'startTime': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime,
+                    'endTime': min(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime, end),
+                    'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName,
+                    'util': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].utilization.calcUtilizationHistogram(bins, begin, end)})
+            elif isFirstLeave and (e-s) > (binSize*minBinCheck) and currentNode.fastSearchInAggBlock[ind]['event'] == 'leave':
+                traceForwardList.append({
+                    'startTime': max(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime, begin),
+                    'endTime': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime,
+                    'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName,
+                    'util': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].utilization.calcUtilizationHistogram(bins, begin, end)})
         results = {'data': greedyIntervalAssignment(traceForwardList)}
         yield json.dumps(results)
         # intervalsCompacted = dict()

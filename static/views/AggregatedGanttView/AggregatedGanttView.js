@@ -362,30 +362,12 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
           ctx.fillText(aggTime.name,
               chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
               this.yScale(location) + bandwidth/2);
-
-          // var urlArgs = {
-          //   bins: Math.floor((Math.min(domain[1], aggTime.endTime) - Math.max(domain[0], aggTime.startTime)) / binSize),
-          //   begin: aggTime.startTime,
-          //   end: aggTime.endTime
-          // };
-          var urlArgs = {
-            bins: chartShape.bins,
-            begin: domain[0],
-            end: domain[1]
-          };
-          let promise = new Promise(function(resolve, reject) {
-            var primitiveData = __self.getUtilizationForAggregatedPrimitives(urlArgs, aggTime, chartShape);
-            resolve(primitiveData);
-          });
-          promise.then(function(primitiveData){
-            __self.drawUtilLines(primitiveData, chartShape, location);
-          });
-          promiseForPrimitiveUtil.push(promise);
+          console.log(Math.max( ...aggTime.util ));
+          this.drawUtilLines(aggTime.util, chartShape, location)
         }
 
       }
     }
-    Promise.all(promiseForPrimitiveUtil);
 
   }
 }

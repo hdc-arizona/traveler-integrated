@@ -482,7 +482,7 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
         for childId in intObj['children']:
             if is_include_primitive_name(self[datasetId]['intervals'][childId]['Primitive']):
                 currentNode.addChildren(getChildren(childId))
-        currentNode.addIntervalToAggregatedList(intObj['enter']['Timestamp'], intObj['leave']['Timestamp'])
+        currentNode.addIntervalToAggregatedList(intObj)
         return currentNode
 
     def mergeTwoTrees(tree1, tree2):
