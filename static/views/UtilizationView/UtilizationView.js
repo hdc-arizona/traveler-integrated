@@ -50,12 +50,12 @@ class UtilizationView extends
       type: 'derivation',
       derive: async () => {
         // Does the current selection have a way of getting selection-specific
-        if(Array.isArray(this.primitiveName)) {
-          const selectedPrimitiveNames = this.linkedState.selection?.primitiveName.join();
-          if(!(selectedPrimitiveNames in this.linkedState.cachedUtilizationData) || this.linkedState.cachedUtilizationData[selectedPrimitiveNames] === null) {
-            this.linkedState.cachedUtilizationData[selectedPrimitiveNames] = this.linkedState.selection?.getUtilization?.({ bins }) || null;
+        if(Array.isArray(this.linkedState.selection?.primitiveName)) {
+          const nodeId = this.linkedState.selection?.primitiveDetails;
+          if(!(nodeId in this.linkedState.cachedUtilizationData) || this.linkedState.cachedUtilizationData[nodeId] === null) {
+            this.linkedState.cachedUtilizationData[nodeId] = this.linkedState.selection?.getUtilization?.({ bins }) || null;
           }
-          return this.linkedState.cachedUtilizationData[selectedPrimitiveNames];
+          return this.linkedState.cachedUtilizationData[nodeId];
         } else {
           return this.linkedState.selection?.getUtilization?.({ bins }) || null;
         }
@@ -173,7 +173,21 @@ class UtilizationView extends
     this.d3el.select('.selectionUtilization')
       .style('display', selectionUtilization === null ? 'none' : null);
     if (selectionUtilization !== null) {
-      this.drawPaths(this.d3el.select('.selectionUtilization'), selectionUtilization);
+      var histogram = {};
+      if(Array.isArray(this.linkedState.selection?.primitiveName)) {
+        const bins = Math.max(Math.ceil(this.chartBounds.width), 1);
+        histogram['data'] = new Array(bins).fill(0);
+        for (const [location, aggregatedTimes] of Object.entries(selectionUtilization.data)) {
+          for (let aggTime of aggregatedTimes) {
+            for (let i = 0; i < bins; i++) {
+              histogram['data'][i] = histogram['data'][i] + aggTime.util[i];
+            }
+          }
+        }
+      } else {
+        histogram = selectionUtilization;
+      }
+      this.drawPaths(this.d3el.select('.selectionUtilization'), histogram);
     }
     // Update the brush
     this.drawBrush();
