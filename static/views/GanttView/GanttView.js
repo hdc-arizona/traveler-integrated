@@ -342,26 +342,39 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   }
 
   drawAggregatedSelection (chartShape) {
-    // const trace = this.linkedState.aggregatedIntervalsSelection;
-    // const currentTimespan = this.linkedState.detailDomain[1] - this.linkedState.detailDomain[0];
-    // if (trace === null ||
-    //     Object.keys(trace.childList).length === 0 ||
-    //     currentTimespan > TRACE_LINE_TIME_LIMIT) {
-    //   return;
-    // }
-    // const theme = globalThis.controller.getNamedResource('theme').cssVariables;
-    //
-    // const canvas = this.d3el.select('canvas');
-    // const ctx = canvas.node().getContext('2d');
-    // ctx.fillStyle = theme['--inclusive-color-3'];
-    // const bandwidth = this.yScale.bandwidth();
-    // const __self = this;
-    // trace.childList.forEach(function (interval){
-    //   ctx.fillRect(chartShape.spilloverXScale(interval.enter) - chartShape.leftOffset,
-    //       __self.yScale(interval.location),
-    //       chartShape.spilloverXScale(interval.leave) - chartShape.spilloverXScale(interval.enter),
-    //       bandwidth);
-    // });
+    const trace = this.getNamedResource('selectionUtilization');
+    const currentTimespan = this.linkedState.detailDomain[1] - this.linkedState.detailDomain[0];
+    if (trace === null ||
+        trace.data === undefined ||
+        Object.keys(trace.data).length === 0 ||
+        currentTimespan > TRACE_LINE_TIME_LIMIT) {
+      return;
+    }
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    const canvas = this.d3el.select('canvas');
+    const ctx = canvas.node().getContext('2d');
+    const bandwidth = this.yScale.bandwidth();
+
+    for (const [d_loc, aggregatedTimes] of Object.entries(trace.data)) {
+      for (let aggTime of aggregatedTimes) {
+        ctx.fillStyle = theme['--inclusive-color-3'];
+        for (const [location, data] of Object.entries(aggTime.util)) {
+          const y0 = this.yScale(location);
+          for (const [binNo, tUtil] of data.entries()) {
+            // Which border to draw (if any)?
+            if (tUtil > 0) {
+              ctx.fillStyle = theme['--inclusive-color-3'];
+              ctx.fillRect(binNo, y0, 1, bandwidth);
+            } else if (tUtil >= 1) {
+              ctx.fillStyle = theme['--disabled-color'];
+              ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+            }
+          }
+        }
+      }
+    }
+
+
   }
 }
 

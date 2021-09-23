@@ -37,53 +37,16 @@ class PrimitiveSelection extends Selection {
     var aggregatedIntervals = undefined;
 
     if(Array.isArray(this.primitiveName)) {
-      // urlArgs.primitive = undefined;
-      // urlArgs.primitives = this.primitiveName.join();
-      // const url = `/datasets/${window.controller.currentDatasetId}/primitives/primitiveTraceForward?` +
-      //     Object.entries(urlArgs).map(([key, value]) => {
-      //       return `${key}=${encodeURIComponent(value)}`;
-      //     }).join('&');
-      // const response = await window.fetch(url);
-      // aggregatedIntervals = await response.json();
-      //
-      // for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals.data)) {
-      //   for (let aggTime of aggregatedTimes) {
-      //     for (const eachChild of aggTime.childList) {
-      //       if(!(eachChild.name in allJson)) {
-      //         allJson[eachChild.name] = await this.getUtilizationResultsForLocation(eachChild.name, aggTime.locationList, urlArgs);
-      //         flag[eachChild.name] = {}
-      //         for (const [loc, utils] of Object.entries(allJson[eachChild.name].locations)) {
-      //           flag[eachChild.name][loc] = new Array(urlArgs.bins).fill(0);
-      //         }
-      //       } else {
-      //         var newLocations = [];
-      //         for(let loc of aggTime.locationList) {
-      //           if(!(loc in allJson[eachChild.name].locations)) {
-      //             newLocations.push(loc);
-      //           }
-      //         }
-      //         if(newLocations.length > 0){
-      //           const json = await this.getUtilizationResultsForLocation(eachChild.name, newLocations, urlArgs);
-      //           for (const [loc, utils] of Object.entries(json.locations)) {
-      //             flag[eachChild.name][loc] = new Array(urlArgs.bins).fill(0);
-      //           }
-      //           Object.assign(allJson[eachChild.name].locations, json.locations);
-      //         }
-      //       }
-      //       let startingBin = this.getBinNumber(eachChild.enter, allJson[eachChild.name].metadata);
-      //       let endingBin = this.getBinNumber(eachChild.leave, allJson[eachChild.name].metadata);
-      //       for(var i = startingBin; i <= Math.min(endingBin, allJson[eachChild.name].metadata.bins-1); i++) {
-      //         if(flag[eachChild.name][eachChild.location][i] > 0) {
-      //           continue;
-      //         }
-      //         utilization[i] = utilization[i] + allJson[eachChild.name].locations[eachChild.location][i];
-      //         flag[eachChild.name][eachChild.location][i] = 1;
-      //       }
-      //     }
-      //   }
-      // }
-      results = {}
-      results['data'] = utilization;
+      urlArgs.primitive = undefined;
+      urlArgs.primitives = this.primitiveName.join();
+      urlArgs.nodeId = this.primitiveDetails;
+      const url = `/datasets/${window.controller.currentDatasetId}/primitives/primitiveTraceForward?` +
+          Object.entries(urlArgs).map(([key, value]) => {
+            return `${key}=${encodeURIComponent(value)}`;
+          }).join('&');
+      const response = await window.fetch(url);
+      const json = await response.json();
+      results = json;
     } else if(!Array.isArray(this.primitiveName)) {
       urlArgs.primitive = this.primitiveName;
       const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +

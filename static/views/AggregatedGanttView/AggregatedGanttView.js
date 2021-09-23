@@ -182,20 +182,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
           url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?nodeId=${selectedNodeId}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
         })
         : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
-    // const primitiveUtilPromise = this.updateResource({
-    //   name: 'selectionUtilization',
-    //   type: 'derivation',
-    //   derive: async () => {
-    //     // Does the current selection have a way of getting selection-specific
-    //     // utilization data?
-    //     return this.linkedState.selection?.getUtilization?.({
-    //       bins: chartShape.bins,
-    //       begin: domain[0],
-    //       end: domain[1],
-    //       locations
-    //     }) || null; // if not, don't show any selection-specific utilization
-    //   }
-    // });
     return Promise.all([aggregatedIntervalsPromise]);
   }
 
@@ -258,19 +244,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
 
     // y tick labels
     yTicksEnter.append('text');
-    // yTicks.select('text')
-    //   .attr('text-anchor', 'end')
-    //   .attr('y', '0.35em')
-    //   .text(d => {
-    //     const a = BigInt(d);
-    //     const c = BigInt(32);
-    //     const node = BigInt(a >> c);
-    //     const thread = (d & 0x0FFFFFFFF);
-    //     let aggText = '';
-    //     aggText += node + ' - T';
-    //     aggText += thread;
-    //     return aggText;
-    //   });
 
     // Set the y label
     this.d3el.select('.yAxisLabel')
@@ -344,9 +317,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     ctx.lineWidth = 2;
     ctx.fillStyle = theme['--inclusive-color-3'];
 
-    var __self = this;
-    var binSize = 1;
-    let promiseForPrimitiveUtil = [];
     for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals.data)) {
       for (let aggTime of aggregatedTimes) {
         ctx.fillStyle = theme['--inclusive-color-3'];
@@ -355,14 +325,13 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
             chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime),
             bandwidth);
 
-        binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
+        var binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
         if((aggTime.endTime - aggTime.startTime) > binSize*10) { // at least ten bins exist
           ctx.fillStyle = "white";
           ctx.font = "10px Arial";
           ctx.fillText(aggTime.name,
               chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
               this.yScale(location) + bandwidth/2);
-          console.log(Math.max( ...aggTime.util ));
           this.drawUtilLines(aggTime.util, chartShape, location)
         }
 

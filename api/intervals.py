@@ -1,4 +1,5 @@
 import bisect
+import copy
 import json
 import math
 
@@ -224,8 +225,6 @@ def primitive_trace_forward(datasetId: str,
 
     if locations:
         locations = locations.split(',')
-    else:
-        locations = db[datasetId]['info']['locationNames']
 
     def traceForward():
         dependencyTree = db[datasetId]['dependencyTree']
@@ -268,6 +267,17 @@ def primitive_trace_forward(datasetId: str,
                     dummyLocation = dummyLocation + 1
             return intervalsCompacted
 
+        def accumulateUtilizationData(sUtil):
+            array = None
+            if locations:
+                array = {}
+                for location in locations:
+                    if location in sUtil.locationDict:
+                        array[location] = sUtil.calcUtilizationForLocation(bins, begin, end, location)
+            else:
+                array = sUtil.calcUtilizationHistogram(bins, begin, end)
+            return array
+
         left_index = bisect.bisect_left(currentNode.timeOnlyList, begin)
         right_index = bisect.bisect_right(currentNode.timeOnlyList, end)  # not inclusive
         isFirstLeave = True
@@ -283,13 +293,13 @@ def primitive_trace_forward(datasetId: str,
                     'startTime': s,
                     'endTime': min(e, end),
                     'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName,
-                    'util': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].utilization.calcUtilizationHistogram(bins, begin, end)})
+                    'util': accumulateUtilizationData(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].utilization)})
             elif isFirstLeave and (e-s) > (binSize*minBinCheck) and currentNode.fastSearchInAggBlock[ind]['event'] == 'leave':
                 traceForwardList.append({
                     'startTime': max(s, begin),
                     'endTime': e,
                     'name': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].firstPrimitiveName,
-                    'util': currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].utilization.calcUtilizationHistogram(bins, begin, end)})
+                    'util': accumulateUtilizationData(currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].utilization)})
         results = {'data': greedyIntervalAssignment(traceForwardList)}
         yield json.dumps(results)
 
