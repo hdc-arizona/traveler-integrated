@@ -14,9 +14,11 @@ def get_primitive_pretty_name_with_prefix(primitive: str):
 class AggregatedBlock:
     def __init__(self, start, end):
         self.utilization = SparseUtilizationList()
+        self.isFinalized = False
         self.startTime = start
         self.endTime = end
         self.firstPrimitiveName = ''
+        self.allLocations = None
 
     def updateStartTime(self, start):
         self.startTime = start
@@ -35,6 +37,9 @@ class DependencyTreeNode:
         self.intervalList = list()  # containing just the enter and leave time of this interval, helper for creating aggreatedBlockList
         self.fastSearchInAggBlock = list()
         self.timeOnlyList = list()
+
+    def isNotDummyRootNode(self):
+        return self.name != 'phylanx'
 
     def setName(self, primitiveName):
         pref, self.name = get_primitive_pretty_name_with_prefix(primitiveName)
@@ -97,29 +102,31 @@ class DependencyTreeNode:
         maxTime = endTime
         for eachChild in self.children:
             aggMaxTime = endTime
-            aggMaxInd = 0
-            for aggInd, eachAgg in enumerate(eachChild.aggregatedBlockList):
+            for eachAgg in eachChild.aggregatedBlockList:
                 if eachAgg.endTime > aggMaxTime:
                     aggMaxTime = eachAgg.endTime
-                    aggMaxInd = aggInd
-            for location, utilObj in eachChild.aggregatedBlockList[aggMaxInd].utilization.locationDict.items():
-                if location not in ab.utilization.locationDict:
-                    ab.utilization.locationDict[location] = list()
-                ab.utilization.locationDict[location].extend(copy.deepcopy(utilObj))
-                allLocations.add(location)
+                for location, utilObj in eachAgg.utilization.locationDict.items():
+                    if location not in ab.utilization.locationDict:
+                        ab.utilization.locationDict[location] = list()
+                    ab.utilization.locationDict[location].extend(copy.deepcopy(utilObj))
+                    allLocations.add(location)
             maxTime = max(maxTime, aggMaxTime)
 
         ab.updateEndTime(maxTime)
         ab.firstPrimitiveName = primitive_name
         ab.utilization.setIntervalAtLocation({'index': int(startTime), 'counter': 1, 'util': 0, 'primitive': primitive_name}, loc)
         ab.utilization.setIntervalAtLocation({'index': int(endTime), 'counter': -1, 'util': 0, 'primitive': primitive_name}, loc)
-        ab.utilization.finalize(list(allLocations))
+        ab.allLocations = list(allLocations)
         self.aggregatedBlockList.append(ab)
 
     def finalizeTreeNode(self):
         self.fastSearchInAggBlock.clear()
         self.timeOnlyList.clear()
         for ind, eachBlock in enumerate(self.aggregatedBlockList):
+            if eachBlock.isFinalized is False:
+                eachBlock.utilization.finalize(eachBlock.allLocations)
+                eachBlock.isFinalized = True
+
             self.fastSearchInAggBlock.append({'time': eachBlock.startTime, 'event': 'enter', 'index': ind})
             self.fastSearchInAggBlock.append({'time': eachBlock.endTime, 'event': 'leave', 'index': ind})
         self.fastSearchInAggBlock.sort(key=lambda x: x['time'])
