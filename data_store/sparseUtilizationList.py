@@ -77,8 +77,9 @@ class SparseUtilizationList():
             if isFirst is True:
                 isFirst = False
                 array = temp
-            for i in range(bins):
-                array[i] = array[i] + temp[i]
+            else:
+                for i in range(bins):
+                    array[i] = array[i] + temp[i]
 
         return array
 
