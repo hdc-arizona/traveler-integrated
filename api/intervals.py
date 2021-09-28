@@ -253,7 +253,7 @@ def primitive_trace_forward(datasetId: str,
             minAmongLocation = {'time': intervalList[0]['startTime'] + 1, 'location': 0}  # making sure to force into else in the for loop
             intervalList.sort(key=lambda x: x['startTime'])
 
-            dummyLocation = 1
+            dummyLocation = 0
             for interval in intervalList:
                 if minAmongLocation['time'] < interval['startTime']:
                     intervalsCompacted[minAmongLocation['location']].append(interval)

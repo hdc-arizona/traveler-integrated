@@ -377,6 +377,21 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       primitiveDetails
     });
   }
+  getColorShades(sn, totalShades=4) {
+    const minShade = 5;
+    const maxShade = 15;
+    sn = sn % totalShades;
+    const scaledSN = (sn * (maxShade - minShade) / totalShades) + minShade;
+
+    // r,g,b value for theme['--inclusive-color-3']
+    const r = 117;
+    const g = 107;
+    const b = 177;
+    var max = Math.max(Math.max(r, Math.max(g,b)), 1);
+    var step = 255 / (max * 10);
+    // from https://stackoverflow.com/questions/40619476/javascript-generate-different-shades-of-the-same-color
+    return `rgb(${r * step * scaledSN}, ${g * step * scaledSN}, ${b * step * scaledSN})`;
+  }
 }
 LinkedState.VIEW_STATUS = VIEW_STATUS;
 LinkedState.COLOR_MODES = COLOR_MODES;

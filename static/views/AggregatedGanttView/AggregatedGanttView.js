@@ -317,9 +317,11 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     ctx.lineWidth = 2;
     ctx.fillStyle = theme['--inclusive-color-3'];
 
+    const dLen = Object.keys(aggregatedIntervals.data).length;
     for (const [location, aggregatedTimes] of Object.entries(aggregatedIntervals.data)) {
       for (let aggTime of aggregatedTimes) {
-        ctx.fillStyle = theme['--inclusive-color-3'];
+        // ctx.fillStyle = theme['--inclusive-color-3'];
+        ctx.fillStyle = this.linkedState.getColorShades(location, dLen);
         ctx.fillRect(chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
             this.yScale(location),
             chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime),
