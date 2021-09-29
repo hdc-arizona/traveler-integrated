@@ -196,19 +196,6 @@ def intervalTrace(datasetId: str,
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
 
-def is_include_primitive_name(primitive: str):
-    if '$' in primitive:
-        return True
-    return False
-
-
-def get_primitive_pretty_name_with_prefix(primitive: str):
-    delimiter = '/'
-    start = primitive.find(delimiter)
-    start = primitive.find(delimiter, start+len(delimiter))
-    return primitive[:start+1], primitive[start+1:]
-
-
 @router.get('/datasets/{datasetId}/primitives/primitiveTraceForward')
 def primitive_trace_forward(datasetId: str,
                             nodeId: str,
