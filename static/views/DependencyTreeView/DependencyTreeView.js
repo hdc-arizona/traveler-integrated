@@ -331,6 +331,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
   }
 
   drawNodes (transition, nodeList) {
+    const self = this;
     let nodes = this.d3el.select('.nodeLayer').selectAll('.node')
       .data(nodeList, d => d.data.name);
     const nodesEnter = nodes.enter().append('g').classed('node', true);
@@ -361,7 +362,10 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     nodes.transition(transition)
       .attr('transform', d => `translate(${d.x},${d.y})`)
       .attr('opacity', 1);
-    nodes.classed('selected', d => d.data.name === this.linkedState.selection?.primitiveName);
+    nodes.classed('selected', d => {
+      let primitives = self.getPrimitiveListFromNode(d);
+      return self.linkedState.selection?.primitiveName?.join() === primitives?.join();
+    });
 
     // Main glyph
     const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);
@@ -372,7 +376,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
       .attr('text-anchor', 'middle')
       .attr('y', 3)
       .style('opacity', 0)
-      .text('?');
+      .text('');
     const mainGlyph = nodes.select('.mainGlyph');
     mainGlyph.selectAll('.area')
       .transition(transition)
@@ -445,21 +449,9 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
       });
 
     // Main interactions
-    const self = this;
     nodes
       .on('click', (event, d) => {
-        let primitives = [];
-        if(d.data.name === 'phylanx') {
-          for(let child of d.data.children){
-            for(let prefix of child.prefixList) {
-              primitives.push(prefix.concat(child.name));
-            }
-          }
-        } else {
-          for (let prefix of d.data.prefixList) {
-            primitives.push(prefix.concat(d.data.name));
-          }
-        }
+        let primitives = self.getPrimitiveListFromNode(d);
         if (this.linkedState.selection?.primitiveName.join() === primitives.join()) {
           // Deselect
           this.linkedState.selection = null;
@@ -492,6 +484,22 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
         d3.select('.extraLinkLayer').selectAll('.link')
           .classed('hovered', false);
       });
+  }
+
+  getPrimitiveListFromNode(d) {
+    let primitives = [];
+    if(d.data.name === 'phylanx') {
+      for(let child of d.data.children){
+        for(let prefix of child.prefixList) {
+          primitives.push(prefix.concat(child.name));
+        }
+      }
+    } else {
+      for (let prefix of d.data.prefixList) {
+        primitives.push(prefix.concat(d.data.name));
+      }
+    }
+    return primitives;
   }
 
   drawLinks (transition) {
