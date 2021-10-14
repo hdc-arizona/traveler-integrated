@@ -270,7 +270,7 @@ def primitive_trace_forward(datasetId: str,
         isFirstLeave = True
         traceForwardList = []
         binSize = int(math.floor((end - begin) / bins))
-        minBinCheck = 10
+        minBinCheck = 1
         for ind in range(left_index, right_index):
             e = currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].endTime
             s = currentNode.aggregatedBlockList[currentNode.fastSearchInAggBlock[ind]['index']].startTime

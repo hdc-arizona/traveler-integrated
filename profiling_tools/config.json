@@ -1,11 +1,11 @@
 {
-  "n_trials": 100,
+  "n_trials": 10,
   "end_pt": "http://127.0.0.1:8000",
   "begin": 742774510,
   "end":   742792117,
   "bins": 2000,
-  "dataset_label": "cannon",
+  "dataset_label": "conv_layer",
   "sort_order": "cumulative",
-  "prof_output": "traceForwardBigDataFib.txt",
+  "prof_output": "traceForwardBigDataConvLayer.txt",
   "function": "traceForward"
 }

@@ -460,10 +460,11 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
 
 async def buildDependencyTree(self, datasetId, log=logToConsole):
     def is_include_primitive_name(primitive: str):
-        if '$' in primitive:
-            return True
-        return False
-
+        return True
+        # if '$' in primitive:
+        #     return True
+        # return False
+    await log('Building dependency tree')
     primitive_set = dict()
     dId = 0
     while str(dId) in self[datasetId]['intervals']:

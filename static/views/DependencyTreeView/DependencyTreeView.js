@@ -363,8 +363,9 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
       .attr('transform', d => `translate(${d.x},${d.y})`)
       .attr('opacity', 1);
     nodes.classed('selected', d => {
-      let primitives = self.getPrimitiveListFromNode(d);
-      return self.linkedState.selection?.primitiveName?.join() === primitives?.join();
+      return d.data.nodeId === self.linkedState.selection?.primitiveDetails;
+      // let primitives = self.getPrimitiveListFromNode(d);
+      // return self.linkedState.selection?.primitiveName?.join() === primitives?.join();
     });
 
     // Main glyph

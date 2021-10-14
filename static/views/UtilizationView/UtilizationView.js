@@ -50,15 +50,15 @@ class UtilizationView extends
       type: 'derivation',
       derive: async () => {
         // Does the current selection have a way of getting selection-specific
-        if(Array.isArray(this.linkedState.selection?.primitiveName)) {
-          const nodeId = this.linkedState.selection?.primitiveDetails;
-          if(!(nodeId in this.linkedState.cachedUtilizationData) || this.linkedState.cachedUtilizationData[nodeId] === null) {
-            this.linkedState.cachedUtilizationData[nodeId] = this.linkedState.selection?.getUtilization?.({ bins }) || null;
-          }
-          return this.linkedState.cachedUtilizationData[nodeId];
-        } else {
+        // if(Array.isArray(this.linkedState.selection?.primitiveName)) {
+          // const nodeId = this.linkedState.selection?.primitiveDetails;
+          // if(!(nodeId in this.linkedState.cachedUtilizationData) || this.linkedState.cachedUtilizationData[nodeId] === null) {
+          //   this.linkedState.cachedUtilizationData[nodeId] = this.linkedState.selection?.getUtilization?.({ bins }) || null;
+          // }
+          // return this.linkedState.cachedUtilizationData[nodeId];
+        // } else {
           return this.linkedState.selection?.getUtilization?.({ bins }) || null;
-        }
+        // }
 
         // if not, don't show any selection-specific utilization
       }
