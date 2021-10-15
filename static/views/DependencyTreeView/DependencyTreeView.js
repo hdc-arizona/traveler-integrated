@@ -400,7 +400,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     // Node label
     nodesEnter.append('text')
       .classed('nodeLabel', true)
-      .attr('x', 2 * this.mainGlyphRadius)
+      .attr('x', 2 * this.mainGlyphRadius + 5)
       .attr('y', this.mainGlyphRadius)
       .text(d => {
         // Use display_name if available, but if not (e.g. we only have trace data), use its full name
