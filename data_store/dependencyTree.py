@@ -13,7 +13,7 @@ def get_primitive_pretty_name_with_prefix(primitive: str):
 
 class AggregatedBlock:
     def __init__(self, start, end):
-        self.utilization = SparseUtilizationList()
+        self.utilization = SparseUtilizationList()  # this is util for intervals
         self.isFinalized = False
         self.startTime = start
         self.endTime = end
@@ -33,10 +33,10 @@ class DependencyTreeNode:
         self.name = 'phylanx'
         self.children = list()  # list of DependencyTreeNode
         self.prefixList = list()  # list of string
-        self.aggregatedBlockList = list()  # list of dictionary (start time, end time), convert it to (event, time) list later
         self.intervalList = list()  # containing just the enter and leave time of this interval, helper for creating aggreatedBlockList
-        self.fastSearchInAggBlock = list()
-        self.timeOnlyList = list()
+
+        self.aggregatedUtil = SparseUtilizationList()  # this is util for aggregated blocks
+        self.aggregatedBlockList = list()  # list of dictionary (start time, end time), convert it to (event, time) list later
 
     def isNotDummyRootNode(self):
         return self.name != 'phylanx'
@@ -120,17 +120,41 @@ class DependencyTreeNode:
         self.aggregatedBlockList.append(ab)
 
     def finalizeTreeNode(self):
-        self.fastSearchInAggBlock.clear()
-        self.timeOnlyList.clear()
+        locationEndTime = dict()
+        self.aggregatedBlockList.sort(key=lambda x: x.startTime)
+        dummyLocation = 1
+        minAmongLocation = {'time': self.aggregatedBlockList[0].startTime + 1, 'location': dummyLocation}  # making sure to force into else in the for loop
+
+        def updateMinAmongLocation():
+            isFirstElement = True
+            mal = dict()
+            for dLocation in locationEndTime:
+                if isFirstElement or mal['time'] > locationEndTime[dLocation]:
+                    mal = {'time': locationEndTime[dLocation], 'location': dLocation}
+                    isFirstElement = False
+            return mal
+
+        allDummyLocations = list()
         for ind, eachBlock in enumerate(self.aggregatedBlockList):
-            if eachBlock.isFinalized is False:
+            if eachBlock.isFinalized is False:  # since the root node takes all children nodes, we need this check
                 eachBlock.utilization.finalize(eachBlock.allLocations)
                 eachBlock.isFinalized = True
 
-            self.fastSearchInAggBlock.append({'time': eachBlock.startTime, 'event': 'enter', 'index': ind})
-            self.fastSearchInAggBlock.append({'time': eachBlock.endTime, 'event': 'leave', 'index': ind})
-        self.fastSearchInAggBlock.sort(key=lambda x: x['time'])
-        self.timeOnlyList = [d['time'] for d in self.fastSearchInAggBlock]
+            if minAmongLocation['time'] < eachBlock.startTime:
+                self.aggregatedUtil.setIntervalAtLocation({'index': int(eachBlock.startTime), 'counter': 0, 'util': ind+1}, minAmongLocation['location'])
+                self.aggregatedUtil.setIntervalAtLocation({'index': int(eachBlock.endTime), 'counter': 0, 'util': ind+1}, minAmongLocation['location'])
+                locationEndTime[minAmongLocation['location']] = eachBlock.endTime
+                minAmongLocation = updateMinAmongLocation()
+            else:
+                print('adding block to dloc', dummyLocation)
+                self.aggregatedUtil.setIntervalAtLocation({'index': int(eachBlock.startTime), 'counter': 0, 'util': ind+1}, dummyLocation)
+                self.aggregatedUtil.setIntervalAtLocation({'index': int(eachBlock.endTime), 'counter': 0, 'util': ind+1}, dummyLocation)
+                locationEndTime[dummyLocation] = eachBlock.endTime
+                minAmongLocation = updateMinAmongLocation()
+                allDummyLocations.append(dummyLocation)
+                dummyLocation = dummyLocation + 1
+        self.aggregatedUtil.finalize(allDummyLocations, False)
+
         for child in self.children:
             child.finalizeTreeNode()
 
