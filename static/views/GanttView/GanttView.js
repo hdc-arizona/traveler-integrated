@@ -350,26 +350,29 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
         currentTimespan > TRACE_LINE_TIME_LIMIT) {
       return;
     }
+    const domain = chartShape.spilloverXScale.domain();
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;
     const canvas = this.d3el.select('canvas');
     const ctx = canvas.node().getContext('2d');
     const bandwidth = this.yScale.bandwidth();
+    const binSize = Math.floor((domain[1] - domain[0]) / chartShape.bins);
 
     const dLen = Object.keys(trace.data).length;
     for (const [d_loc, aggregatedTimes] of Object.entries(trace.data)) {
       for (let aggTime of aggregatedTimes) {
         // ctx.fillStyle = theme['--inclusive-color-3'];
         for (const [location, data] of Object.entries(aggTime.util)) {
+          const starterBin = Math.floor((aggTime.startTime - domain[0]) / binSize);
           const y0 = this.yScale(location);
           for (const [binNo, tUtil] of data.entries()) {
             // Which border to draw (if any)?
             if (tUtil > 0) {
               ctx.fillStyle = this.linkedState.getColorShades(d_loc, dLen);
               // ctx.fillStyle = theme['--inclusive-color-3'];
-              ctx.fillRect(binNo, y0, 1, bandwidth);
+              ctx.fillRect(binNo + starterBin, y0, 1, bandwidth);
             } else if (tUtil >= 1) {
               ctx.fillStyle = theme['--disabled-color'];
-              ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+              ctx.fillRect(binNo + starterBin, y0 + 1, 1, bandwidth - 2);
             }
           }
         }

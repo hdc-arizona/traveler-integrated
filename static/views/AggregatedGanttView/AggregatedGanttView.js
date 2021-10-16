@@ -265,7 +265,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     return (metadata.end - metadata.begin) / metadata.bins;
   }
 
-  drawUtilLines(primitiveData, chartShape, location) {
+  drawUtilLines(primitiveData, chartShape, location, cstart) {
     // console.log("drawing primitive util data");
     const domain = chartShape.spilloverXScale.domain();
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;
@@ -280,7 +280,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     // const maxUtil = Math.ceil(Math.max(...primitiveData));
     const outlinePathGenerator = d3.area()
         .x((d, i) => {
-          let actualTime = domain[0] + (i * binSize);
+          let actualTime = cstart + (i * binSize);
           return chartShape.spilloverXScale(actualTime) - chartShape.leftOffset;
         }) // bin number corresponds to screen coordinate
         .y1(d => {
@@ -334,7 +334,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
           ctx.fillText(aggTime.name,
               chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
               this.yScale(location) + bandwidth/2);
-          this.drawUtilLines(aggTime.util, chartShape, location)
+          this.drawUtilLines(aggTime.util, chartShape, location, aggTime.startTime)
         }
 
       }
