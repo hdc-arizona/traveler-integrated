@@ -276,6 +276,9 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     const bandwidth = this.yScale.bandwidth();
 
     let binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
+    if(cstart < domain[0]) {
+      cstart = domain[0];
+    }
     const maxUtil = this.linkedState.info.locationNames.length;
     // const maxUtil = Math.ceil(Math.max(...primitiveData));
     const outlinePathGenerator = d3.area()

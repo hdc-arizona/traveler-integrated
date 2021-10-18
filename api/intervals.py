@@ -230,6 +230,8 @@ def primitive_trace_forward(datasetId: str,
                 for location in locations:
                     if location in sUtil.locationDict:
                         array[location] = sUtil.calcUtilizationForLocation(sbin, st, en, location)
+                        # if array[location][1] > 0:
+                        #     print(array[location])
             else:
                 array = sUtil.calcUtilizationHistogram(sbin, st, en)
             return array
@@ -243,11 +245,19 @@ def primitive_trace_forward(datasetId: str,
             for each_bin in range(bins):
                 if 0 < (int(aggUtilValues[each_bin])-1) != last_id:
                     last_id = int(aggUtilValues[each_bin]) - 1
+                    if currentNode.aggregatedBlockList[last_id].endTime < begin:
+                        continue
                     if dummy_location not in aggregatedData:
                         aggregatedData[dummy_location] = list()
-                    snappedStart = (int(math.floor((currentNode.aggregatedBlockList[last_id].startTime - begin) / binSize)) * binSize) + begin
-                    snappedEnd = (int(math.ceil((currentNode.aggregatedBlockList[last_id].endTime - begin) / binSize)) * binSize) + begin
-                    snappedBins = int((snappedEnd - snappedStart) / binSize)
+                    snappedStart = begin
+                    if begin < currentNode.aggregatedBlockList[last_id].startTime:
+                        snappedStart = (int(math.floor((currentNode.aggregatedBlockList[last_id].startTime - begin) / binSize)) * binSize) + begin
+                    snappedEnd = end
+                    if currentNode.aggregatedBlockList[last_id].endTime < end:
+                        snappedEnd = currentNode.aggregatedBlockList[last_id].endTime
+                        #(int(math.ceil((currentNode.aggregatedBlockList[last_id].endTime - begin) / binSize)) * binSize) + begin
+                    snappedBins = int(math.ceil((snappedEnd - snappedStart) / binSize))
+                    print(snappedStart, snappedEnd, snappedBins, begin, end, bins, last_id, currentNode.aggregatedBlockList[last_id].endTime)
                     aggregatedData[dummy_location].append({
                         'startTime': currentNode.aggregatedBlockList[last_id].startTime,
                         'endTime': currentNode.aggregatedBlockList[last_id].endTime,

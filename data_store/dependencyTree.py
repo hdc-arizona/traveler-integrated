@@ -146,7 +146,6 @@ class DependencyTreeNode:
                 locationEndTime[minAmongLocation['location']] = eachBlock.endTime
                 minAmongLocation = updateMinAmongLocation()
             else:
-                print('adding block to dloc', dummyLocation)
                 self.aggregatedUtil.setIntervalAtLocation({'index': int(eachBlock.startTime), 'counter': 0, 'util': ind+1}, dummyLocation)
                 self.aggregatedUtil.setIntervalAtLocation({'index': int(eachBlock.endTime), 'counter': 0, 'util': ind+1}, dummyLocation)
                 locationEndTime[dummyLocation] = eachBlock.endTime

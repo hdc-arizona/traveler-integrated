@@ -185,9 +185,6 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     // Draw the links
     this.drawLinks(transition);
 
-    // Draw the extra (shown-on-hover-only) links
-    this.drawExtraLinks(nodeList);
-
     // Trash any interaction placeholders now that we've used them
     delete this._expandedParentCoords;
     delete this._collapsedParent;
@@ -542,46 +539,6 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
       .remove();
     links.transition(transition)
       .attr('opacity', 1)
-      .attr('d', link => {
-        // Animate to the correct locations
-        return computePath(link.source, link.target);
-      });
-  }
-
-  drawExtraLinks (nodeList) {
-    // Create links based on common references to variables
-    const allMatches = {};
-    const linkList = [];
-    const variableNameMatcher = /(?:(?:variable)|(?:access-argument)|(?:access-function))\/([^(]*)\(/;
-    for (const node of nodeList) {
-      const referencedVariable = node.details.display_name?.match(variableNameMatcher)?.[1];
-      if (referencedVariable) {
-        allMatches[referencedVariable] = allMatches[referencedVariable] || [];
-        // Add this reference, and any links to any other references
-        for (const priorReferenceNode of allMatches[referencedVariable]) {
-          linkList.push({
-            source: node,
-            target: priorReferenceNode
-          });
-        }
-        allMatches[referencedVariable].push(node);
-      }
-    }
-
-    let links = this.d3el.select('.extraLinkLayer').selectAll('.link')
-      .data(linkList, d => d.source.data.name + d.target.data.name);
-    const linksEnter = links.enter().append('path').classed('link', true);
-    links.exit().remove();
-    links = links.merge(linksEnter);
-
-    // Helper function for computing custom paths:
-    const computePath = (source, target) => {
-      return `\
-        M${source.x + this.mainGlyphRadius},${source.y}\
-        L${target.x + this.mainGlyphRadius},${target.y}`
-        .replace(/\s/g, '');
-    };
-    links.classed('hovered', false)
       .attr('d', link => {
         // Animate to the correct locations
         return computePath(link.source, link.target);
