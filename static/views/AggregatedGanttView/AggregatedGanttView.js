@@ -281,14 +281,13 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
         const visibleBins = chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime)
         const minBinsForUtilAndText = 20;
         if(visibleBins > minBinsForUtilAndText) { // at least ten bins exist
+          this.drawUtilLines(aggTime.util, chartShape, location, aggTime.startTime);
           ctx.fillStyle = "white";
           ctx.font = "10px Arial";
           ctx.fillText(aggTime.name,
               chartShape.spilloverXScale(aggTime.startTime) - chartShape.leftOffset,
               this.yScale(location) + bandwidth/2);
-          this.drawUtilLines(aggTime.util, chartShape, location, aggTime.startTime)
         }
-
       }
     }
 
