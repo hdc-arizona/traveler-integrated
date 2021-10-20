@@ -236,7 +236,7 @@ def primitive_trace_forward(datasetId: str,
                 array = sUtil.calcUtilizationHistogram(sbin, st, en)
             return array
 
-        binSize = int(math.floor((end - begin) / bins))
+        binSize = (end - begin) / bins
         aggregatedData = dict()
         for dummy_location in currentNode.aggregatedUtil.locationDict:
             aggUtilValues = currentNode.aggregatedUtil.calcUtilizationForLocation(bins, begin, end, dummy_location, False)
@@ -251,11 +251,11 @@ def primitive_trace_forward(datasetId: str,
                         aggregatedData[dummy_location] = list()
                     snappedStart = begin
                     if begin < currentNode.aggregatedBlockList[last_id].startTime:
-                        snappedStart = (int(math.floor((currentNode.aggregatedBlockList[last_id].startTime - begin) / binSize)) * binSize) + begin
+                        snappedStart = int(math.floor(((currentNode.aggregatedBlockList[last_id].startTime - begin) / binSize) * binSize)) + begin
                     snappedEnd = end
                     if currentNode.aggregatedBlockList[last_id].endTime < end:
-                        snappedEnd = currentNode.aggregatedBlockList[last_id].endTime
-                        #(int(math.ceil((currentNode.aggregatedBlockList[last_id].endTime - begin) / binSize)) * binSize) + begin
+                        # snappedEnd = currentNode.aggregatedBlockList[last_id].endTime
+                        snappedEnd = int(math.ceil(((currentNode.aggregatedBlockList[last_id].endTime - begin) / binSize) * binSize)) + begin
                     snappedBins = int(math.ceil((snappedEnd - snappedStart) / binSize))
                     print(snappedStart, snappedEnd, snappedBins, begin, end, bins, last_id, currentNode.aggregatedBlockList[last_id].endTime)
                     aggregatedData[dummy_location].append({
