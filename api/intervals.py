@@ -202,7 +202,8 @@ def primitive_trace_forward(datasetId: str,
                             bins: int = 100,
                             begin: int = None,
                             end: int = None,
-                            locations: str = None):
+                            locations: str = None,
+                            dLocations: str = None):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
     if begin is None:
@@ -212,6 +213,10 @@ def primitive_trace_forward(datasetId: str,
 
     if locations:
         locations = locations.split(',')
+    if dLocations and dLocations == 'undefined':
+        dLocations = None
+    if dLocations:
+        dLocations = dLocations.split(',')
 
     def traceForward():
         dependencyTree = db[datasetId]['dependencyTree']
@@ -236,7 +241,11 @@ def primitive_trace_forward(datasetId: str,
 
         binSize = (end - begin) / bins
         aggregatedData = dict()
+        allDummyLocations = list()
         for dummy_location in currentNode.aggregatedUtil.locationDict:
+            allDummyLocations.append(dummy_location)
+            if dLocations and str(dummy_location) not in dLocations:
+                continue
             aggUtilValues = currentNode.aggregatedUtil.calcUtilizationForLocation(bins, begin, end, dummy_location, False)
 
             last_id = -1
@@ -263,7 +272,7 @@ def primitive_trace_forward(datasetId: str,
                         'name': currentNode.aggregatedBlockList[last_id].firstPrimitiveName,
                         'util': accumulateUtilizationData(currentNode.aggregatedBlockList[last_id].utilization, snappedBins, snappedStart, snappedEnd)})
 
-        results = {'data': aggregatedData}
+        results = {'data': aggregatedData, 'locations': allDummyLocations}
         yield json.dumps(results)
 
     return StreamingResponse(traceForward(), media_type='application/json')

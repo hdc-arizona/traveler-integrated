@@ -139,18 +139,24 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
     const selectedNodeId = this.linkedState.selection?.primitiveDetails;
+    const dLocations = this.linkedState.visibleAggGanttLocations?.join(',');
     const aggregatedIntervalsPromise = selectedNodeId
         ? this.updateResource({
           name: 'aggregatedIntervals',
           type: 'json',
-          url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?nodeId=${selectedNodeId}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
+          url: `/datasets/${this.datasetId}/primitives/primitiveTraceForward?nodeId=${selectedNodeId}&bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}&dLocations=${dLocations}`
         })
         : this.updateResource({ name: 'aggregatedIntervals', type: 'placeholder', value: null });
     return Promise.all([aggregatedIntervalsPromise]);
   }
 
   getRequiredChartHeight () {
-    return MIN_LOCATION_HEIGHT;
+    const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
+    let m = 1;
+    if(aggregatedIntervals?.locations?.length > 0) {
+      m = aggregatedIntervals.locations.length;
+    }
+    return MIN_LOCATION_HEIGHT * m;
   }
 
   /**
@@ -160,13 +166,16 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
    */
   getChartShape () {
     const chartShape = super.getChartShape();
+    const visLoc = Math.ceil(chartShape.chartHeight / MIN_LOCATION_HEIGHT);
+    let dummy = Array(visLoc).fill().map((_, idx) => 1 + idx);
+
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
-    if(aggregatedIntervals === null || Object.keys(aggregatedIntervals.data).length === 0) {
+    if(aggregatedIntervals === null || aggregatedIntervals.locations.length === 0) {
       this.yScale.range([0, chartShape.fullHeight])
-          .domain([0]);
+          .domain(dummy);
     } else {
       this.yScale.range([0, chartShape.fullHeight])
-          .domain(Object.keys(aggregatedIntervals.data));
+          .domain(aggregatedIntervals.locations);
     }
 
 
@@ -180,6 +189,11 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     spilloverYRange = this.computeSpillover(spilloverYRange, VERTICAL_SPILLOVER_FACTOR);
     chartShape.spilloverYRange = spilloverYRange;
     chartShape.locations = this.yScale.invertRange(...spilloverYRange);
+    if(this.linkedState.visibleAggGanttLocations === null) {
+      this.linkedState.visibleAggGanttLocations = dummy;
+    } else {
+      this.linkedState.visibleAggGanttLocations = chartShape.locations;
+    }
 
     return chartShape;
   }
@@ -248,7 +262,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
 
   drawAggregatedBars (chartShape) {
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
-    const domain = chartShape.spilloverXScale.domain();
     const currentTimespan = this.linkedState.detailDomain[1] -
         this.linkedState.detailDomain[0];
     if (aggregatedIntervals === null ||

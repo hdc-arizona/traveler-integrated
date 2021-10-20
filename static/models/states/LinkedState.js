@@ -28,6 +28,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     });
     super(options);
 
+    this.visibleAggGanttLocations = null;
     this.info = options.info;
     this._selection = options.priorLinkedState?.selection || null;
     this._colorMode = COLOR_MODES.INCLUSIVE;
@@ -47,6 +48,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
   set selection (selection) {
     this._selection = selection;
+    this.visibleAggGanttLocations = null;
     this.trigger('selectionChanged');
   }
 

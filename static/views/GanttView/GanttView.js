@@ -153,6 +153,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
 
     // Make the list of locations a URL-friendly comma-separated list
     const locations = chartShape.locations.join(',');
+    const dLocations = this.linkedState.visibleAggGanttLocations?.join(',');
 
     // Send the utilization API requests
     const totalPromise = this.updateResource({
@@ -170,7 +171,8 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
           bins: chartShape.bins,
           begin: domain[0],
           end: domain[1],
-          locations
+          locations,
+          dLocations
         }) || null; // if not, don't show any selection-specific utilization
       }
     });
