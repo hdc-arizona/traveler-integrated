@@ -250,7 +250,7 @@ def primitive_trace_forward(datasetId: str,
 
             last_id = -1
             for each_bin in range(bins):
-                if 0 < (int(aggUtilValues[each_bin])-1) != last_id:
+                if 0 <= (int(aggUtilValues[each_bin])-1) != last_id:
                     last_id = int(aggUtilValues[each_bin]) - 1
                     if currentNode.aggregatedBlockList[last_id].endTime < begin:
                         continue
@@ -260,7 +260,7 @@ def primitive_trace_forward(datasetId: str,
                     snappedStart = int(((each_bin - 1) * binSize) + begin)
                     snappedBins = 1
                     while each_bin < bins:
-                        if 0 == (int(aggUtilValues[each_bin])-1) or (int(aggUtilValues[each_bin])-1) != last_id:
+                        if 0 > (int(aggUtilValues[each_bin])-1) or (int(aggUtilValues[each_bin])-1) != last_id:
                             break
                         snappedBins = snappedBins + 1
                         each_bin = each_bin + 1
