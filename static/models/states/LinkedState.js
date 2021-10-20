@@ -30,7 +30,6 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
     this.info = options.info;
     this._selection = options.priorLinkedState?.selection || null;
-    this._aggregatedIntervalsSelection = null;
     this._colorMode = COLOR_MODES.INCLUSIVE;
     this._viewLayout = options.priorLinkedState?._viewLayout || null;
     this.cachedUtilizationData = {};
@@ -42,24 +41,12 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     }
   }
 
-  get aggregatedIntervalsSelection () {
-    return this._aggregatedIntervalsSelection;
-  }
-
-  set aggregatedIntervalsSelection (selection) {
-    this._aggregatedIntervalsSelection = selection;
-    if(selection !== null) {
-      this.trigger('aggregatedIntervalsSelectionChanged');
-    }
-  }
-
   get selection () {
     return this._selection;
   }
 
   set selection (selection) {
     this._selection = selection;
-    this.aggregatedIntervalsSelection = null;
     this.trigger('selectionChanged');
   }
 

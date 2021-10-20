@@ -19,7 +19,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     ]);
     super(options);
 
-    this.linkedState.aggregatedIntervalsSelection = null;
     // yScale maps the full list of locationNames to the full height of the
     // canvas
     this.yScale = d3.scaleBand()
@@ -249,7 +248,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
 
   drawAggregatedBars (chartShape) {
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
-    this.linkedState.aggregatedIntervalsSelection = aggregatedIntervals;
     const domain = chartShape.spilloverXScale.domain();
     const currentTimespan = this.linkedState.detailDomain[1] -
         this.linkedState.detailDomain[0];

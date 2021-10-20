@@ -116,7 +116,6 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
 
   setupInteractions () {
     super.setupInteractions();
-    this.linkedState.on('aggregatedIntervalsSelectionChanged', () => { this.drawCanvas(this._renderedChartShape); });
     // Make sure the y axis links with scrolling
     this.d3el.select('foreignObject').on('scroll', () => {
       if (this._ignoreYScrollEvents) {
