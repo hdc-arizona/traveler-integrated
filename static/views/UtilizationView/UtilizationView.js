@@ -175,18 +175,20 @@ class UtilizationView extends
     if (selectionUtilization !== null) {
       var histogram = {};
       if(Array.isArray(this.linkedState.selection?.primitiveName)) {
-        const trueBegin = this.xScale.domain()[0];
-        const trueEnd = this.xScale.domain()[1];
         const bins = Math.max(Math.ceil(this.chartBounds.width), 1);
-        const binSize = Math.floor((trueEnd - trueBegin) / bins);
         histogram['data'] = new Array(bins).fill(0);
         for (const [location, aggregatedTimes] of Object.entries(selectionUtilization.data)) {
           for (let aggTime of aggregatedTimes) {
-            let snappedStartBin = Math.floor((aggTime.startTime - trueBegin) / binSize);
-            let snappedEndBin = Math.ceil((aggTime.endTime - trueBegin) / binSize);
-            for (let i = snappedStartBin, j = 0; i < snappedEndBin; i++, j++) {
-              histogram['data'][i] = histogram['data'][i] + aggTime.util[j];
-            }
+            let snappedStartBin = Math.floor(this.xScale(aggTime.startTime)) - 1;
+            aggTime.util.forEach((d,j)=>{
+              if(j+ snappedStartBin === 662) {
+                console.log(d);
+              }
+              histogram['data'][j + snappedStartBin] = histogram['data'][j + snappedStartBin] + d;
+            });
+            // for (let i = snappedStartBin, j = 0; i < snappedEndBin; i++, j++) {
+            //   histogram['data'][i] = histogram['data'][i] + aggTime.util[j];
+            // }
           }
         }
       } else {

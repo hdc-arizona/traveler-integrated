@@ -8,33 +8,13 @@ class PrimitiveSelection extends Selection {
     this.primitiveDetails = options.primitiveDetails;
   }
 
-  getBinNumber(cTime, metadata) {
-    const binSize = (metadata.end - metadata.begin) / metadata.bins;
-    return Math.floor((cTime - metadata.begin) / binSize);
-  }
-
-  async getUtilizationResultsForLocation(primitive, locations, urlArgs) {
-    urlArgs.primitive = primitive;
-    urlArgs.locations = locations.join();
-    const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
-        Object.entries(urlArgs).map(([key, value]) => {
-          return `${key}=${encodeURIComponent(value)}`;
-        }).join('&');
-    const response = await window.fetch(url);
-    const json = await response.json();
-    return json;
-  }
-
   /**
    * Add selection-specific arguments to /utilizationHistogram API endpoint,
    * and fetch the data
    */
   async getUtilization (urlArgs) {
-    var allJson = {};
     var utilization = new Array(urlArgs.bins).fill(0);
     var results = {};
-    var flag = {};
-    var aggregatedIntervals = undefined;
 
     if(Array.isArray(this.primitiveName)) {
       urlArgs.primitive = undefined;
