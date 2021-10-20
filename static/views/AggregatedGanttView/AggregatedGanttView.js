@@ -136,41 +136,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     lastChartShape.locations.some((loc, i) => chartShape.locations[i] !== loc);
   }
 
-  getBinNumber(cTime, chartShape) {
-    const domain = chartShape.spilloverXScale.domain();
-    const binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins})
-    return Math.floor((cTime - domain[0]) / binSize);
-  }
-
-  async getUtilizationForAggregatedPrimitives (urlArgs, aggTime, chartShape) {
-    var allJson = {};
-    var utilization = new Array(chartShape.bins).fill(0);
-    const domain = chartShape.spilloverXScale.domain();
-    if(Array.isArray(aggTime.childList)) {
-      for (const eachChild of aggTime.childList) {
-        if(!(eachChild.name in allJson)) {
-          urlArgs.primitive = eachChild.name;
-          urlArgs.locations = aggTime.locationList.join();
-          const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
-              Object.entries(urlArgs).map(([key, value]) => {
-                return `${key}=${encodeURIComponent(value)}`;
-              }).join('&');
-          const response = await window.fetch(url);
-          const json = await response.json();
-          allJson[eachChild.name] = json.locations;
-        }
-        let startingBin = this.getBinNumber(Math.max(domain[0], eachChild.enter), chartShape);
-        let endingBin = this.getBinNumber(Math.min(domain[1], eachChild.leave), chartShape);
-        for(var i = startingBin; i <= Math.min(endingBin, chartShape.bins-1); i++) {
-          utilization[i] = utilization[i] + allJson[eachChild.name][eachChild.location][i];
-        }
-      }
-    } else {
-      console.log("Primitive List should be an array");
-    }
-    return utilization;
-  }
-
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
@@ -250,21 +215,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
       .text('');
   }
 
-  buildLocationText(d) {
-    const a = BigInt(d);
-    const c = BigInt(32);
-    const node = BigInt(a >> c);
-    const thread = (d & 0x0FFFFFFFF);
-    let aggText = '';
-    aggText += node + ' - T';
-    aggText += thread;
-    return aggText;
-  }
-
-  getBinSize(metadata) {
-    return (metadata.end - metadata.begin) / metadata.bins;
-  }
-
   drawUtilLines(primitiveData, chartShape, location, cstart) {
     // console.log("drawing primitive util data");
     const domain = chartShape.spilloverXScale.domain();
@@ -275,7 +225,6 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
 
     const bandwidth = this.yScale.bandwidth();
 
-    let binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
     if(cstart < domain[0]) {
       cstart = domain[0];
     }
@@ -283,8 +232,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     // const maxUtil = Math.ceil(Math.max(...primitiveData));
     const outlinePathGenerator = d3.area()
         .x((d, i) => {
-          let actualTime = cstart + (i * binSize);
-          return chartShape.spilloverXScale(actualTime) - chartShape.leftOffset;
+          return chartShape.spilloverXScale(cstart) - chartShape.leftOffset + i;
         }) // bin number corresponds to screen coordinate
         .y1(d => {
           return this.yScale(location) + bandwidth * (1 - d/maxUtil);
@@ -330,8 +278,9 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
             chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime),
             bandwidth);
 
-        var binSize = this.getBinSize({begin: domain[0], end: domain[1], bins: chartShape.bins});
-        if((aggTime.endTime - aggTime.startTime) > binSize*10) { // at least ten bins exist
+        const visibleBins = chartShape.spilloverXScale(aggTime.endTime) - chartShape.spilloverXScale(aggTime.startTime)
+        const minBinsForUtilAndText = 20;
+        if(visibleBins > minBinsForUtilAndText) { // at least ten bins exist
           ctx.fillStyle = "white";
           ctx.font = "10px Arial";
           ctx.fillText(aggTime.name,
