@@ -330,7 +330,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
   drawNodes (transition, nodeList) {
     const self = this;
     let nodes = this.d3el.select('.nodeLayer').selectAll('.node')
-      .data(nodeList, d => d.data.name);
+      .data(nodeList, d => d.data.nodeId);
     const nodesEnter = nodes.enter().append('g').classed('node', true);
     const nodesExit = nodes.exit();
     nodes = nodes.merge(nodesEnter);
