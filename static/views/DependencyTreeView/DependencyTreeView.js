@@ -450,7 +450,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     nodes
       .on('click', (event, d) => {
         let primitives = self.getPrimitiveListFromNode(d);
-        if (this.linkedState.selection?.primitiveName.join() === primitives.join()) {
+        if (this.linkedState.selection?.primitiveDetails === d.data.nodeId) {
           // Deselect
           this.linkedState.selection = null;
         } else {
@@ -502,7 +502,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
 
   drawLinks (transition) {
     let links = this.d3el.select('.linkLayer').selectAll('.link')
-      .data(this.tree.links(), d => d.source.data.name + d.target.data.name);
+      .data(this.tree.links(), d => d.source.data.nodeId + d.target.data.nodeId);
     const linksEnter = links.enter().append('path').classed('link', true);
     const linksExit = links.exit();
     links = links.merge(linksEnter);
