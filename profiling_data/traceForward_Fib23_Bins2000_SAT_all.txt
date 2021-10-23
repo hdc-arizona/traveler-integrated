@@ -1,0 +1,62 @@
+
+
+ Averaged over 100 trials 
+
+         41284 function calls (41273 primitive calls) in 0.223 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.005    0.005    0.223    0.223 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:199(primitive_trace_forward)
+       34    0.140    0.004    0.204    0.006 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/sparseUtilizationList.py:104(calcUtilizationForLocation)
+        6    0.000    0.000    0.197    0.033 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:232(accumulateUtilizationData)
+        6    0.012    0.002    0.197    0.033 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/sparseUtilizationList.py:73(calcUtilizationHistogram)
+    40193    0.058    0.000    0.058    0.000 {method 'append' of 'list' objects}
+       34    0.002    0.000    0.002    0.000 {built-in method _cCalcBin.calcHistogram}
+        5    0.000    0.000    0.002    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/persistent.py:753(__getitem__)
+        5    0.000    0.000    0.002    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:1252(__getitem__)
+        5    0.000    0.000    0.001    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:1155(get)
+        1    0.000    0.000    0.001    0.001 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/__init__.py:34(validateDataset)
+       34    0.000    0.000    0.001    0.000 <__array_function__ internals>:2(empty_like)
+     10/5    0.000    0.000    0.001    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:672(_sql)
+     10/5    0.000    0.000    0.001    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:633(_con)
+        2    0.001    0.000    0.001    0.000 {built-in method builtins.print}
+       34    0.000    0.000    0.001    0.000 {built-in method numpy.core._multiarray_umath.implement_array_function}
+        9    0.001    0.000    0.001    0.000 {method 'execute' of 'sqlite3.Connection' objects}
+      137    0.001    0.000    0.001    0.000 {method 'new' of 'CompiledFFI' objects}
+       34    0.000    0.000    0.000    0.000 {built-in method numpy.empty}
+      103    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/numpy/core/_internal.py:251(__init__)
+      208    0.000    0.000    0.000    0.000 {built-in method builtins.len}
+       34    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/numpy/core/_internal.py:830(npy_ctypes_check)
+        2    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:2401(reset)
+        0    0.000             0.000          {built-in method _sqlite3.connect}
+      103    0.000    0.000    0.000    0.000 {method 'cast' of 'CompiledFFI' objects}
+      103    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/numpy/core/_internal.py:305(data)
+       34    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/sparseUtilizationList.py:13(getCLocation)
+        9    0.000    0.000    0.000    0.000 {method 'fetchall' of 'sqlite3.Cursor' objects}
+       34    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/numpy/core/multiarray.py:77(empty_like)
+        2    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:677(_sql_retry)
+        5    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:276(fetch)
+       21    0.000    0.000    0.000    0.000 {built-in method builtins.getattr}
+       10    0.000    0.000    0.000    0.000 {built-in method posix.getpid}
+        7    0.000    0.000    0.000    0.000 {built-in method time.time}
+        3    0.000    0.000    0.000    0.000 {built-in method _pickle.load}
+        0    0.000             0.000          /usr/lib/python3.6/posixpath.py:75(join)
+       11    0.000    0.000    0.000    0.000 {method 'startswith' of 'str' objects}
+        5    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:176(put)
+        2    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/__init__.py:70(__iter__)
+        4    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/__init__.py:58(__getitem__)
+        1    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/profiling_tools/profilier.py:11(end)
+        2    0.000    0.000    0.000    0.000 {built-in method builtins.setattr}
+        0    0.000             0.000          {built-in method posix.fspath}
+        2    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/__init__.py:61(__contains__)
+        2    0.000    0.000    0.000    0.000 {method 'discard' of 'set' objects}
+        1    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/dependencyTree.py:161(find_node_in_dependency_tree)
+        0    0.000             0.000          /usr/lib/python3.6/posixpath.py:41(_get_sep)
+        0    0.000             0.000          /home/sayefsakin/.local/lib/python3.6/site-packages/diskcache/core.py:2361(close)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+        1    0.000    0.000    0.000    0.000 {method 'values' of 'dict' objects}
+        0    0.000             0.000          {built-in method builtins.isinstance}
+        0    0.000             0.000          {method 'endswith' of 'str' objects}
+
+

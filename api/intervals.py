@@ -248,29 +248,34 @@ def primitive_trace_forward(datasetId: str,
                 continue
             aggUtilValues = currentNode.aggregatedUtil.calcUtilizationForLocation(bins, begin, end, dummy_location, False)
 
-            last_id = -1
-            for each_bin in range(bins):
-                if 0 <= (int(aggUtilValues[each_bin])-1) != last_id:
-                    last_id = int(aggUtilValues[each_bin]) - 1
-                    if currentNode.aggregatedBlockList[last_id].endTime < begin:
-                        continue
-                    if dummy_location not in aggregatedData:
-                        aggregatedData[dummy_location] = list()
+        last_id = -1
+        each_bin = 0
+        while each_bin < bins:
+            if 0 <= (int(aggUtilValues[each_bin])-1) != last_id:
+                last_id = int(aggUtilValues[each_bin]) - 1
+                if currentNode.aggregatedBlockList[last_id].endTime < begin:
+                    each_bin = each_bin + 1
+                    continue
 
-                    snappedStart = int(((each_bin - 1) * binSize) + begin)
-                    snappedBins = 1
-                    while each_bin < bins:
-                        if 0 > (int(aggUtilValues[each_bin])-1) or (int(aggUtilValues[each_bin])-1) != last_id:
-                            break
-                        snappedBins = snappedBins + 1
-                        each_bin = each_bin + 1
-                    snappedEnd = int((each_bin * binSize) + begin)
+                if dummy_location not in aggregatedData:
+                    aggregatedData[dummy_location] = list()
 
-                    aggregatedData[dummy_location].append({
-                        'startTime': currentNode.aggregatedBlockList[last_id].startTime,
-                        'endTime': currentNode.aggregatedBlockList[last_id].endTime,
-                        'name': currentNode.aggregatedBlockList[last_id].firstPrimitiveName,
-                        'util': accumulateUtilizationData(currentNode.aggregatedBlockList[last_id].utilization, snappedBins, snappedStart, snappedEnd)})
+                snappedStart = int(((each_bin - 1) * binSize) + begin)
+                snappedBins = 1
+                while each_bin < bins:
+                    if 0 > (int(aggUtilValues[each_bin])-1) or (int(aggUtilValues[each_bin])-1) != last_id:
+                        break
+                    snappedBins = snappedBins + 1
+                    each_bin = each_bin + 1
+                snappedEnd = int((each_bin * binSize) + begin)
+
+                aggregatedData[dummy_location].append({
+                    'startTime': currentNode.aggregatedBlockList[last_id].startTime,
+                    'endTime': currentNode.aggregatedBlockList[last_id].endTime,
+                    'name': currentNode.aggregatedBlockList[last_id].firstPrimitiveName,
+                    'util': accumulateUtilizationData(currentNode.aggregatedBlockList[last_id].utilization, snappedBins, snappedStart, snappedEnd)})
+            else:
+                each_bin = each_bin + 1
 
         results = {'data': aggregatedData, 'locations': allDummyLocations}
         yield json.dumps(results)

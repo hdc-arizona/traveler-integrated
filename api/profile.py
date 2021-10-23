@@ -23,10 +23,10 @@ def profileIntervals(label: str, begin: float = None, end: float = None):
 
 
 @router.get('/profile/datasets/{label}/traceForward')
-def traceForwardIntervals(label: str, begin: float = None, end: float = None):
+def traceForwardIntervals(label: str, bins: int = 100, begin: float = None, end: float = None):
     print('this is here')
     prf.start()
-    primitive_trace_forward(label, 'e352e9fe-15a5-4241-af9d-858c8ab396c7')
+    primitive_trace_forward(label, '1b8b1b22-fdd7-4a63-b112-bea6fc7ed747', bins, None, None, '1,2,3,4,5,6,7,8,9,10', '1,2,3,4,5,6,7,8,9,10')
     prf.end()
 
 
