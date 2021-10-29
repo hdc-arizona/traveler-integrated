@@ -162,13 +162,13 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     //     componentState: { datasetId: this.info.datasetId }
     //   });
     // }
-    if (availableViews.DependencyTreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
-      layout.content.push({
-        type: 'component',
-        componentName: 'DependencyTreeView',
-        componentState: { datasetId: this.info.datasetId }
-      });
-    }
+    // if (availableViews.DependencyTreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
+    //   layout.content.push({
+    //     type: 'component',
+    //     componentName: 'DependencyTreeView',
+    //     componentState: { datasetId: this.info.datasetId }
+    //   });
+    // }
     return layout;
   }
 
@@ -294,7 +294,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
     return [
       this.createViewMenuEntry('Selection Info', 'SelectionInfoView', null, availableViews, openViews),
-      this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews),
+      // this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews),
       // this.createViewMenuEntry('Tree', 'TreeView', null, availableViews, openViews),
       // Submenu for code views
       {

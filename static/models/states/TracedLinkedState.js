@@ -128,7 +128,7 @@ class TracedLinkedState extends LinkedState {
     const availableViews = await this.getAvailableViews();
 
     // Starting views are only UtilizationView and GanttView
-    const traceColumnLayout = ['UtilizationView', 'GanttView', 'AggregatedGanttView']
+    const traceColumnLayout = ['UtilizationView', 'GanttView']
       .filter(componentName => {
         return availableViews?.[componentName]?.status !== VIEW_STATUS.UNAVAILABLE;
       })
@@ -193,7 +193,9 @@ class TracedLinkedState extends LinkedState {
       // Singular views
       this.createViewMenuEntry('Gantt Timeline', 'GanttView', null, availableViews, openViews),
       this.createViewMenuEntry('Utilization Overview', 'UtilizationView', null, availableViews, openViews),
-      this.createViewMenuEntry('Interval Histogram', 'IntervalHistogramView', null, availableViews, openViews)
+      this.createViewMenuEntry('Interval Histogram', 'IntervalHistogramView', null, availableViews, openViews),
+      this.createViewMenuEntry('Aggregated Gantt', 'AggregatedGanttView', null, availableViews, openViews),
+      this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews)
     ]);
     // Submenus
     for (const menu of [metricSubmenu, lmSensorSubmenu, papiSubmenu]) {

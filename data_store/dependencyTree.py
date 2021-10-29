@@ -30,7 +30,7 @@ class AggregatedBlock:
 class DependencyTreeNode:
     def __init__(self):
         self.nodeId = str(uuid.uuid4())
-        self.name = 'phylanx'
+        self.name = 'root'
         self.children = list()  # list of DependencyTreeNode
         self.prefixList = list()  # list of string
         self.intervalList = list()  # containing just the enter and leave time of this interval, helper for creating aggreatedBlockList
@@ -39,7 +39,7 @@ class DependencyTreeNode:
         self.aggregatedBlockList = list()  # list of dictionary (start time, end time), convert it to (event, time) list later
 
     def isNotDummyRootNode(self):
-        return self.name != 'phylanx'
+        return self.name != 'root'
 
     def setName(self, primitiveName):
         pref, self.name = get_primitive_pretty_name_with_prefix(primitiveName)

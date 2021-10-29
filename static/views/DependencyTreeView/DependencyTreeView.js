@@ -458,16 +458,8 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
         }
       }).on('mouseenter', function (event, d) {
         const label = d.details.display_name || d.data.name;
-        let time = self.linkedState.colorMode === 'inclusive'
-          ? d.details?.time
-          : d.details?.exclusiveTime;
-        if (time === undefined) {
-          time = '(no time data)';
-        } else {
-          time = prettyPrintTime(time);
-        }
         uki.showTooltip({
-          content: `${label}: ${time}`,
+          content: `${label}`,
           targetBounds: this.getBoundingClientRect(),
           interactive: false,
           hideAfterMs: 1000,
