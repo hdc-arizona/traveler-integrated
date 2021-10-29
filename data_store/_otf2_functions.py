@@ -7,6 +7,7 @@ import numpy as np
 from blist import sortedlist
 from intervaltree import Interval, IntervalTree
 from .sparseUtilizationList import SparseUtilizationList
+from .dependencyTree import DependencyTreeNode
 from . import logToConsole
 
 # Helper function from https://stackoverflow.com/a/4836734/1058935 for
@@ -65,6 +66,8 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     await self.connectIntervals(datasetId, log)
     gc.collect()
     await self.buildSparseUtilizationLists(datasetId, log)
+    gc.collect()
+    await self.buildDependencyTree(datasetId, log)
     gc.collect()
     self.finishLoadingSourceFile(datasetId, file.name)
 
@@ -453,3 +456,66 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
 
     self[datasetId]['sparseUtilizationList'] = allSuls
     self[datasetId]['info']['intervalHistograms'] = intervalHistograms
+
+
+async def buildDependencyTree(self, datasetId, log=logToConsole):
+    def is_include_primitive_name(primitive: str):
+        return True
+        # if '$' in primitive:
+        #     return True
+        # return False
+    await log('Building dependency tree')
+    primitive_set = dict()
+    dId = 0
+    while str(dId) in self[datasetId]['intervals']:
+        intervalObj = self[datasetId]['intervals'][str(dId)]
+        if intervalObj['parent'] is None:
+            if is_include_primitive_name(intervalObj['Primitive']):
+                if intervalObj['Primitive'] not in primitive_set:
+                    primitive_set[intervalObj['Primitive']] = list()
+                primitive_set[intervalObj['Primitive']].append(str(dId))
+        dId = dId + 1
+
+    def getChildren(cId):
+        currentNode = DependencyTreeNode()
+        intObj = self[datasetId]['intervals'][cId]
+        currentNode.setName(intObj['Primitive'])
+        for childId in intObj['children']:
+            if is_include_primitive_name(self[datasetId]['intervals'][childId]['Primitive']):
+                currentNode.addChildren(getChildren(childId))
+        currentNode.addIntervalToAggregatedList(intObj)
+        return currentNode
+
+    def mergeTwoTrees(tree1, tree2):
+        if tree1.name != tree2.name:
+            return
+        for eachTree2Child in tree2.children:
+            tree1.addChildren(eachTree2Child)  # call add children instead of list.append to merge safely
+        tree1.intervalList.extend(tree2.intervalList)
+        tree1.aggregatedBlockList.extend(tree2.aggregatedBlockList)
+
+    count = 0
+    pre_c = None
+    for prim in primitive_set:
+        for each_interval_id in primitive_set[prim]:
+            thisNode = DependencyTreeNode()
+            newChild = getChildren(each_interval_id)
+            thisNode.addChildren(newChild)
+            thisNode.aggregatedBlockList.extend(newChild.aggregatedBlockList)
+            thisNode.intervalList.extend(newChild.intervalList)
+            current_c = thisNode
+            if pre_c is None:
+                pre_c = current_c
+            else:
+                mergeTwoTrees(pre_c, current_c)
+            count += 1
+            if count % 2500 == 0:
+                await log('.', end='')
+            if count % 100000 == 0:
+                await log('processed %i primitives' % count)
+    await log('')
+
+    results = pre_c
+    if results:
+        results.finalizeTreeNode()
+    self[datasetId]['dependencyTree'] = results

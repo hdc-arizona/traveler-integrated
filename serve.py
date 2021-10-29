@@ -4,7 +4,7 @@ import asyncio
 import uvicorn
 from fastapi import FastAPI
 from starlette.staticfiles import StaticFiles
-from api import args, db, core, intervals, metrics, primitives, ClientLogger
+from api import args, db, core, intervals, metrics, primitives, ClientLogger, profile
 
 app = FastAPI(
     title=__name__,
@@ -17,6 +17,7 @@ app.include_router(core.router)
 app.include_router(intervals.router)
 app.include_router(metrics.router)
 app.include_router(primitives.router)
+app.include_router(profile.router)
 
 if __name__ == '__main__':
     logger = ClientLogger()

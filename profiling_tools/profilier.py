@@ -51,7 +51,7 @@ class Profilier():
         with open(filename, 'w') as f:
             f.write("\n\n Averaged over {} trials \n\n".format(num_of_runs+1))
             sts = pstats.Stats(self.prf, stream=f)
-            if num_of_runs is not 1:
+            if num_of_runs != 1:
                 self.calcAvgStatsHelper(sts.__dict__['stats'], num_of_runs)
                 sts.__dict__['total_tt'] = sts.__dict__['total_tt']/num_of_runs
                 sts.__dict__['total_calls'] = sts.__dict__['total_calls']//num_of_runs

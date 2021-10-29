@@ -57,33 +57,33 @@ function evalTypeGlyph (evalCode, radius) {
   }
 }
 
-class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
+class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState is updated through app-wide things like Controller.refreshDatasets()
   uki.ui.SvgGLView) { // Ensures this.d3el is an SVG element; adds the download icon to the tab
   constructor (options) {
     options.resources = options.resources || [];
     options.resources.push(...[
-      { type: 'less', url: 'views/TreeView/style.less' },
-      { type: 'text', url: 'views/TreeView/template.html', name: 'template' },
-      { type: 'text', url: 'views/TreeView/shapeKey.html' },
+      { type: 'less', url: 'views/DependencyTreeView/style.less' },
+      { type: 'text', url: 'views/DependencyTreeView/template.html', name: 'template' },
+      { type: 'text', url: 'views/DependencyTreeView/shapeKey.html' },
       {
         type: 'json',
-        url: `/datasets/${options.glState.datasetId}/tree`,
+        url: `/datasets/${options.glState.datasetId}/getDependencyTree`,
         name: 'tree',
         then: rawTree => {
           const tree = d3.hierarchy(rawTree);
           // Attach details about each primitive to each tree node
           tree.each(node => {
-            node.details = this.linkedState.getPrimitiveDetails(node.data.name);
+            node.details = node.data.name;//this.linkedState.getPrimitiveDetails(node.data.name);
           });
           // Now that we have details, compute exclusive times
           tree.each(node => {
             if (node.details.time !== undefined) {
-              node.details.exclusiveTime = node.details.time;
-              for (const childNode of node.children || []) {
-                if (childNode.details.time !== undefined) {
-                  node.details.exclusiveTime -= childNode.details.time;
-                }
-              }
+              node.details.exclusiveTime = 10;//node.details.time;
+              // for (const childNode of node.children || []) {
+              //   if (childNode.details.time !== undefined) {
+              //     node.details.exclusiveTime -= childNode.details.time;
+              //   }
+              // }
             }
           });
           return tree;
@@ -92,7 +92,7 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
     ]);
     super(options);
 
-    // In addition to the listeners that LinkedMixin provides, TreeView should
+    // In addition to the listeners that LinkedMixin provides, DependencyTreeView should
     // also redraw itself when the colorMode changes
     this.linkedState.on('colorModeChanged', () => { this.render(); });
   }
@@ -120,21 +120,21 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
     this.mainGlyphRadius = this.nodeHeight / 2;
     this.expanderRadius = 3 * this.mainGlyphRadius / 4;
 
-    this.glEl.classed('TreeView', true);
+    this.glEl.classed('DependencyTreeView', true);
     this.d3el.html(this.getNamedResource('template'));
     this.initKey();
 
     // Listen for ctrl+f so that all labels are visible when the user is searching
     this.showAllLabels = false;
     const body = d3.select('body');
-    body.on('keydown.TreeViewSearchInterceptor', event => {
+    body.on('keydown.DependencyTreeViewSearchInterceptor', event => {
       // 17, 91 are cmd+ctrl, 13 is enter, 70 is F
       if (event.keyCode === 17 || event.keyCode === 91 || event.keyCode === 92) { // ctrl & cmd
         this.showAllLabels = true;
         this.render();
-        body.on('click.TreeViewSearchInterceptor', () => {
+        body.on('click.DependencyTreeViewSearchInterceptor', () => {
           this.showAllLabels = false;
-          body.on('click.TreeViewSearchInterceptor', null);
+          body.on('click.DependencyTreeViewSearchInterceptor', null);
           this.render();
         });
       }
@@ -184,9 +184,6 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
 
     // Draw the links
     this.drawLinks(transition);
-
-    // Draw the extra (shown-on-hover-only) links
-    this.drawExtraLinks(nodeList);
 
     // Trash any interaction placeholders now that we've used them
     delete this._expandedParentCoords;
@@ -331,8 +328,9 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
   }
 
   drawNodes (transition, nodeList) {
+    const self = this;
     let nodes = this.d3el.select('.nodeLayer').selectAll('.node')
-      .data(nodeList, d => d.data.name);
+      .data(nodeList, d => d.data.nodeId);
     const nodesEnter = nodes.enter().append('g').classed('node', true);
     const nodesExit = nodes.exit();
     nodes = nodes.merge(nodesEnter);
@@ -361,7 +359,11 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
     nodes.transition(transition)
       .attr('transform', d => `translate(${d.x},${d.y})`)
       .attr('opacity', 1);
-    nodes.classed('selected', d => d.data.name === this.linkedState.selection?.primitiveName);
+    nodes.classed('selected', d => {
+      return d.data.nodeId === self.linkedState.selection?.primitiveDetails;
+      // let primitives = self.getPrimitiveListFromNode(d);
+      // return self.linkedState.selection?.primitiveName?.join() === primitives?.join();
+    });
 
     // Main glyph
     const mainGlyphEnter = nodesEnter.append('g').classed('mainGlyph', true);
@@ -372,7 +374,7 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
       .attr('text-anchor', 'middle')
       .attr('y', 3)
       .style('opacity', 0)
-      .text('?');
+      .text('');
     const mainGlyph = nodes.select('.mainGlyph');
     mainGlyph.selectAll('.area')
       .transition(transition)
@@ -395,7 +397,7 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
     // Node label
     nodesEnter.append('text')
       .classed('nodeLabel', true)
-      .attr('x', 2 * this.mainGlyphRadius)
+      .attr('x', 2 * this.mainGlyphRadius + 5)
       .attr('y', this.mainGlyphRadius)
       .text(d => {
         // Use display_name if available, but if not (e.g. we only have trace data), use its full name
@@ -434,50 +436,30 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
       .attr('d', d => {
         if (d._children) {
           // There are hidden children
-          return TreeView.GLYPHS.COLLAPSED_TRIANGLE(this.expanderRadius);
+          return DependencyTreeView.GLYPHS.COLLAPSED_TRIANGLE(this.expanderRadius);
         } else if (!d.children || d.children.length === 0) {
           // No children; this is a leaf
           return null;
         } else {
           // All children are showing
-          return TreeView.GLYPHS.EXPANDED_TRIANGLE(this.expanderRadius);
+          return DependencyTreeView.GLYPHS.EXPANDED_TRIANGLE(this.expanderRadius);
         }
       });
 
     // Main interactions
-    const self = this;
     nodes
       .on('click', (event, d) => {
-        if (this.linkedState.selection?.primitiveName === d.data.name) {
+        let primitives = self.getPrimitiveListFromNode(d);
+        if (this.linkedState.selection?.primitiveDetails === d.data.nodeId) {
           // Deselect
           this.linkedState.selection = null;
         } else {
-          // let primitivesStack = [d];
-          // let primitives = [];
-          // let currentNode = primitivesStack.pop();
-          // while(currentNode) {
-          //   primitives.push(currentNode.data.name);
-          //   if(currentNode.children !== undefined) {
-          //     for(const eachNode of currentNode.children) {
-          //       primitivesStack.push(eachNode);
-          //     }
-          //   }
-          //   currentNode = primitivesStack.pop();
-          // }
-          this.linkedState.selectPrimitive(d.data.name);
+          this.linkedState.selectPrimitives(primitives, d.data.nodeId);
         }
       }).on('mouseenter', function (event, d) {
         const label = d.details.display_name || d.data.name;
-        let time = self.linkedState.colorMode === 'inclusive'
-          ? d.details?.time
-          : d.details?.exclusiveTime;
-        if (time === undefined) {
-          time = '(no time data)';
-        } else {
-          time = prettyPrintTime(time);
-        }
         uki.showTooltip({
-          content: `${label}: ${time}`,
+          content: `${label}`,
           targetBounds: this.getBoundingClientRect(),
           interactive: false,
           hideAfterMs: 1000,
@@ -494,9 +476,25 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
       });
   }
 
+  getPrimitiveListFromNode(d) {
+    let primitives = [];
+    if(d.data.name === 'phylanx') {
+      for(let child of d.data.children){
+        for(let prefix of child.prefixList) {
+          primitives.push(prefix.concat(child.name));
+        }
+      }
+    } else {
+      for (let prefix of d.data.prefixList) {
+        primitives.push(prefix.concat(d.data.name));
+      }
+    }
+    return primitives;
+  }
+
   drawLinks (transition) {
     let links = this.d3el.select('.linkLayer').selectAll('.link')
-      .data(this.tree.links(), d => d.source.data.name + d.target.data.name);
+      .data(this.tree.links(), d => d.source.data.nodeId + d.target.data.nodeId);
     const linksEnter = links.enter().append('path').classed('link', true);
     const linksExit = links.exit();
     links = links.merge(linksEnter);
@@ -538,47 +536,7 @@ class TreeView extends LinkedMixin( // Ensures that this.linkedState is updated 
         return computePath(link.source, link.target);
       });
   }
-
-  drawExtraLinks (nodeList) {
-    // Create links based on common references to variables
-    const allMatches = {};
-    const linkList = [];
-    const variableNameMatcher = /(?:(?:variable)|(?:access-argument)|(?:access-function))\/([^(]*)\(/;
-    for (const node of nodeList) {
-      const referencedVariable = node.details.display_name?.match(variableNameMatcher)?.[1];
-      if (referencedVariable) {
-        allMatches[referencedVariable] = allMatches[referencedVariable] || [];
-        // Add this reference, and any links to any other references
-        for (const priorReferenceNode of allMatches[referencedVariable]) {
-          linkList.push({
-            source: node,
-            target: priorReferenceNode
-          });
-        }
-        allMatches[referencedVariable].push(node);
-      }
-    }
-
-    let links = this.d3el.select('.extraLinkLayer').selectAll('.link')
-      .data(linkList, d => d.source.data.name + d.target.data.name);
-    const linksEnter = links.enter().append('path').classed('link', true);
-    links.exit().remove();
-    links = links.merge(linksEnter);
-
-    // Helper function for computing custom paths:
-    const computePath = (source, target) => {
-      return `\
-        M${source.x + this.mainGlyphRadius},${source.y}\
-        L${target.x + this.mainGlyphRadius},${target.y}`
-        .replace(/\s/g, '');
-    };
-    links.classed('hovered', false)
-      .attr('d', link => {
-        // Animate to the correct locations
-        return computePath(link.source, link.target);
-      });
-  }
 }
-TreeView.GLYPHS = GLYPHS;
+DependencyTreeView.GLYPHS = GLYPHS;
 
-export default TreeView;
+export default DependencyTreeView;

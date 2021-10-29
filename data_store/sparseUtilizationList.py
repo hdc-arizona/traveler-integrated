@@ -19,21 +19,22 @@ class SparseUtilizationList():
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
 
-    def finalize(self, allLocations):
+    def finalize(self, allLocations, isUpdateCounter=True):
         for loc in allLocations:
             if loc in self.locationDict:
                 self.sortAtLoc(loc)
             self.locationDict[loc] = np.array(self.locationDict.get(loc, []))
 
             length = len(self.locationDict[loc])
-            counter = 0
-            for i, criticalPt in enumerate(self.locationDict[loc]):
-                counter += criticalPt['counter']
-                criticalPt['counter'] = counter
-                if i == 0:
-                    criticalPt['util'] = self.calcCurrentUtil(criticalPt['index'], None)
-                else:
-                    criticalPt['util'] = self.calcCurrentUtil(criticalPt['index'], self.locationDict[loc][i-1])
+            if isUpdateCounter:
+                counter = 0
+                for i, criticalPt in enumerate(self.locationDict[loc]):
+                    counter += criticalPt['counter']
+                    criticalPt['counter'] = counter
+                    if i == 0:
+                        criticalPt['util'] = self.calcCurrentUtil(criticalPt['index'], None)
+                    else:
+                        criticalPt['util'] = self.calcCurrentUtil(criticalPt['index'], self.locationDict[loc][i-1])
 
             locStruct = {'index': np.empty(length, dtype=np.int64), 'counter': np.empty(length, dtype=np.int64), 'util': np.zeros(length, dtype=np.double)}
             for i in range(length):
@@ -77,8 +78,9 @@ class SparseUtilizationList():
             if isFirst is True:
                 isFirst = False
                 array = temp
-            for i in range(bins):
-                array[i] = array[i] + temp[i]
+            else:
+                for i in range(bins):
+                    array[i] = array[i] + temp[i]
 
         return array
 

@@ -1,0 +1,112 @@
+
+
+ Averaged over 10 trials 
+
+         3380308 function calls (2516398 primitive calls) in 17.565 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.026    0.026   17.565   17.565 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:209(primitive_trace_forward)
+      258    0.663    0.003   16.463    0.064 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:247(intervalFinder)
+    83583    0.340    0.000    8.574    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/persistent.py:710(__getitem__)
+    83583    0.399    0.000    8.234    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:1230(__getitem__)
+    83583    1.419    0.000    7.835    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:1126(get)
+    77017    0.287    0.000    7.745    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/intervaltree/intervaltree.py:1143(iterOverlap)
+940923/77017    5.067    0.000    7.458    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/intervaltree/node.py:633(iterOverlap)
+    83585    2.421    0.000    2.421    0.000 {method 'execute' of 'sqlite3.Connection' objects}
+83585/83583    0.341    0.000    1.601    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:649(_sql)
+    83583    0.430    0.000    1.399    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:253(fetch)
+83585/83583    0.660    0.000    1.260    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:611(_con)
+    83581    0.969    0.000    0.969    0.000 {built-in method _pickle.load}
+   538117    0.936    0.000    0.936    0.000 {built-in method builtins.len}
+     1108    0.147    0.000    0.916    0.001 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:262(startEndTimeFinder)
+    49282    0.402    0.000    0.839    0.000 {built-in method builtins.sorted}
+   241998    0.530    0.000    0.530    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/intervaltree/interval.py:173(__cmp__)
+    83585    0.514    0.000    0.514    0.000 {method 'fetchall' of 'sqlite3.Cursor' objects}
+   167171    0.332    0.000    0.332    0.000 {built-in method builtins.getattr}
+    83584    0.297    0.000    0.297    0.000 {built-in method time.time}
+    83585    0.267    0.000    0.267    0.000 {built-in method posix.getpid}
+    40592    0.155    0.000    0.256    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/intervaltree/node.py:640(<lambda>)
+    83583    0.184    0.000    0.184    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:148(put)
+    86306    0.181    0.000    0.181    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/intervaltree/node.py:636(<lambda>)
+    84266    0.178    0.000    0.178    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/__init__.py:58(__getitem__)
+      213    0.082    0.000    0.134    0.001 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/sparseUtilizationList.py:103(calcUtilizationForLocation)
+    49282    0.101    0.000    0.101    0.000 {built-in method _functools.cmp_to_key}
+    40592    0.101    0.000    0.101    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/intervaltree/interval.py:204(endCmp)
+    30912    0.055    0.000    0.055    0.000 {method 'append' of 'list' objects}
+     6817    0.014    0.000    0.014    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:196(is_include_primitive_name)
+     1360    0.008    0.000    0.014    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:259(updateTimes)
+        1    0.005    0.005    0.014    0.014 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:312(greedyIntervalAssignment)
+     6001    0.013    0.000    0.013    0.000 {method 'pop' of 'list' objects}
+     3577    0.008    0.000    0.008    0.000 {built-in method builtins.max}
+     2720    0.006    0.000    0.006    0.000 {method 'add' of 'set' objects}
+        1    0.002    0.002    0.004    0.004 {method 'sort' of 'list' objects}
+     1360    0.003    0.000    0.003    0.000 {built-in method builtins.min}
+     1108    0.003    0.000    0.003    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:303(updateMinAmongLocation)
+      213    0.001    0.000    0.003    0.000 <__array_function__ internals>:2(empty_like)
+        6    0.003    0.000    0.003    0.000 {built-in method builtins.print}
+     1108    0.002    0.000    0.002    0.000 {method 'extend' of 'list' objects}
+     1108    0.002    0.000    0.002    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/intervals.py:319(<lambda>)
+      853    0.002    0.000    0.002    0.000 {method 'new' of '_cffi_backend.FFI' objects}
+      640    0.002    0.000    0.002    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/numpy/core/_internal.py:250(__init__)
+      640    0.001    0.000    0.001    0.000 {method 'cast' of '_cffi_backend.FFI' objects}
+      213    0.001    0.000    0.001    0.000 {built-in method _cCalcBin.calcHistogram}
+      640    0.001    0.000    0.001    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/numpy/core/_internal.py:304(data)
+      213    0.001    0.000    0.001    0.000 {built-in method numpy.empty}
+      213    0.001    0.000    0.001    0.000 {built-in method numpy.core._multiarray_umath.implement_array_function}
+        1    0.000    0.000    0.001    0.001 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/api/__init__.py:34(validateDataset)
+      213    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/sparseUtilizationList.py:13(getCLocation)
+      213    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/numpy/core/multiarray.py:80(empty_like)
+        1    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:2384(reset)
+        0    0.000             0.000          {built-in method _sqlite3.connect}
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/base_events.py:652(__del__)
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/unix_events.py:57(close)
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/selector_events.py:87(close)
+        1    0.000    0.000    0.000    0.000 /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:653(_sql_retry)
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/selector_events.py:98(_close_self_pipe)
+        2    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/__init__.py:70(__iter__)
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/selector_events.py:272(_remove_reader)
+        4    0.000    0.000    0.000    0.000 {method 'startswith' of 'str' objects}
+        1    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/profiling_tools/profilier.py:11(end)
+        0    0.000             0.000          /usr/lib/python3.8/posixpath.py:71(join)
+        0    0.000             0.000          /usr/lib/python3.8/socket.py:496(close)
+        2    0.000    0.000    0.000    0.000 /mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_store/__init__.py:61(__contains__)
+        0    0.000             0.000          /usr/lib/python3.8/socket.py:492(_real_close)
+        1    0.000    0.000    0.000    0.000 {method 'split' of 'str' objects}
+        2    0.000    0.000    0.000    0.000 {method 'discard' of 'set' objects}
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:365(unregister)
+        0    0.000             0.000          {built-in method _warnings.warn}
+        0    0.000             0.000          {function socket.close at 0x7f38cc0fe670}
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/base_events.py:626(close)
+        1    0.000    0.000    0.000    0.000 {built-in method builtins.setattr}
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/base_events.py:414(__repr__)
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:180(get_key)
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:483(close)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:215(_fileobj_lookup)
+        1    0.000    0.000    0.000    0.000 {method 'values' of 'dict' objects}
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:247(unregister)
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:69(__getitem__)
+        0    0.000             0.000          /usr/lib/python3.8/posixpath.py:41(_get_sep)
+        0    0.000             0.000          /home/sayefsakin/.local/lib/python3.8/site-packages/diskcache/core.py:2351(close)
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:21(_fileobj_to_fd)
+        0    0.000             0.000          {method 'clear' of 'collections.deque' objects}
+        0    0.000             0.000          {method 'unregister' of 'select.epoll' objects}
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/base_events.py:648(is_closed)
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/events.py:65(cancel)
+        0    0.000             0.000          {built-in method builtins.isinstance}
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/base_events.py:658(is_running)
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:268(close)
+        0    0.000             0.000          {method 'close' of 'select.epoll' objects}
+        0    0.000             0.000          /usr/lib/python3.8/asyncio/base_events.py:1877(get_debug)
+        0    0.000             0.000          {method 'endswith' of 'str' objects}
+        0    0.000             0.000          {built-in method posix.fspath}
+        0    0.000             0.000          {built-in method sys.is_finalizing}
+        0    0.000             0.000          {method 'fileno' of '_socket.socket' objects}
+        0    0.000             0.000          {method 'pop' of 'dict' objects}
+        0    0.000             0.000          {method 'clear' of 'dict' objects}
+        0    0.000             0.000          /usr/lib/python3.8/selectors.py:272(get_map)
+        0    0.000             0.000          {method 'clear' of 'list' objects}
+
+

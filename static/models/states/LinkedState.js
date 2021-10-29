@@ -3,6 +3,8 @@
 import PrimitiveSelection from '../selections/PrimitiveSelection.js';
 
 import RenameModal from '../../views/RenameModal/RenameModal.js';
+import TreeView from "../../views/TreeView/TreeView.js";
+import DependencyTreeView from "../../views/DependencyTreeView/DependencyTreeView.js";
 
 const VIEW_STATUS = {
   UNAVAILABLE: 'UNAVAILABLE',
@@ -26,10 +28,12 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     });
     super(options);
 
+    this.visibleAggGanttLocations = null;
     this.info = options.info;
     this._selection = options.priorLinkedState?.selection || null;
     this._colorMode = COLOR_MODES.INCLUSIVE;
     this._viewLayout = options.priorLinkedState?._viewLayout || null;
+    this.cachedUtilizationData = {};
     this._viewLayoutPromise = this._viewLayout
       ? Promise.resolve(this._viewLayout)
       : this.ready.then(() => this.getDefaultLayout());
@@ -44,6 +48,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
   set selection (selection) {
     this._selection = selection;
+    this.visibleAggGanttLocations = null;
     this.trigger('selectionChanged');
   }
 
@@ -94,12 +99,14 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   async getAvailableViews () {
     const views = {
       SelectionInfoView: { status: VIEW_STATUS.AVAILABLE },
+      DependencyTreeView: { status: VIEW_STATUS.AVAILABLE },
       TreeView: { status: VIEW_STATUS.UNAVAILABLE },
       CodeView: { status: VIEW_STATUS.UNAVAILABLE, variants: [] }
     };
     for (const { fileType, stillLoading } of this.info.sourceFiles) {
       if (fileType === 'log' || fileType === 'newick') {
         views.TreeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
+        views.DependencyTreeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
       } else if (fileType === 'cpp' || fileType === 'python' || fileType === 'physl') {
         if (views.CodeView.status !== VIEW_STATUS.LOADING) {
           views.CodeView.status = stillLoading ? VIEW_STATUS.LOADING : VIEW_STATUS.AVAILABLE;
@@ -148,14 +155,20 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     }
 
     // Put the tree view at the bottom
-    if (availableViews.TreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
-      layout.content.push({
-        type: 'component',
-        componentName: 'TreeView',
-        componentState: { datasetId: this.info.datasetId }
-      });
-    }
-
+    // if (availableViews.TreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
+    //   layout.content.push({
+    //     type: 'component',
+    //     componentName: 'TreeView',
+    //     componentState: { datasetId: this.info.datasetId }
+    //   });
+    // }
+    // if (availableViews.DependencyTreeView?.status !== VIEW_STATUS.UNAVAILABLE) {
+    //   layout.content.push({
+    //     type: 'component',
+    //     componentName: 'DependencyTreeView',
+    //     componentState: { datasetId: this.info.datasetId }
+    //   });
+    // }
     return layout;
   }
 
@@ -261,7 +274,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     if (variant && !disabled) {
       disabled = availableViews[viewName].variants.indexOf(variant) === -1;
     }
-    return {
+    let ret = {
       label,
       img: viewStatus === VIEW_STATUS.LOADING ? 'img/spinner.png' : null,
       disabled,
@@ -270,6 +283,19 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
         window.controller.rootView.openView(this.info.datasetId, viewName, variant);
       }
     };
+    if(viewName === 'DependencyTreeView') {
+      ret = {
+        label,
+        img: viewStatus === VIEW_STATUS.LOADING ? 'img/spinner.png' : null,
+        disabled,
+        checked: alreadyOpen,
+        onclick: () => {
+          window.controller.rootView.openView(this.info.datasetId, viewName, variant);
+          window.controller.rootView.openView(this.info.datasetId, 'AggregatedGanttView', variant);
+        }
+      };
+    }
+    return ret;
   }
 
   /**
@@ -281,7 +307,8 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
     return [
       this.createViewMenuEntry('Selection Info', 'SelectionInfoView', null, availableViews, openViews),
-      this.createViewMenuEntry('Tree', 'TreeView', null, availableViews, openViews),
+      // this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews),
+      // this.createViewMenuEntry('Tree', 'TreeView', null, availableViews, openViews),
       // Submenu for code views
       {
         label: 'Code',
@@ -340,6 +367,32 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       primitiveName,
       primitiveDetails
     });
+  }
+
+  /**
+   * Change the current selection to the set of named primitives
+   */
+  selectPrimitives (primitiveName, primitiveDetails) {
+    //online the first primitive details will be shown
+    this.selection = new PrimitiveSelection({
+      primitiveName,
+      primitiveDetails
+    });
+  }
+  getColorShades(sn, totalShades=4) {
+    const minShade = 5;
+    const maxShade = 15;
+    sn = sn % totalShades;
+    const scaledSN = (sn * (maxShade - minShade) / totalShades) + minShade;
+
+    // r,g,b value for theme['--inclusive-color-3']
+    const r = 117;
+    const g = 107;
+    const b = 177;
+    var max = Math.max(Math.max(r, Math.max(g,b)), 1);
+    var step = 255 / (max * 10);
+    // from https://stackoverflow.com/questions/40619476/javascript-generate-different-shades-of-the-same-color
+    return `rgb(${r * step * scaledSN}, ${g * step * scaledSN}, ${b * step * scaledSN})`;
   }
 }
 LinkedState.VIEW_STATUS = VIEW_STATUS;

@@ -10,7 +10,7 @@ import diskcache
 # Possible files / metadata structures that we create / open / update
 diskCacheIndices = ['info', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
 requiredDiskCacheIndices = ['info', 'primitives', 'primitiveLinks']
-pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList', 'intervalIndex']
+pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList', 'intervalIndex', 'dependencyTree']
 requiredPickleDicts = ['trees']
 defaultInfo = {
     'sourceFiles': [],
@@ -207,4 +207,4 @@ class DataStore:
     from ._csv_functions import processCsvLine, processCsv, processCsvFile
     from ._code_functions import processCode, processCodeFile
     from ._log_functions import processPhylanxLog, processPhylanxLogFile
-    from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree, connectIntervals, buildSparseUtilizationLists
+    from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree, connectIntervals, buildSparseUtilizationLists, buildDependencyTree

@@ -34,7 +34,6 @@ db = DataStore(args.dbDir, args.debug)
 def validateDataset(datasetId, requiredFiles=None, filesMustBeReady=None, allFilesMustBeReady=False):
     if datasetId not in db:
         # Not strictly RESTful, but we also support looking up datasets by their label
-        print('validating', datasetId)
         for dataset in db:
             if dataset['info']['label'] == datasetId:
                 datasetId = dataset['info']['datasetId']

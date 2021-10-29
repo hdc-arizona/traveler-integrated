@@ -1,0 +1,87 @@
+.DependencyTreeView {
+  &.lm_content {
+    overflow: auto;
+  }
+  text {
+    font: 9px sans-serif;
+    fill: var(--text-color);
+  }
+  .node {
+    cursor: pointer;
+
+    .mainGlyph {
+      .area {
+        stroke: none;
+      }
+      .outline {
+        fill: none;
+        stroke-width: 3px;
+        opacity: 1;
+        stroke: var(--text-color-softer);
+      }
+      .unknownValue {
+        fill: var(--text-color-softer);
+      }
+      &:hover .outline {
+        opacity: 0.75;
+      }
+    }
+    &.selected .mainGlyph .outline {
+      opacity: 1;
+      stroke: var(--selection-color);
+    }
+
+    .expander {
+      .outline {
+        fill: none;
+        stroke-width: 1px;
+        stroke: var(--text-color);
+      }
+      .area {
+        stroke: none;
+        opacity: 0.1;
+        fill: var(--text-color);
+      }
+      &:hover .area {
+        opacity: 0.5;
+      }
+    }
+  }
+  .link {
+    fill: none;
+    stroke-width: 1px;
+    stroke: var(--text-color-softer);
+  }
+  .extraLinkLayer .link {
+    display: none;
+    stroke-width: 3px;
+    stroke: var(--border-color-richer);
+    &.hovered {
+      display: initial;
+    }
+  }
+
+  .key {
+    font-size: 0.75em;
+    .wrapper1 {
+      text-align: center;
+    }
+    .wrapper2 {
+      display: inline-block;
+      margin-left: 0.5em;
+    }
+    label {
+      display: inline-block;
+      white-space: nowrap;
+      margin-bottom: 0;
+    }
+    input {
+      margin-bottom: 0;
+    }
+    svg {
+      margin-right: 0.1em;
+      vertical-align: bottom;
+      fill: var(--text-color-softer);
+    }
+  }
+}

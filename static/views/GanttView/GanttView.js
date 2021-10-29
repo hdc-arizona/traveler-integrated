@@ -116,7 +116,6 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
 
   setupInteractions () {
     super.setupInteractions();
-
     // Make sure the y axis links with scrolling
     this.d3el.select('foreignObject').on('scroll', () => {
       if (this._ignoreYScrollEvents) {
@@ -136,6 +135,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   drawCanvas (chartShape) {
     this.drawBars(chartShape);
     this.drawTraceLines(chartShape);
+    this.drawAggregatedSelection(chartShape);
   }
 
   hasEnoughDataToComputeChartShape () {
@@ -153,6 +153,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
 
     // Make the list of locations a URL-friendly comma-separated list
     const locations = chartShape.locations.join(',');
+    const dLocations = this.linkedState.visibleAggGanttLocations?.join(',');
 
     // Send the utilization API requests
     const totalPromise = this.updateResource({
@@ -170,7 +171,8 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
           bins: chartShape.bins,
           begin: domain[0],
           end: domain[1],
-          locations
+          locations,
+          dLocations
         }) || null; // if not, don't show any selection-specific utilization
       }
     });
@@ -337,6 +339,51 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
         drawPath(parent, child);
       }
     }
+
+  }
+
+  drawAggregatedSelection (chartShape) {
+    const trace = this.getNamedResource('selectionUtilization');
+    const currentTimespan = this.linkedState.detailDomain[1] - this.linkedState.detailDomain[0];
+    if (trace === null ||
+        trace.data === undefined ||
+        Object.keys(trace.data).length === 0 ||
+        currentTimespan > TRACE_LINE_TIME_LIMIT) {
+      return;
+    }
+    const domain = chartShape.spilloverXScale.domain();
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    const canvas = this.d3el.select('canvas');
+    const ctx = canvas.node().getContext('2d');
+    const bandwidth = this.yScale.bandwidth();
+
+    const dLen = Object.keys(trace.data).length;
+    for (const [d_loc, aggregatedTimes] of Object.entries(trace.data)) {
+      for (let aggTime of aggregatedTimes) {
+        for (const [location, data] of Object.entries(aggTime.util)) {
+          var snappedStart = domain[0];
+          if (domain[0] < aggTime.startTime) {
+            snappedStart = aggTime.startTime;
+          }
+          const starterBin = chartShape.spilloverXScale(snappedStart) - chartShape.leftOffset;
+          const y0 = this.yScale(location);
+
+          for (const [binNo, tUtil] of data.entries()) {
+            // Which border to draw (if any)?
+            if (tUtil >= 1) {
+              ctx.fillStyle = this.linkedState.getColorShades(d_loc, dLen);
+              // ctx.fillStyle = theme['--inclusive-color-3'];
+              ctx.fillRect(binNo + starterBin, y0, 1, bandwidth);
+            } else if (tUtil > 0) {
+              ctx.fillStyle = theme['--text-color-softer'];
+              ctx.fillRect(binNo + starterBin, y0 + 1, 1, bandwidth - 2);
+            }
+          }
+        }
+      }
+    }
+
+
   }
 }
 

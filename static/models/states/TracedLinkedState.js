@@ -101,6 +101,7 @@ class TracedLinkedState extends LinkedState {
       : VIEW_STATUS.AVAILABLE;
 
     views.GanttView = { status: otf2Status };
+    views.AggregatedGanttView = { status: otf2Status };
     views.UtilizationView = { status: otf2Status };
     views.IntervalHistogramView = {
       status: otf2Status,
@@ -192,7 +193,8 @@ class TracedLinkedState extends LinkedState {
       // Singular views
       this.createViewMenuEntry('Gantt Timeline', 'GanttView', null, availableViews, openViews),
       this.createViewMenuEntry('Utilization Overview', 'UtilizationView', null, availableViews, openViews),
-      this.createViewMenuEntry('Interval Histogram', 'IntervalHistogramView', null, availableViews, openViews)
+      this.createViewMenuEntry('Interval Histogram', 'IntervalHistogramView', null, availableViews, openViews),
+      this.createViewMenuEntry('Task Dependency Tree', 'DependencyTreeView', null, availableViews, openViews)
     ]);
     // Submenus
     for (const menu of [metricSubmenu, lmSensorSubmenu, papiSubmenu]) {

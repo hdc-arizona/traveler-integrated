@@ -1,8 +1,12 @@
+import bisect
+import copy
 import json
+import math
 
 from fastapi import APIRouter
 from starlette.responses import StreamingResponse
 
+from data_store.dependencyTree import find_node_in_dependency_tree
 from . import db, validateDataset
 
 router = APIRouter()
@@ -58,11 +62,13 @@ def get_intervals(datasetId: str, \
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
+
 @router.get('/datasets/{datasetId}/intervals/{intervalId}')
 def get_interval(datasetId: str, \
                  intervalId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
     return db[datasetId]['intervals'].get(intervalId, None)
+
 
 @router.get('/datasets/{datasetId}/intervals/{intervalId}/trace')
 def intervalTrace(datasetId: str,
@@ -101,7 +107,7 @@ def intervalTrace(datasetId: str,
     if end is None:
         end = db[datasetId]['info']['intervalDomain'][1]
 
-    def format_interval(intervalObj, childId = None):
+    def format_interval(intervalObj, childId=None):
         result = {
             'enter': intervalObj['enter']['Timestamp'],
             'leave': intervalObj['leave']['Timestamp'],
@@ -188,3 +194,100 @@ def intervalTrace(datasetId: str,
         yield '}}'
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
+
+
+@router.get('/datasets/{datasetId}/primitives/primitiveTraceForward')
+def primitive_trace_forward(datasetId: str,
+                            nodeId: str,
+                            bins: int = 100,
+                            begin: int = None,
+                            end: int = None,
+                            locations: str = None,
+                            dLocations: str = None):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+
+    if begin is None:
+        begin = db[datasetId]['info']['intervalDomain'][0]
+    if end is None:
+        end = db[datasetId]['info']['intervalDomain'][1]
+
+    if locations:
+        locations = locations.split(',')
+    if dLocations and dLocations == 'undefined':
+        dLocations = None
+    if dLocations:
+        dLocations = dLocations.split(',')
+
+    def traceForward():
+        dependencyTree = db[datasetId]['dependencyTree']
+        currentNode = dependencyTree
+        if nodeId != currentNode.nodeId:
+            currentNode = find_node_in_dependency_tree(dependencyTree, nodeId)
+        if currentNode is None:
+            print('Node in dependency tree not found')
+            yield ''
+            return
+
+        def accumulateUtilizationData(sUtil, sbin, st, en):
+            array = None
+            if locations:
+                array = {}
+                for location in locations:
+                    if location in sUtil.locationDict:
+                        array[location] = sUtil.calcUtilizationForLocation(sbin, st, en, location)
+            else:
+                array = sUtil.calcUtilizationHistogram(sbin, st, en)
+            return array
+
+        binSize = (end - begin) / bins
+        aggregatedData = dict()
+        allDummyLocations = list()
+        for dummy_location in currentNode.aggregatedUtil.locationDict:
+            allDummyLocations.append(dummy_location)
+            if dLocations and str(dummy_location) not in dLocations:
+                continue
+            aggUtilValues = currentNode.aggregatedUtil.calcUtilizationForLocation(bins, begin, end, dummy_location, False)
+
+            last_id = -1
+            each_bin = 0
+            while each_bin < bins:
+                if 0 <= (int(aggUtilValues[each_bin])-1) != last_id:
+                    last_id = int(aggUtilValues[each_bin]) - 1
+                    if currentNode.aggregatedBlockList[last_id].endTime < begin:
+                        each_bin = each_bin + 1
+                        continue
+
+                    if dummy_location not in aggregatedData:
+                        aggregatedData[dummy_location] = list()
+
+                    snappedStart = int(((each_bin - 1) * binSize) + begin)
+                    snappedBins = 1
+                    while each_bin < bins:
+                        if 0 > (int(aggUtilValues[each_bin])-1) or (int(aggUtilValues[each_bin])-1) != last_id:
+                            break
+                        snappedBins = snappedBins + 1
+                        each_bin = each_bin + 1
+                    snappedEnd = int((each_bin * binSize) + begin)
+
+                    aggregatedData[dummy_location].append({
+                        'startTime': currentNode.aggregatedBlockList[last_id].startTime,
+                        'endTime': currentNode.aggregatedBlockList[last_id].endTime,
+                        'name': currentNode.aggregatedBlockList[last_id].firstPrimitiveName,
+                        'util': accumulateUtilizationData(currentNode.aggregatedBlockList[last_id].utilization, snappedBins, snappedStart, snappedEnd)})
+                else:
+                    each_bin = each_bin + 1
+
+        results = {'data': aggregatedData, 'locations': allDummyLocations}
+        yield json.dumps(results)
+
+    return StreamingResponse(traceForward(), media_type='application/json')
+
+
+@router.get('/datasets/{datasetId}/getDependencyTree')
+def get_dependency_tree(datasetId: str):
+    datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
+
+    def generateTree():
+        yield json.dumps(db[datasetId]['dependencyTree'].getTheTree())
+
+    return StreamingResponse(generateTree(), media_type='application/json')
