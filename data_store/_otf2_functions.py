@@ -494,6 +494,7 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
         tree1.intervalList.extend(tree2.intervalList)
         tree1.aggregatedBlockList.extend(tree2.aggregatedBlockList)
 
+    count = 0
     pre_c = None
     for prim in primitive_set:
         for each_interval_id in primitive_set[prim]:
@@ -507,6 +508,12 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
                 pre_c = current_c
             else:
                 mergeTwoTrees(pre_c, current_c)
+            count += 1
+            if count % 2500 == 0:
+                await log('.', end='')
+            if count % 100000 == 0:
+                await log('processed %i primitives' % count)
+    await log('')
 
     results = pre_c
     if results:
