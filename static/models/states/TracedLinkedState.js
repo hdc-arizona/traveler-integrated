@@ -194,8 +194,7 @@ class TracedLinkedState extends LinkedState {
       this.createViewMenuEntry('Gantt Timeline', 'GanttView', null, availableViews, openViews),
       this.createViewMenuEntry('Utilization Overview', 'UtilizationView', null, availableViews, openViews),
       this.createViewMenuEntry('Interval Histogram', 'IntervalHistogramView', null, availableViews, openViews),
-      this.createViewMenuEntry('Aggregated Gantt', 'AggregatedGanttView', null, availableViews, openViews),
-      this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews)
+      this.createViewMenuEntry('Task Dependency Tree', 'DependencyTreeView', null, availableViews, openViews)
     ]);
     // Submenus
     for (const menu of [metricSubmenu, lmSensorSubmenu, papiSubmenu]) {

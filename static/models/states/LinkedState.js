@@ -274,7 +274,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     if (variant && !disabled) {
       disabled = availableViews[viewName].variants.indexOf(variant) === -1;
     }
-    return {
+    let ret = {
       label,
       img: viewStatus === VIEW_STATUS.LOADING ? 'img/spinner.png' : null,
       disabled,
@@ -283,6 +283,19 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
         window.controller.rootView.openView(this.info.datasetId, viewName, variant);
       }
     };
+    if(viewName === 'DependencyTreeView') {
+      ret = {
+        label,
+        img: viewStatus === VIEW_STATUS.LOADING ? 'img/spinner.png' : null,
+        disabled,
+        checked: alreadyOpen,
+        onclick: () => {
+          window.controller.rootView.openView(this.info.datasetId, viewName, variant);
+          window.controller.rootView.openView(this.info.datasetId, 'AggregatedGanttView', variant);
+        }
+      };
+    }
+    return ret;
   }
 
   /**
