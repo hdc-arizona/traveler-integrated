@@ -53,7 +53,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     if (super.isLoading) {
       return true;
     }
-    if (this.linkedState.selection?.primitiveName) {
+    if(Array.isArray(this.linkedState.selection?.primitiveName)) {
       const trace2 = this.getNamedResource('aggregatedIntervals');
       if (trace2 === null || (trace2 instanceof Error && trace2.status === 503)) {
         return true;
@@ -170,7 +170,7 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
     let dummy = Array(visLoc).fill().map((_, idx) => 1 + idx);
 
     const aggregatedIntervals = this.getNamedResource('aggregatedIntervals');
-    if(aggregatedIntervals === null || aggregatedIntervals.locations.length === 0) {
+    if(aggregatedIntervals === null || !aggregatedIntervals.locations || aggregatedIntervals.locations.length === 0) {
       this.yScale.range([0, chartShape.fullHeight])
           .domain(dummy);
     } else {
