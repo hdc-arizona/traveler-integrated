@@ -269,6 +269,14 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     return nodeList;
   }
 
+  findColorShadeForNode(d) {
+    let totalF = this.linkedState.overviewDomain[1] - this.linkedState.overviewDomain[0];
+    let count = d.data.totalUtil;
+    let totalBound = 10;
+    let per = (totalBound - ((count / totalF) * totalBound));
+    return this.linkedState.getColorShades(per, totalBound);
+  }
+
   drawLegend (nodeList) {
     // TODO: need to move the color scale stuff to this.linkedState so that
     // other views can use it
@@ -379,11 +387,15 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     mainGlyph.selectAll('.area')
       .transition(transition)
       .attr('d', d => evalTypeGlyph(d.details.eval_direct, this.mainGlyphRadius))
-      .attr('fill', d => d.details.time === undefined
-        ? 'transparent'
-        : this.currentColorTimeScale(this.linkedState.colorMode === 'inclusive'
-          ? d.details.time
-          : d.details.exclusiveTime));
+      .attr('fill', d => {
+        let c = this.findColorShadeForNode(d);
+        return c;
+      });
+      // .attr('fill', d => d.details.time === undefined
+      //   ? 'transparent'
+      //   : this.currentColorTimeScale(this.linkedState.colorMode === 'inclusive'
+      //     ? d.details.time
+      //     : d.details.exclusiveTime));
     mainGlyph.selectAll('.outline')
       .transition(transition)
       .attr('d', d => evalTypeGlyph(d.details.eval_direct, 1.25 * this.mainGlyphRadius))
