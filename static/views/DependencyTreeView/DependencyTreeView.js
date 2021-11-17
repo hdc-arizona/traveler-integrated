@@ -270,9 +270,9 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
   }
 
   findColorShadeForNode(d) {
-    let totalF = this.linkedState.overviewDomain[1] - this.linkedState.overviewDomain[0];
+    let totalF = (this.linkedState.overviewDomain[1] - this.linkedState.overviewDomain[0]) * this.linkedState.info.locationNames.length;
     let count = d.data.totalUtil;
-    let totalBound = 10;
+    let totalBound = 50;
     let per = (totalBound - ((count / totalF) * totalBound));
     return this.linkedState.getColorShades(per, totalBound);
   }
