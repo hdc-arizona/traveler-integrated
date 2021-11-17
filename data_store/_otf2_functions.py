@@ -4,7 +4,7 @@ import re
 import gc
 import diskcache
 import numpy as np
-from blist import sortedlist
+from sortedcontainers import SortedList
 from intervaltree import Interval, IntervalTree
 from .sparseUtilizationList import SparseUtilizationList
 from .dependencyTree import DependencyTreeNode
@@ -50,7 +50,7 @@ def processEvent(self, datasetId, event):
         if not event['Location'] in self.sortedEventsByLocation:
             # TODO: use BPlusTree instead of blist? For big enough runs, piling
             # all this up in memory could be a problem...
-            self.sortedEventsByLocation[event['Location']] = sortedlist(key=lambda i: i[0])
+            self.sortedEventsByLocation[event['Location']] = SortedList()
         self.sortedEventsByLocation[event['Location']].add((event['Timestamp'], event))
     return (newR, seenR)
 

@@ -80,6 +80,10 @@ class DependencyTreeNode:
         thisNode['nodeId'] = self.nodeId
         thisNode['name'] = self.name
         thisNode['prefixList'] = self.prefixList
+        cnt = 0
+        for ei in self.intervalList:
+            cnt = cnt + (ei['leave'] - ei['enter'])
+        thisNode['totalUtil'] = cnt
         cList = list()
         for child in self.children:
             cList.append(child.getTheTree())
