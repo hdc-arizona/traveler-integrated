@@ -12,7 +12,7 @@ def get_procMetrics(datasetId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'])
     return db[datasetId]['info']['procMetricList']
 
-@router.get('/datasets/{datasetId}/metrics/{metric}/raw')
+@router.get('/datasets/{datasetId}/metrics/raw')
 def get_procMetric_values(datasetId: str,
                           metric: str,
                           begin: float = None,

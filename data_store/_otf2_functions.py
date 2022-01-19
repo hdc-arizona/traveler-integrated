@@ -120,10 +120,13 @@ async def processRawTrace(self, datasetId, file, log):
                     self[datasetId]['info']['procMetricList'] = procMetricList
             else: # do the other meminfo status io parsing here
                 if metricType not in procMetrics:
-                    procMetrics[metricType] = {}
+                    cMetric = dict()
                     procMetricList.append(metricType)
                     self[datasetId]['info']['procMetricList'] = procMetricList
-                procMetrics[metricType][str(timestamp)] = {'Timestamp': timestamp, 'Value':  value}
+                else:
+                    cMetric = procMetrics[metricType]
+                cMetric[str(timestamp)] = {'Timestamp': timestamp, 'Value':  value}
+                procMetrics[metricType] = cMetric
         elif eventLineMatch is not None:
             # This is the beginning of a new event; process the previous one
             if currentEvent is not None:
