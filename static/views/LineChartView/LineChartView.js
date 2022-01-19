@@ -75,6 +75,9 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
 
       for (var i=fetchedData.length-1; i>=0; i--) {
         let tmp = fetchedData[i]['Value'];
+        if(i>0) {
+          tmp = tmp - fetchedData[i-1]['Value'];
+        }
         if (tmp < minY) minY = tmp;
         if (tmp > maxY) maxY = tmp;
       }
@@ -116,13 +119,35 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
     const theme = globalThis.controller.getNamedResource('theme').cssVariables;
 
     if(fetchedData !== null) {
+      var processedData = [];
+      fetchedData.forEach((d, i) => {
+        if(i>0){
+          var el1 = {};
+          el1['Timestamp'] = d['Timestamp'];
+          el1['Value'] = fetchedData[i-1]['Value'];
+          if(i>1) {
+            el1['Value'] = el1['Value'] - fetchedData[i-2]['Value'];
+          }
+          processedData.push(el1);
+        }
+        var el = {};
+        el['Timestamp'] = d['Timestamp'];
+        el['Value'] = d['Value'];
+        if(i>0) {
+          el['Value'] = el['Value'] - fetchedData[i-1]['Value'];
+        }
+        processedData.push(el);
+      });
+
+
       const __self = this;
       var line = d3.line()
           .x(function(d) { return (chartShape.spilloverXScale(d['Timestamp']) - chartShape.leftOffset); })
-          .y(function(d) { return __self.yScale(d['Value']); })
+          .y(function(d, i) { return __self.yScale(d['Value']); })
           .context(context);
       context.beginPath();
-      line(fetchedData);
+      // line(fetchedData);
+      line(processedData);
       context.lineWidth = 1.5;
       context.strokeStyle = theme['--text-color-softer'];
       context.stroke();
