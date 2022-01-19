@@ -75,16 +75,19 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
 
       for (var i=fetchedData.length-1; i>=0; i--) {
         let tmp = fetchedData[i]['Value'];
+        let div = fetchedData[i]['Timestamp'];
         if(i>0) {
           tmp = tmp - fetchedData[i-1]['Value'];
+          div = div - fetchedData[i-1]['Timestamp'];
         }
+        tmp = tmp / div;
         if (tmp < minY) minY = tmp;
         if (tmp > maxY) maxY = tmp;
       }
     }
 
     this.yScale.range([chartShape.fullHeight, 0])
-      .domain([minY, maxY]);
+      .domain([minY-1, maxY+1]);
     chartShape.maxMetricValue = maxY;
     chartShape.minMetricValue = minY;
     return chartShape;
@@ -101,15 +104,15 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
 
     let unit = '';
     if(zeroCutter > 1000000000){
-      unit = 'G';
+      unit = '(G)';
     } else if(zeroCutter > 1000000){
-      unit = 'M';
+      unit = '(M)';
     } else if(zeroCutter > 1000) {
-      unit = 'K';
+      unit = '(K)';
     }
     // Set the y label
     this.d3el.select('.yAxisLabel')
-        .text(this.metric.substring(this.metric.lastIndexOf('/')+1) + '(' + unit + ')');
+        .text(this.metric.substring(this.metric.lastIndexOf('/')+1) + unit);
   }
 
   drawCanvas (chartShape) {
@@ -125,17 +128,23 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
           var el1 = {};
           el1['Timestamp'] = d['Timestamp'];
           el1['Value'] = fetchedData[i-1]['Value'];
+          var div = fetchedData[i-1]['Timestamp'];
           if(i>1) {
             el1['Value'] = el1['Value'] - fetchedData[i-2]['Value'];
+            div = div - fetchedData[i-2]['Timestamp'];
           }
+          el1['Value'] = el1['Value'] / div;
           processedData.push(el1);
         }
         var el = {};
         el['Timestamp'] = d['Timestamp'];
         el['Value'] = d['Value'];
+        div = d['Timestamp'];
         if(i>0) {
           el['Value'] = el['Value'] - fetchedData[i-1]['Value'];
+          div = div - fetchedData[i-1]['Timestamp'];
         }
+        el['Value'] = el['Value'] / div;
         processedData.push(el);
       });
 
