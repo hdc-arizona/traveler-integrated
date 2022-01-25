@@ -114,9 +114,8 @@ async def processRawTrace(self, datasetId, file, log):
                 else:
                     includedMetrics += 1
                     currentEvent['metrics'][metricType] = value #pylint: disable=unsubscriptable-object
-                metricTypePapi = 'PAPI' + ':' + metricType
-                if metricTypePapi not in self[datasetId]['info']['procMetricList']:
-                    procMetricList.append(metricTypePapi)
+                if metricType not in self[datasetId]['info']['procMetricList']:
+                    procMetricList.append(metricType)
                     self[datasetId]['info']['procMetricList'] = procMetricList
             else: # do the other meminfo status io parsing here
                 if metricType not in procMetrics:
@@ -390,7 +389,7 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
         if 'metrics' in event:
             for k, value in event['metrics'].items():
                 if k not in allSuls['metrics']:
-                    allSuls['metrics'][k] = SparseUtilizationList()
+                    allSuls['metrics'][k] = SparseUtilizationList(False)
                     preMetricValue[k] = {'Timestamp': 0, 'Value': 0}
                 current_rate = (value - preMetricValue[k]['Value']) / (event['Timestamp'] - preMetricValue[k]['Timestamp'])
                 allSuls['metrics'][k].setIntervalAtLocation({'index': int(event['Timestamp']), 'counter': 0, 'util': current_rate}, cur_location)

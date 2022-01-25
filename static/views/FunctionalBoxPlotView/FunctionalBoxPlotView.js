@@ -38,12 +38,48 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     }
   }
 
+  setYDomain(maxMin) {
+    var yOffset = (maxMin['max'] - maxMin['min']) / 10;
+    this.yScale.domain([maxMin['max'] + yOffset, maxMin['min'] - yOffset]);
+  }
+  getSpilloverWidth(width) {
+    return width*3;
+  }
+
+  findBinNumber(t){
+    const data = this.linkedState.getCurrentMetricBins(this.curMetric);
+    var offset = (data.metadata.end - data.metadata.begin) / data.metadata.bins;
+    var bin = (t - data.metadata.begin) / offset;
+    var fBin = Math.floor(bin);
+    return {max: data.data.max[fBin].toFixed(3),
+      avg: data.data.average[fBin].toFixed(3),
+      std: data.data.std[fBin].toFixed(3),
+      min: data.data.min[fBin].toFixed(3)};
+  }
+
   drawCanvas (chartShape) {
-    // TODO: Need to adapt the original drawing code from
-    // https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/static/views/LineChartView/LineChartView.js
-    // (yes, that's named LineChartView; it had been edited to render a functional box plot)
-    // to use this.getNamedResource('data') instead (the data should be in the
-    // same format)
+    const fetchedData = this.getNamedResource('data');
+    if(fetchedData === null || fetchedData.data === undefined) return;
+
+    const canvas = this.d3el.select('canvas');
+    const context = canvas.node().getContext('2d');
+    const __self = this;
+    var line = d3.line()
+        .x(function(d, i) { return i; })
+        .y(function(d) { return __self.yScale(d); })
+        .context(context);
+    this.drawLine(context, line, fetchedData.data.average);
+    this.drawLine(context, line, fetchedData.data.min);
+    this.drawLine(context, line, fetchedData.data.max);
+  }
+
+  drawLine(context, line, data) {
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    context.beginPath();
+    line(data);
+    context.lineWidth = 1.5;
+    context.strokeStyle = theme['--text-color-softer'];
+    context.stroke();
   }
 
   async updateData (chartShape) {
@@ -66,20 +102,31 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
   getChartShape () {
     const chartShape = super.getChartShape();
 
+    const fetchedData = this.getNamedResource('data');
     this.yScale.range([0, chartShape.fullHeight])
-      .domain([]); // TODO
+        .domain([10, 0]);
+    if(fetchedData === null || fetchedData.data === undefined) return chartShape;
+    var maxY = Number.MIN_VALUE;
+    var minY = Number.MAX_VALUE;
 
+    for (var i = 0; i < fetchedData.metadata.bins; i++) {
+      maxY = Math.max(maxY, fetchedData.data.max[i]);
+      minY = Math.min(minY, fetchedData.data.min[i]);
+    }
+    this.setYDomain({'max':maxY, 'min':minY});
+    chartShape.maxMetricValue = maxY;
+    chartShape.minMetricValue = minY;
     return chartShape;
   }
 
   drawAxes (chartShape) {
     super.drawAxes(chartShape);
-
-    // TODO: Update the y axis
-
+    // Update the y axis
+    this.d3el.select('.yAxis')
+        .call(d3.axisLeft(this.yScale)); //.tickFormat(x => x / zeroCutter));
     // Set the y label
     this.d3el.select('.yAxisLabel')
-      .text(this.metric);
+      .text(this.metric.substring(this.metric.lastIndexOf(':')+1));
   }
 }
 
