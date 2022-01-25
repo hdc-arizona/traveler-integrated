@@ -61,6 +61,7 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     const fetchedData = this.getNamedResource('data');
     if(fetchedData === null || fetchedData.data === undefined) return;
 
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
     const canvas = this.d3el.select('canvas');
     const context = canvas.node().getContext('2d');
     const __self = this;
@@ -68,17 +69,27 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
         .x(function(d, i) { return i; })
         .y(function(d) { return __self.yScale(d); })
         .context(context);
-    this.drawLine(context, line, fetchedData.data.average);
-    this.drawLine(context, line, fetchedData.data.min);
-    this.drawLine(context, line, fetchedData.data.max);
+
+    this.drawLine(context, line, fetchedData.data.min, theme['--text-color-softer'], 1.5);
+    this.drawLine(context, line, fetchedData.data.max, theme['--text-color-softer'], 1.5);
+    for (var i = 0; i < fetchedData.metadata.bins; i++) {
+      let d = fetchedData.data.std[i];
+      let avgD = fetchedData.data.average[i];
+      context.beginPath();
+      context.lineWidth = "1";
+      context.strokeStyle = theme['--disabled-color'];
+      context.moveTo(i, __self.yScale(avgD + d));
+      context.lineTo(i, __self.yScale(avgD - d));
+      context.stroke();
+    }
+    this.drawLine(context, line, fetchedData.data.average, theme['--inverted-shadow-color'], 1.5);
   }
 
-  drawLine(context, line, data) {
-    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+  drawLine(context, line, data, tColor, lWidth) {
     context.beginPath();
     line(data);
-    context.lineWidth = 1.5;
-    context.strokeStyle = theme['--text-color-softer'];
+    context.lineWidth = lWidth;
+    context.strokeStyle = tColor;
     context.stroke();
   }
 
