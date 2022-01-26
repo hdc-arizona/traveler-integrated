@@ -13,5 +13,6 @@
   <foreignObject>
     <canvas></canvas>
   </foreignObject>
+  <text class="funcInfo"></text>
   <rect class="eventCapturer" fill="transparent"></rect>
 </g>

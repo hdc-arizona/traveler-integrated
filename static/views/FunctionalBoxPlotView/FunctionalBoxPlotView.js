@@ -42,20 +42,6 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     var yOffset = (maxMin['max'] - maxMin['min']) / 10;
     this.yScale.domain([maxMin['max'] + yOffset, maxMin['min'] - yOffset]);
   }
-  getSpilloverWidth(width) {
-    return width*3;
-  }
-
-  findBinNumber(t){
-    const data = this.linkedState.getCurrentMetricBins(this.curMetric);
-    var offset = (data.metadata.end - data.metadata.begin) / data.metadata.bins;
-    var bin = (t - data.metadata.begin) / offset;
-    var fBin = Math.floor(bin);
-    return {max: data.data.max[fBin].toFixed(3),
-      avg: data.data.average[fBin].toFixed(3),
-      std: data.data.std[fBin].toFixed(3),
-      min: data.data.min[fBin].toFixed(3)};
-  }
 
   drawCanvas (chartShape) {
     const fetchedData = this.getNamedResource('data');
@@ -83,6 +69,7 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
       context.stroke();
     }
     this.drawLine(context, line, fetchedData.data.average, theme['--inverted-shadow-color'], 1.5);
+    this.__chartShape = chartShape;
   }
 
   drawLine(context, line, data, tColor, lWidth) {
@@ -138,6 +125,50 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     // Set the y label
     this.d3el.select('.yAxisLabel')
       .text(this.metric.substring(this.metric.lastIndexOf(':')+1));
+    this.d3el.select('.funcInfo')
+        .html(()=>{
+          const xc = 10;
+          return '<tspan x="' + xc + '" dy="1.2em">Min: 0</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Max: 0</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Avg: 0</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Std: 0</tspan>';
+        })
+        .attr('x', 0)
+        .attr('y', 0);
+  }
+
+  updateFuncInfoText(mn, mx, avg, std) {
+    this.d3el.select('.funcInfo')
+        .html(()=>{
+          const xc = 10;
+          return '<tspan x="' + xc + '" dy="1.2em">Min: ' + mn.toFixed(2).toString() + '</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Max: ' + mx.toFixed(2).toString() + '</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Avg: ' + avg.toFixed(2).toString() + '</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Std: ' + std.toFixed(2).toString() + '</tspan>';
+        });
+  }
+
+  updateCursor () {
+    const position = this.linkedState.cursorPosition === null
+        ? null
+        : this.getCursorPosition(this.linkedState.cursorPosition);
+    this.d3el.select('.cursor')
+        .style('display', position === null ? 'none' : null)
+        .attr('x1', position)
+        .attr('x2', position);
+
+    if(this.linkedState.cursorPosition !== null
+        && this.linkedState.cursorPosition > this.xScale.domain()[0]
+        && this.linkedState.cursorPosition < this.xScale.domain()[1]) {
+      const fetchedData = this.getNamedResource('data');
+      if(fetchedData === null || fetchedData.data === undefined) return;
+      const binSize = (fetchedData.metadata.end - fetchedData.metadata.begin) / fetchedData.metadata.bins;
+      const cBin = Math.trunc((this.linkedState.cursorPosition - this.__chartShape.spilloverXScale.domain()[0]) / binSize);
+      this.updateFuncInfoText(fetchedData.data.min[cBin],
+          fetchedData.data.max[cBin],
+          fetchedData.data.average[cBin],
+          fetchedData.data.std[cBin]);
+    }
   }
 }
 
