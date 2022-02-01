@@ -142,7 +142,14 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
   }
 
   updateCursor () {
-    super.updateCursor();
+    const position = this.linkedState.cursorPosition === null
+        ? null
+        : this.getCursorPosition(this.linkedState.cursorPosition);
+    if(this.d3el == null) return; // it will check both null or undefined
+    this.d3el.select('.cursor')
+        .style('display', position === null ? 'none' : null)
+        .attr('x1', position)
+        .attr('x2', position);
 
     if(this.linkedState.cursorPosition !== null
         && this.linkedState.cursorPosition > this.xScale.domain()[0]

@@ -1,8 +1,6 @@
 /* globals d3 */
 import ZoomableTimelineView from '../ZoomableTimelineView/ZoomableTimelineView.js';
-
-// Minimum vertical pixels per row
-const MIN_LOCATION_HEIGHT = 30;
+import normalizeWheel from "../../utils/normalize-wheel.js";
 
 // Fetch and draw 3x the time data than we're actually showing, for smooth
 // scrolling interactions
@@ -47,6 +45,8 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       }
       return result;
     };
+    // Minimum vertical pixels per row
+    this.minLocationHeight = 30;
   }
 
   get isLoading () {
@@ -128,7 +128,28 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     });
     // Link wheel events on the y axis back to vertical scrolling
     this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
-      this.d3el.select('foreignObject').node().scrollTop += event.deltaY;
+      // this.d3el.select('foreignObject').node().scrollTop += event.deltaY;
+      // console.log(event);
+      const zoomFactor = 1.05 ** (normalizeWheel(event).pixelY / 100);
+      const chartBounds = this.d3el.select('.chart').node().getBoundingClientRect();
+      const chartShape = this.getChartShape();
+      let vZoom = 15;
+
+      if(event.wheelDeltaY>0) { // zoom in
+        this.minLocationHeight = Math.min(chartShape.chartHeight, this.minLocationHeight + vZoom);
+      } else {
+        this.minLocationHeight = Math.max(5, this.minLocationHeight - vZoom);
+        vZoom = vZoom * -1;
+      }
+
+      const hIncreament = this.linkedState.info.locationNames.length * vZoom;
+
+      const scTop = this.d3el.select('foreignObject').node().scrollTop;
+      this.d3el.select('foreignObject').node().scrollTop = scTop + (event.layerY / chartShape.chartHeight * hIncreament);// scTop + vZoom
+      // * 3;
+
+      this.quickDraw();
+      this.render();
     });
   }
 
@@ -191,7 +212,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   }
 
   getRequiredChartHeight () {
-    return MIN_LOCATION_HEIGHT * this.linkedState.info.locationNames.length;
+    return this.minLocationHeight * this.linkedState.info.locationNames.length;
   }
 
   /**
