@@ -124,42 +124,30 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
         .call(d3.axisLeft(this.yScale)); //.tickFormat(x => x / zeroCutter));
     // Set the y label
     this.d3el.select('.yAxisLabel')
-      .text(this.metric.substring(this.metric.lastIndexOf(':')+1));
-    this.d3el.select('.funcInfo')
-        .html(()=>{
-          const xc = 10;
-          return '<tspan x="' + xc + '" dy="1.2em">Min: 0</tspan>'
-              + '<tspan x="' + xc + '" dy="1.2em">Max: 0</tspan>'
-              + '<tspan x="' + xc + '" dy="1.2em">Avg: 0</tspan>'
-              + '<tspan x="' + xc + '" dy="1.2em">Std: 0</tspan>';
-        })
-        .attr('x', 0)
-        .attr('y', 0);
+      .text(this.metric.substring(this.metric.lastIndexOf(':')+1) + ' (rate)');
+    this.updateFuncInfoText(0, 0, 0, 0);
   }
 
   updateFuncInfoText(mn, mx, avg, std) {
     this.d3el.select('.funcInfo')
         .html(()=>{
           const xc = 10;
-          return '<tspan x="' + xc + '" dy="1.2em">Min: ' + mn.toFixed(2).toString() + '</tspan>'
-              + '<tspan x="' + xc + '" dy="1.2em">Max: ' + mx.toFixed(2).toString() + '</tspan>'
+          return '<tspan x="' + xc + '" dy="1.2em">Max: ' + mx.toFixed(2).toString() + '</tspan>'
               + '<tspan x="' + xc + '" dy="1.2em">Avg: ' + avg.toFixed(2).toString() + '</tspan>'
-              + '<tspan x="' + xc + '" dy="1.2em">Std: ' + std.toFixed(2).toString() + '</tspan>';
-        });
+              + '<tspan x="' + xc + '" dy="1.2em">Std: ' + std.toFixed(2).toString() + '</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Min: ' + mn.toFixed(2).toString() + '</tspan>';
+        })
+        .attr('x', 0)
+        .attr('y', 0);
   }
 
   updateCursor () {
-    const position = this.linkedState.cursorPosition === null
-        ? null
-        : this.getCursorPosition(this.linkedState.cursorPosition);
-    this.d3el.select('.cursor')
-        .style('display', position === null ? 'none' : null)
-        .attr('x1', position)
-        .attr('x2', position);
+    super.updateCursor();
 
     if(this.linkedState.cursorPosition !== null
         && this.linkedState.cursorPosition > this.xScale.domain()[0]
-        && this.linkedState.cursorPosition < this.xScale.domain()[1]) {
+        && this.linkedState.cursorPosition < this.xScale.domain()[1]
+        && this.__chartShape !== undefined) {
       const fetchedData = this.getNamedResource('data');
       if(fetchedData === null || fetchedData.data === undefined) return;
       const binSize = (fetchedData.metadata.end - fetchedData.metadata.begin) / fetchedData.metadata.bins;
