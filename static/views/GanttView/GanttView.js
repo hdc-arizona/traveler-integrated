@@ -45,6 +45,12 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       }
       return result;
     };
+    // This only finds the lowest and highest visible index
+    this.yScale.invertedRangeIndex = function (low, high) {
+      let l = this.domain().indexOf(this.invert(low));
+      let h = this.domain().indexOf(this.invert(high));
+      return [l, h];
+    };
     // Minimum vertical pixels per row
     this.minLocationHeight = 30;
   }
@@ -117,14 +123,20 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   setupInteractions () {
     super.setupInteractions();
     // Make sure the y axis links with scrolling
-    this.d3el.select('foreignObject').on('scroll', () => {
-      if (this._ignoreYScrollEvents) {
-        // suppress false scroll events from setting scrollTop
-        this._ignoreYScrollEvents = false;
-        return;
-      }
-      this.quickDraw();
-      this.render();
+    this.d3el.select('foreignObject').on('wheel', event => {
+      // if (this._ignoreYScrollEvents) {
+      //   // suppress false scroll events from setting scrollTop
+      //   this._ignoreYScrollEvents = false;
+      //   return;
+      // }
+      // this.quickDraw();
+      // this.render();
+      const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
+      let visibleYRange = [
+        scrollTop,
+        scrollTop + this.getChartShape().chartHeight
+      ];
+      this.linkedState.verticalDomain = this.yScale.invertedRangeIndex(...visibleYRange);
     });
     // Link wheel events on the y axis back to vertical scrolling
     this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
@@ -145,11 +157,19 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       const hIncreament = this.linkedState.info.locationNames.length * vZoom;
 
       const scTop = this.d3el.select('foreignObject').node().scrollTop;
-      this.d3el.select('foreignObject').node().scrollTop = scTop + (event.layerY / chartShape.chartHeight * hIncreament);// scTop + vZoom
-      // * 3;
+      this.d3el.select('foreignObject').node().scrollTop = scTop + (event.layerY / chartShape.chartHeight * hIncreament);
 
-      this.quickDraw();
-      this.render();
+
+
+      const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
+      let visibleYRange = [
+        scrollTop,
+        scrollTop + chartShape.chartHeight
+      ];
+      this.linkedState.verticalDomain = this.yScale.invertedRangeIndex(...visibleYRange);
+
+      // this.quickDraw();
+      // this.render();
     });
   }
 

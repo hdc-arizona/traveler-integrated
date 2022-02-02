@@ -71,6 +71,16 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     this.linkedState.on('detailDomainChanged', () => {
       this.updateDataIfNeeded();
     });
+
+    // Do a quickDraw immediately for vertical brush / scroll / zoom
+    // interactions...
+    this.linkedState.on('verticalDomainChangedSync', () => { this.quickDraw(); });
+    // ... and ask for new data when we're confident that rapid interactions
+    // have finished
+    this.linkedState.on('verticalDomainChanged', () => {
+      this.updateDataIfNeeded();
+    });
+
     // Also ask for new data when the selection changes
     this.linkedState.on('selectionChanged', () => {
       this.updateDataIfNeeded();
@@ -246,6 +256,8 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     const needsRefresh = !this._lastChartShape ||
       this._lastChartShape.spilloverXScale.domain()
         .some((timestamp, i) => domain[i] !== timestamp) ||
+      this._lastChartShape.verticalYDomain[0] !== chartShape.verticalYDomain[0] ||
+      this._lastChartShape.verticalYDomain[1] !== chartShape.verticalYDomain[1] ||
     // 2. a subclass says we need to update,
       this.determineIfShapeNeedsRefresh(this._lastChartShape, chartShape) ||
     // 3. the selection has changed
@@ -348,6 +360,8 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
       chartShape.zoomFactor = 1.0;
       chartShape.leftOffset = spilloverXRange[0];
     }
+
+    chartShape.verticalYDomain = this.linkedState.verticalDomain;
 
     return chartShape;
   }

@@ -102,6 +102,8 @@ class UtilizationView extends
     this.linkedState.on('selectionChanged', () => { this.updateResolution(); });
     // Update the brush immediately whenever any view changes it
     this.linkedState.on('detailDomainChangedSync', () => { this.drawBrush(); });
+    // Update the brush immediately whenever any view changes it
+    this.linkedState.on('verticalDomainChangedSync', () => { this.drawBrush(); });
     // Prep local interactive callbacks for updating the brush
     this.setupBrush();
     // Set up the cursor

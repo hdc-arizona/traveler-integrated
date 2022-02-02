@@ -14,6 +14,7 @@ class TracedLinkedState extends LinkedState {
 
     // Start the detail domain at the same level as the overview
     this._detailDomain = this.overviewDomain && Array.from(this.overviewDomain);
+    this._verticalDomain = [0, this.info.locationNames.length - 1];// this should hold the index of the location names
     this._cursorPosition = null;
   }
 
@@ -65,6 +66,56 @@ class TracedLinkedState extends LinkedState {
       this.syncTrigger('detailDomainChangedSync'); // For cheap responses like scrolling axes / adjusting brush sizes
       this.stickyTrigger('detailDomainChanged', null, 100); // For more expensive responses like full re-renders of views
     }
+  }
+
+  /**
+   * Detail views should all use the same domain
+   */
+  get verticalDomain () {
+    return this._verticalDomain;
+  }
+
+  /**
+   * Constrain that verticalDomain makes sense, and notify views when it changes
+   */
+  set verticalDomain (inputDomain) {
+    // Allow views to set just one of the values (e.g. dragging one brush
+    // handle in UtilizationView)
+    const newDomain = [
+      inputDomain[0] === undefined ? this._verticalDomain[0] : inputDomain[0],
+      inputDomain[1] === undefined ? this._verticalDomain[1] : inputDomain[1]
+    ];
+    // Clamp to the lowest / highest possible values
+    newDomain[0] = Math.max(newDomain[0], 0);
+    newDomain[1] = Math.max(newDomain[1], 0);
+    newDomain[1] = Math.min(newDomain[1], this.info.locationNames.length - 1);
+    newDomain[0] = Math.min(newDomain[0], this.info.locationNames.length - 1);
+    // Ensure begin < end
+    if (newDomain[1] < newDomain[0]) {
+      const temp = newDomain[1];
+      newDomain[1] = newDomain[0];
+      newDomain[0] = temp;
+    }
+    // Ensure the brush is at least MIN_BRUSH_SIZE
+    if (newDomain[1] - newDomain[0] < MIN_BRUSH_SIZE) {
+      if (inputDomain[0] === undefined || newDomain[1] + MIN_BRUSH_SIZE <= this.overviewDomain[1]) {
+        // The left boundary isn't changing, or there's space to the right, so
+        // constrain the right boundary
+        newDomain[1] = newDomain[0] + MIN_BRUSH_SIZE;
+      } else {
+        // Constrain the left boundary
+        newDomain[0] = newDomain[1] - MIN_BRUSH_SIZE;
+      }
+    }
+    // Ensure integer queries
+    newDomain[0] = Math.floor(newDomain[0]);
+    newDomain[1] = Math.ceil(newDomain[1]);
+    // Only update if something is different
+    // if (newDomain[0] !== this._verticalDomain[0] || newDomain[1] !== this._verticalDomain[1]) {
+      this._verticalDomain = newDomain;
+      this.syncTrigger('verticalDomainChangedSync'); // For cheap responses like scrolling axes / adjusting brush sizes
+      this.stickyTrigger('verticalDomainChanged', null, 100); // For more expensive responses like full re-renders of views
+    // }
   }
 
   /**
