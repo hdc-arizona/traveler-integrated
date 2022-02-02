@@ -53,6 +53,14 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     };
     // Minimum vertical pixels per row
     this.minLocationHeight = 30;
+    // Do a quickDraw immediately for vertical brush / scroll / zoom
+    // interactions...
+    this.linkedState.on('verticalDomainChangedSync', () => { this.quickDraw(); });
+    // ... and ask for new data when we're confident that rapid interactions
+    // have finished
+    this.linkedState.on('verticalDomainChanged', () => {
+      this.updateDataIfNeeded();
+    });
   }
 
   get isLoading () {

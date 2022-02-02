@@ -72,15 +72,6 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
       this.updateDataIfNeeded();
     });
 
-    // Do a quickDraw immediately for vertical brush / scroll / zoom
-    // interactions...
-    this.linkedState.on('verticalDomainChangedSync', () => { this.quickDraw(); });
-    // ... and ask for new data when we're confident that rapid interactions
-    // have finished
-    this.linkedState.on('verticalDomainChanged', () => {
-      this.updateDataIfNeeded();
-    });
-
     // Also ask for new data when the selection changes
     this.linkedState.on('selectionChanged', () => {
       this.updateDataIfNeeded();

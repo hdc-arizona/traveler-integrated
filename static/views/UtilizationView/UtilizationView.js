@@ -183,9 +183,6 @@ class UtilizationView extends
           for (let aggTime of aggregatedTimes) {
             let snappedStartBin = Math.floor(this.xScale(aggTime.startTime)) - 1;
             aggTime.util.forEach((d,j)=>{
-              if(j+ snappedStartBin === 662) {
-                console.log(d);
-              }
               histogram['data'][j + snappedStartBin] = histogram['data'][j + snappedStartBin] + d;
             });
             // for (let i = snappedStartBin, j = 0; i < snappedEndBin; i++, j++) {
