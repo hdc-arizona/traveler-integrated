@@ -123,14 +123,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   setupInteractions () {
     super.setupInteractions();
     // Make sure the y axis links with scrolling
-    this.d3el.select('foreignObject').on('wheel', event => {
-      // if (this._ignoreYScrollEvents) {
-      //   // suppress false scroll events from setting scrollTop
-      //   this._ignoreYScrollEvents = false;
-      //   return;
-      // }
-      // this.quickDraw();
-      // this.render();
+    this.d3el.select('foreignObject').on('wheel', () => {
       const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
       let visibleYRange = [
         scrollTop,
@@ -140,10 +133,6 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     });
     // Link wheel events on the y axis back to vertical scrolling
     this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
-      // this.d3el.select('foreignObject').node().scrollTop += event.deltaY;
-      // console.log(event);
-      const zoomFactor = 1.05 ** (normalizeWheel(event).pixelY / 100);
-      const chartBounds = this.d3el.select('.chart').node().getBoundingClientRect();
       const chartShape = this.getChartShape();
       let vZoom = 15;
 
@@ -155,11 +144,8 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       }
 
       const hIncreament = this.linkedState.info.locationNames.length * vZoom;
-
       const scTop = this.d3el.select('foreignObject').node().scrollTop;
       this.d3el.select('foreignObject').node().scrollTop = scTop + (event.layerY / chartShape.chartHeight * hIncreament);
-
-
 
       const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
       let visibleYRange = [
@@ -167,9 +153,6 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
         scrollTop + chartShape.chartHeight
       ];
       this.linkedState.verticalDomain = this.yScale.invertedRangeIndex(...visibleYRange);
-
-      // this.quickDraw();
-      // this.render();
     });
   }
 
