@@ -21,7 +21,8 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
 
     // Ensure unique clip path IDs for each instantiation (can create
     // problems if there's more than one)
-    this.clipPathId = (ZoomableTimelineView.NEXT_CLIP_ID || 1);
+    ZoomableTimelineView.NEXT_CLIP_ID = (ZoomableTimelineView.NEXT_CLIP_ID || 1);
+    this.clipPathId = ZoomableTimelineView.NEXT_CLIP_ID;
     ZoomableTimelineView.NEXT_CLIP_ID += 1;
     this.clipPathId = 'clip' + this.clipPathId;
 
