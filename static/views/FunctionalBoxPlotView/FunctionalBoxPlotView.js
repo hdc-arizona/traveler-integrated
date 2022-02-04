@@ -11,7 +11,6 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     super(options);
 
     this.metric = options.glState.variant;
-
     this.yScale = d3.scaleLinear();
   }
 
@@ -127,25 +126,25 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
       .text(this.metric.substring(this.metric.lastIndexOf(':')+1) + ' (rate)');
     this.updateFuncInfoText(0, 0, 0, 0);
 
-    // const theme = globalThis.controller.getNamedResource('theme').cssVariables;
-    // var addchild = this.d3el.append("circle")
-    //     .attr("cx",12)
-    //     .attr("cy",28)
-    //     .attr("r",7)
-    //     .attr("class","addchild")
-    //     .style("fill",theme['--text-color-softer'])
-    //     .style("pointer-events","visible");
-    //
-    // addchild.on("mouseover", function() {
-    //   alert("on click");
-    // });
-    this.d3el.select('.yAxisScrollCapturer')
-        .on('mouseover', event => {
-          console.log("wheeling");
-        })
-        .on('mouseout', event => {
-          console.log("wheeling out");
-        });
+    // // const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    // // var addchild = this.d3el.append("circle")
+    // //     .attr("cx",12)
+    // //     .attr("cy",28)
+    // //     .attr("r",7)
+    // //     .attr("class","addchild")
+    // //     .style("fill",theme['--text-color-softer'])
+    // //     .style("pointer-events","visible");
+    // //
+    // // addchild.on("mouseover", function() {
+    // //   alert("on click");
+    // // });
+    // this.d3el.select('.yAxisScrollCapturer')
+    //     .on('mouseover', event => {
+    //       console.log("wheeling");
+    //     })
+    //     .on('mouseout', event => {
+    //       console.log("wheeling out");
+    //     });
   }
 
   updateFuncInfoText(mn, mx, avg, std) {

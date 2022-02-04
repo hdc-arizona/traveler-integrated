@@ -30,10 +30,12 @@ const CursoredViewMixin = function (superclass) {
       const position = this.linkedState.cursorPosition === null
         ? null
         : this.getCursorPosition(this.linkedState.cursorPosition);
-      this.d3el.select('.cursor')
-        .style('display', position === null ? 'none' : null)
-        .attr('x1', position)
-        .attr('x2', position);
+      if(this.d3el) {
+        this.d3el.select('.cursor')
+            .style('display', position === null ? 'none' : null)
+            .attr('x1', position)
+            .attr('x2', position);
+      }
     }
 
     /**

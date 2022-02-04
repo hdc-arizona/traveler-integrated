@@ -66,15 +66,15 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
 
     // Do a quickDraw immediately for horizontal brush / scroll / zoom
     // interactions...
-    this.linkedState.on('detailDomainChangedSync', () => { this.quickDraw(); });
+    this.linkedState.on('detailDomainChangedSync' + '.' + this.clipPathId, () => { this.quickDraw();});
     // ... and ask for new data when we're confident that rapid interactions
     // have finished
-    this.linkedState.on('detailDomainChanged', () => {
+    this.linkedState.on('detailDomainChanged' + '.' + this.clipPathId, () => {
       this.updateDataIfNeeded();
     });
 
     // Also ask for new data when the selection changes
-    this.linkedState.on('selectionChanged', () => {
+    this.linkedState.on('selectionChanged' + '.' + this.clipPathId, () => {
       this.updateDataIfNeeded();
     });
 
@@ -88,6 +88,14 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     // views need to know how many pixels we have to work with, only at this
     // point do we know how many bins to ask for
     this.updateDataIfNeeded();
+    this.glContainer.on('destroy', () => { this.handleDestroyEvent();});
+  }
+
+  handleDestroyEvent() {
+    this.linkedState.off('detailDomainChangedSync' + '.' + this.clipPathId);
+    this.linkedState.off('detailDomainChanged' + '.' + this.clipPathId);
+    this.linkedState.off('selectionChanged' + '.' + this.clipPathId);
+    // console.log("item destroyed called in functional box plot " + this.clipPathId);
   }
 
   handlePanningStart (event, dragState) {
