@@ -149,17 +149,27 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
       const chartShape = this.getChartShape();
       let vZoom = 15;
-
+      const preHeight = this.minLocationHeight;
       if(event.wheelDeltaY>0) { // zoom in
         this.minLocationHeight = Math.min(chartShape.chartHeight, this.minLocationHeight + vZoom);
       } else {
         this.minLocationHeight = Math.max(5, this.minLocationHeight - vZoom);
-        vZoom = vZoom * -1;
       }
 
-      const hIncreament = this.linkedState.info.locationNames.length * vZoom;
+      const chartBounds = this.d3el.select('.chart').node().getBoundingClientRect();
+      const mousedPosition = this.yScale.invert(event.clientY - chartBounds.top);
+      let mousedIndex = 0;
+      for(;mousedIndex < this.linkedState.info.locationNames.length; mousedIndex++){
+        if(this.linkedState.info.locationNames[mousedIndex].valueOf() === mousedPosition.valueOf()) {
+          break;
+        }
+      }
+      const vIncreament = (mousedIndex+1) * (this.minLocationHeight - preHeight);
       const scTop = this.d3el.select('foreignObject').node().scrollTop;
-      this.d3el.select('foreignObject').node().scrollTop = scTop + (event.layerY / chartShape.chartHeight * hIncreament);
+      const nscTop = scTop + ( vIncreament);
+      const maxH = (this.linkedState.info.locationNames.length - Math.ceil(chartShape.chartHeight / this.minLocationHeight)) * this.minLocationHeight;
+      // const nscTop = scTop + (event_layerY * zoomFactor);
+      this.d3el.select('foreignObject').node().scrollTop = Math.min(nscTop, maxH);
 
       const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
       let visibleYRange = [
