@@ -137,7 +137,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   setupInteractions () {
     super.setupInteractions();
     // Make sure the y axis links with scrolling
-    this.d3el.select('foreignObject').on('wheel', () => {
+    this.d3el.select('foreignObject').on('scroll', () => {
       const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
       let visibleYRange = [
         scrollTop,
