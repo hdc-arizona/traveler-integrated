@@ -11,7 +11,6 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     super(options);
 
     this.metric = options.glState.variant;
-
     this.yScale = d3.scaleLinear();
   }
 
@@ -38,12 +37,46 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     }
   }
 
+  setYDomain(maxMin) {
+    var yOffset = (maxMin['max'] - maxMin['min']) / 10;
+    this.yScale.domain([maxMin['max'] + yOffset, maxMin['min'] - yOffset]);
+  }
+
   drawCanvas (chartShape) {
-    // TODO: Need to adapt the original drawing code from
-    // https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/static/views/LineChartView/LineChartView.js
-    // (yes, that's named LineChartView; it had been edited to render a functional box plot)
-    // to use this.getNamedResource('data') instead (the data should be in the
-    // same format)
+    const fetchedData = this.getNamedResource('data');
+    if(fetchedData === null || fetchedData.data === undefined) return;
+
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    const canvas = this.d3el.select('canvas');
+    const context = canvas.node().getContext('2d');
+    const __self = this;
+    var line = d3.line()
+        .x(function(d, i) { return i; })
+        .y(function(d) { return __self.yScale(d); })
+        .context(context);
+
+    this.drawLine(context, line, fetchedData.data.min, theme['--text-color-softer'], 1.5);
+    this.drawLine(context, line, fetchedData.data.max, theme['--text-color-softer'], 1.5);
+    for (var i = 0; i < fetchedData.metadata.bins; i++) {
+      let d = fetchedData.data.std[i];
+      let avgD = fetchedData.data.average[i];
+      context.beginPath();
+      context.lineWidth = "1";
+      context.strokeStyle = theme['--disabled-color'];
+      context.moveTo(i, __self.yScale(avgD + d));
+      context.lineTo(i, __self.yScale(avgD - d));
+      context.stroke();
+    }
+    this.drawLine(context, line, fetchedData.data.average, theme['--inverted-shadow-color'], 1.5);
+    this.__chartShape = chartShape;
+  }
+
+  drawLine(context, line, data, tColor, lWidth) {
+    context.beginPath();
+    line(data);
+    context.lineWidth = lWidth;
+    context.strokeStyle = tColor;
+    context.stroke();
   }
 
   async updateData (chartShape) {
@@ -66,20 +99,90 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
   getChartShape () {
     const chartShape = super.getChartShape();
 
+    const fetchedData = this.getNamedResource('data');
     this.yScale.range([0, chartShape.fullHeight])
-      .domain([]); // TODO
+        .domain([10, 0]);
+    if(fetchedData === null || fetchedData.data === undefined) return chartShape;
+    var maxY = Number.MIN_VALUE;
+    var minY = Number.MAX_VALUE;
 
+    for (var i = 0; i < fetchedData.metadata.bins; i++) {
+      maxY = Math.max(maxY, fetchedData.data.max[i]);
+      minY = Math.min(minY, fetchedData.data.min[i]);
+    }
+    this.setYDomain({'max':maxY, 'min':minY});
+    chartShape.maxMetricValue = maxY;
+    chartShape.minMetricValue = minY;
     return chartShape;
   }
 
   drawAxes (chartShape) {
     super.drawAxes(chartShape);
-
-    // TODO: Update the y axis
-
+    // Update the y axis
+    this.d3el.select('.yAxis')
+        .call(d3.axisLeft(this.yScale));
     // Set the y label
-    this.d3el.select('.yAxisLabel')
-      .text(this.metric);
+    var yl = this.d3el.select('.yAxisLabel')
+      .text(this.metric.substring(this.metric.lastIndexOf(':')+1) + ' (rate)');
+    this.updateFuncInfoText(0, 0, 0, 0);
+
+    // // const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    // // var addchild = this.d3el.append("circle")
+    // //     .attr("cx",12)
+    // //     .attr("cy",28)
+    // //     .attr("r",7)
+    // //     .attr("class","addchild")
+    // //     .style("fill",theme['--text-color-softer'])
+    // //     .style("pointer-events","visible");
+    // //
+    // // addchild.on("mouseover", function() {
+    // //   alert("on click");
+    // // });
+    // this.d3el.select('.yAxisScrollCapturer')
+    //     .on('mouseover', event => {
+    //       console.log("wheeling");
+    //     })
+    //     .on('mouseout', event => {
+    //       console.log("wheeling out");
+    //     });
+  }
+
+  updateFuncInfoText(mn, mx, avg, std) {
+    this.d3el.select('.funcInfo')
+        .html(()=>{
+          const xc = 10;
+          return '<tspan x="' + xc + '" dy="1.2em">Max: ' + mx.toFixed(2).toString() + '</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Avg: ' + avg.toFixed(2).toString() + '</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Std: ' + std.toFixed(2).toString() + '</tspan>'
+              + '<tspan x="' + xc + '" dy="1.2em">Min: ' + mn.toFixed(2).toString() + '</tspan>';
+        })
+        .attr('x', 0)
+        .attr('y', 0);
+  }
+
+  updateCursor () {
+    const position = this.linkedState.cursorPosition === null
+        ? null
+        : this.getCursorPosition(this.linkedState.cursorPosition);
+    if(this.d3el == null) return; // it will check both null or undefined
+    this.d3el.select('.cursor')
+        .style('display', position === null ? 'none' : null)
+        .attr('x1', position)
+        .attr('x2', position);
+
+    if(this.linkedState.cursorPosition !== null
+        && this.linkedState.cursorPosition > this.xScale.domain()[0]
+        && this.linkedState.cursorPosition < this.xScale.domain()[1]
+        && this.__chartShape !== undefined) {
+      const fetchedData = this.getNamedResource('data');
+      if(fetchedData === null || fetchedData.data === undefined) return;
+      const binSize = (fetchedData.metadata.end - fetchedData.metadata.begin) / fetchedData.metadata.bins;
+      const cBin = Math.trunc((this.linkedState.cursorPosition - this.__chartShape.spilloverXScale.domain()[0]) / binSize);
+      this.updateFuncInfoText(fetchedData.data.min[cBin],
+          fetchedData.data.max[cBin],
+          fetchedData.data.average[cBin],
+          fetchedData.data.std[cBin]);
+    }
   }
 }
 

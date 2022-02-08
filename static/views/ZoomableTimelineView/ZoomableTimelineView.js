@@ -21,7 +21,8 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
 
     // Ensure unique clip path IDs for each instantiation (can create
     // problems if there's more than one)
-    this.clipPathId = (ZoomableTimelineView.NEXT_CLIP_ID || 1);
+    ZoomableTimelineView.NEXT_CLIP_ID = (ZoomableTimelineView.NEXT_CLIP_ID || 1);
+    this.clipPathId = ZoomableTimelineView.NEXT_CLIP_ID;
     ZoomableTimelineView.NEXT_CLIP_ID += 1;
     this.clipPathId = 'clip' + this.clipPathId;
 
@@ -65,14 +66,15 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
 
     // Do a quickDraw immediately for horizontal brush / scroll / zoom
     // interactions...
-    this.linkedState.on('detailDomainChangedSync', () => { this.quickDraw(); });
+    this.linkedState.on('detailDomainChangedSync' + '.' + this.clipPathId, () => { this.quickDraw();});
     // ... and ask for new data when we're confident that rapid interactions
     // have finished
-    this.linkedState.on('detailDomainChanged', () => {
+    this.linkedState.on('detailDomainChanged' + '.' + this.clipPathId, () => {
       this.updateDataIfNeeded();
     });
+
     // Also ask for new data when the selection changes
-    this.linkedState.on('selectionChanged', () => {
+    this.linkedState.on('selectionChanged' + '.' + this.clipPathId, () => {
       this.updateDataIfNeeded();
     });
 
@@ -86,6 +88,14 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     // views need to know how many pixels we have to work with, only at this
     // point do we know how many bins to ask for
     this.updateDataIfNeeded();
+    this.glContainer.on('destroy', () => { this.handleDestroyEvent();});
+  }
+
+  handleDestroyEvent() {
+    this.linkedState.off('detailDomainChangedSync' + '.' + this.clipPathId);
+    this.linkedState.off('detailDomainChanged' + '.' + this.clipPathId);
+    this.linkedState.off('selectionChanged' + '.' + this.clipPathId);
+    // console.log("item destroyed called in functional box plot " + this.clipPathId);
   }
 
   handlePanningStart (event, dragState) {
@@ -246,6 +256,8 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     const needsRefresh = !this._lastChartShape ||
       this._lastChartShape.spilloverXScale.domain()
         .some((timestamp, i) => domain[i] !== timestamp) ||
+      this._lastChartShape.verticalYDomain[0] !== chartShape.verticalYDomain[0] ||
+      this._lastChartShape.verticalYDomain[1] !== chartShape.verticalYDomain[1] ||
     // 2. a subclass says we need to update,
       this.determineIfShapeNeedsRefresh(this._lastChartShape, chartShape) ||
     // 3. the selection has changed
@@ -348,6 +360,8 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
       chartShape.zoomFactor = 1.0;
       chartShape.leftOffset = spilloverXRange[0];
     }
+
+    chartShape.verticalYDomain = this.linkedState.verticalDomain;
 
     return chartShape;
   }

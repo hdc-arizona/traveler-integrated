@@ -35,7 +35,7 @@ class DependencyTreeNode:
         self.prefixList = list()  # list of string
         self.intervalList = list()  # containing just the enter and leave time of this interval, helper for creating aggreatedBlockList
 
-        self.aggregatedUtil = SparseUtilizationList()  # this is util for aggregated blocks
+        self.aggregatedUtil = SparseUtilizationList(False)  # this is util for aggregated blocks
         self.aggregatedBlockList = list()  # list of dictionary (start time, end time), convert it to (event, time) list later
 
     def isNotDummyRootNode(self):
@@ -156,7 +156,7 @@ class DependencyTreeNode:
                 minAmongLocation = updateMinAmongLocation()
                 allDummyLocations.append(dummyLocation)
                 dummyLocation = dummyLocation + 1
-        self.aggregatedUtil.finalize(allDummyLocations, False)
+        self.aggregatedUtil.finalize(allDummyLocations)
 
         for child in self.children:
             child.finalizeTreeNode()

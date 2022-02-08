@@ -102,6 +102,8 @@ class UtilizationView extends
     this.linkedState.on('selectionChanged', () => { this.updateResolution(); });
     // Update the brush immediately whenever any view changes it
     this.linkedState.on('detailDomainChangedSync', () => { this.drawBrush(); });
+    // Update the brush immediately whenever any view changes it
+    this.linkedState.on('verticalDomainChangedSync', () => { this.drawBrush(); });
     // Prep local interactive callbacks for updating the brush
     this.setupBrush();
     // Set up the cursor
@@ -181,9 +183,6 @@ class UtilizationView extends
           for (let aggTime of aggregatedTimes) {
             let snappedStartBin = Math.floor(this.xScale(aggTime.startTime)) - 1;
             aggTime.util.forEach((d,j)=>{
-              if(j+ snappedStartBin === 662) {
-                console.log(d);
-              }
               histogram['data'][j + snappedStartBin] = histogram['data'][j + snappedStartBin] + d;
             });
             // for (let i = snappedStartBin, j = 0; i < snappedEndBin; i++, j++) {

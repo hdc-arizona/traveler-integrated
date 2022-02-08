@@ -51,7 +51,7 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
     return this.updateResource({
       name: 'data',
       type: 'json',
-      url: `/datasets/${this.datasetId}/metrics/${encodeURIComponent(this.metric)}/raw?bins=${chartShape.bins}&begin=${domain[0]}&end=${domain[1]}`
+      url: `/datasets/${this.datasetId}/metrics/raw?metric=${encodeURIComponent(this.metric)}&begin=${domain[0]}&end=${domain[1]}`
     });
   }
 
@@ -64,22 +64,103 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
    * the last updateShapeAndDataIfNeeded call)
    */
   getChartShape () {
-    const chartShape = super.getChartShape();
+    let chartShape = super.getChartShape();
+    const fetchedData = this.getNamedResource('data');
 
-    this.yScale.range([0, chartShape.fullHeight])
-      .domain([]); // TODO: compute the domain from this.getNamedResource('data')
+    var maxY = 10;
+    var minY = 0;
+    if(fetchedData !== null) {
+      maxY = Number.MIN_VALUE;
+      minY = Number.MAX_VALUE;
 
+      for (var i=fetchedData.length-1; i>=0; i--) {
+        let tmp = fetchedData[i]['Value'];
+        let div = fetchedData[i]['Timestamp'];
+        if(i>0) {
+          tmp = tmp - fetchedData[i-1]['Value'];
+          div = div - fetchedData[i-1]['Timestamp'];
+        }
+        tmp = tmp / div;
+        if (tmp < minY) minY = tmp;
+        if (tmp > maxY) maxY = tmp;
+      }
+    }
+
+    this.yScale.range([chartShape.fullHeight, 0])
+      .domain([minY-1, maxY+1]);
+    chartShape.maxMetricValue = maxY;
+    chartShape.minMetricValue = minY;
     return chartShape;
   }
 
   drawAxes (chartShape) {
     super.drawAxes(chartShape);
 
-    // TODO: Update the y axis
+    const middle = (chartShape.minMetricValue + chartShape.maxMetricValue) / 4;
+    const zeroCutter = Math.pow(10, Math.floor(Math.log10(middle)));
+    // Update the y axis
+    this.d3el.select('.yAxis')
+        .call(d3.axisLeft(this.yScale).tickFormat(x => x / zeroCutter));
 
+    let unit = '';
+    if(zeroCutter > 1000000000){
+      unit = '(G)';
+    } else if(zeroCutter > 1000000){
+      unit = '(M)';
+    } else if(zeroCutter > 1000) {
+      unit = '(K)';
+    }
     // Set the y label
     this.d3el.select('.yAxisLabel')
-      .text(this.metric);
+        .text(this.metric.substring(this.metric.lastIndexOf('/')+1) + unit);
+  }
+
+  drawCanvas (chartShape) {
+    const canvas = this.d3el.select('canvas');
+    const context = canvas.node().getContext('2d');
+    const fetchedData = this.getNamedResource('data');
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+
+    if(fetchedData !== null) {
+      var processedData = [];
+      fetchedData.forEach((d, i) => {
+        if(i>0){
+          var el1 = {};
+          el1['Timestamp'] = d['Timestamp'];
+          el1['Value'] = fetchedData[i-1]['Value'];
+          var div = fetchedData[i-1]['Timestamp'];
+          if(i>1) {
+            el1['Value'] = el1['Value'] - fetchedData[i-2]['Value'];
+            div = div - fetchedData[i-2]['Timestamp'];
+          }
+          el1['Value'] = el1['Value'] / div;
+          processedData.push(el1);
+        }
+        var el = {};
+        el['Timestamp'] = d['Timestamp'];
+        el['Value'] = d['Value'];
+        div = d['Timestamp'];
+        if(i>0) {
+          el['Value'] = el['Value'] - fetchedData[i-1]['Value'];
+          div = div - fetchedData[i-1]['Timestamp'];
+        }
+        el['Value'] = el['Value'] / div;
+        processedData.push(el);
+      });
+
+
+      const __self = this;
+      var line = d3.line()
+          .x(function(d) { return (chartShape.spilloverXScale(d['Timestamp']) - chartShape.leftOffset); })
+          .y(function(d, i) { return __self.yScale(d['Value']); })
+          .context(context);
+      context.beginPath();
+      // line(fetchedData);
+      line(processedData);
+      context.lineWidth = 1.5;
+      context.strokeStyle = theme['--text-color-softer'];
+      context.stroke();
+    }
   }
 }
 

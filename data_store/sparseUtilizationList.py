@@ -6,9 +6,10 @@ import json
 from profiling_tools._cCalcBin import ffi, lib
 
 class SparseUtilizationList():
-    def __init__(self):
+    def __init__(self, isUpdate=True):
         self.locationDict = dict()
         self.cLocationDict = dict()
+        self.isUpdateCounter = isUpdate
 
     def getCLocation(self, loc):
         return self.cLocationDict[loc]
@@ -19,14 +20,14 @@ class SparseUtilizationList():
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
 
-    def finalize(self, allLocations, isUpdateCounter=True):
+    def finalize(self, allLocations):
         for loc in allLocations:
             if loc in self.locationDict:
                 self.sortAtLoc(loc)
             self.locationDict[loc] = np.array(self.locationDict.get(loc, []))
 
             length = len(self.locationDict[loc])
-            if isUpdateCounter:
+            if self.isUpdateCounter:
                 counter = 0
                 for i, criticalPt in enumerate(self.locationDict[loc]):
                     counter += criticalPt['counter']

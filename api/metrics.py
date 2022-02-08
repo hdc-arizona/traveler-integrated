@@ -12,7 +12,7 @@ def get_procMetrics(datasetId: str):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'])
     return db[datasetId]['info']['procMetricList']
 
-@router.get('/datasets/{datasetId}/metrics/{metric}/raw')
+@router.get('/datasets/{datasetId}/metrics/raw')
 def get_procMetric_values(datasetId: str,
                           metric: str,
                           begin: float = None,
@@ -39,7 +39,8 @@ def get_procMetric_values(datasetId: str,
     return StreamingResponse(procMetricGenerator(), media_type='application/json')
 
 @router.get('/datasets/{datasetId}/metrics/{metric}/summary')
-def newMetricData(datasetId: str,
+def getMetricData(datasetId: str,
+                  metric: str,
                   bins: int = 100,
                   begin: int = None,
                   end: int = None,
@@ -53,9 +54,9 @@ def newMetricData(datasetId: str,
 
     ret = {}
     if location is None:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric].calcMetricHistogram(bins, begin, end)
     else:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric_type].calcMetricHistogram(bins, begin, end, location)
+        ret['data'] = db[datasetId]['sparseUtilizationList']['metrics'][metric].calcMetricHistogram(bins, begin, end, location)
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret
 

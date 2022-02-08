@@ -1,8 +1,6 @@
 /* globals d3 */
 import ZoomableTimelineView from '../ZoomableTimelineView/ZoomableTimelineView.js';
-
-// Minimum vertical pixels per row
-const MIN_LOCATION_HEIGHT = 30;
+import normalizeWheel from "../../utils/normalize-wheel.js";
 
 // Fetch and draw 3x the time data than we're actually showing, for smooth
 // scrolling interactions
@@ -47,6 +45,28 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       }
       return result;
     };
+    // This only finds the lowest and highest visible index
+    this.yScale.invertedRangeIndex = function (low, high) {
+      let l = this.domain().indexOf(this.invert(low));
+      let h = this.domain().indexOf(this.invert(high));
+      return [l, h];
+    };
+    // Minimum vertical pixels per row
+    this.minLocationHeight = 30;
+    // Do a quickDraw immediately for vertical brush / scroll / zoom
+    // interactions...
+    this.linkedState.on('verticalDomainChangedSync' + '.' + this.clipPathId, () => { this.quickDraw(); });
+    // ... and ask for new data when we're confident that rapid interactions
+    // have finished
+    this.linkedState.on('verticalDomainChanged' + '.' + this.clipPathId, () => {
+      this.updateDataIfNeeded();
+    });
+  }
+
+  handleDestroyEvent() {
+    super.handleDestroyEvent();
+    this.linkedState.off('verticalDomainChangedSync' + '.' + this.clipPathId);
+    this.linkedState.off('verticalDomainChanged' + '.' + this.clipPathId);
   }
 
   get isLoading () {
@@ -118,17 +138,45 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     super.setupInteractions();
     // Make sure the y axis links with scrolling
     this.d3el.select('foreignObject').on('scroll', () => {
-      if (this._ignoreYScrollEvents) {
-        // suppress false scroll events from setting scrollTop
-        this._ignoreYScrollEvents = false;
-        return;
-      }
-      this.quickDraw();
-      this.render();
+      const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
+      let visibleYRange = [
+        scrollTop,
+        scrollTop + this.getChartShape().chartHeight
+      ];
+      this.linkedState.verticalDomain = this.yScale.invertedRangeIndex(...visibleYRange);
     });
     // Link wheel events on the y axis back to vertical scrolling
     this.d3el.select('.yAxisScrollCapturer').on('wheel', event => {
-      this.d3el.select('foreignObject').node().scrollTop += event.deltaY;
+      const chartShape = this.getChartShape();
+      let vZoom = 15;
+      const preHeight = this.minLocationHeight;
+      if(event.wheelDeltaY>0) { // zoom in
+        this.minLocationHeight = Math.min(chartShape.chartHeight, this.minLocationHeight + vZoom);
+      } else {
+        this.minLocationHeight = Math.max(5, this.minLocationHeight - vZoom);
+      }
+
+      const chartBounds = this.d3el.select('.chart').node().getBoundingClientRect();
+      const mousedPosition = this.yScale.invert(event.clientY - chartBounds.top);
+      let mousedIndex = 0;
+      for(;mousedIndex < this.linkedState.info.locationNames.length; mousedIndex++){
+        if(this.linkedState.info.locationNames[mousedIndex].valueOf() === mousedPosition.valueOf()) {
+          break;
+        }
+      }
+      const vIncreament = (mousedIndex+1) * (this.minLocationHeight - preHeight);
+      const scTop = this.d3el.select('foreignObject').node().scrollTop;
+      const nscTop = scTop + ( vIncreament);
+      const maxH = (this.linkedState.info.locationNames.length - Math.ceil(chartShape.chartHeight / this.minLocationHeight)) * this.minLocationHeight;
+      // const nscTop = scTop + (event_layerY * zoomFactor);
+      this.d3el.select('foreignObject').node().scrollTop = Math.min(nscTop, maxH);
+
+      const scrollTop = this.d3el.select('foreignObject').node().scrollTop;
+      let visibleYRange = [
+        scrollTop,
+        scrollTop + chartShape.chartHeight
+      ];
+      this.linkedState.verticalDomain = this.yScale.invertedRangeIndex(...visibleYRange);
     });
   }
 
@@ -191,7 +239,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
   }
 
   getRequiredChartHeight () {
-    return MIN_LOCATION_HEIGHT * this.linkedState.info.locationNames.length;
+    return this.minLocationHeight * this.linkedState.info.locationNames.length;
   }
 
   /**

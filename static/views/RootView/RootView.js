@@ -53,6 +53,13 @@ class RootView extends uki.ui.GLRootView {
     this.on('itemCreated', updateLayout);
   }
 
+  handleViewDestruction (view) {
+    // Prevent the view from rendering and remove it from our lookup
+    view.revokeD3elOwnership();
+    delete this.views[view.viewID];
+    view = undefined;
+  }
+
   openView (datasetId, viewClassName, variant) {
     const helper = () => {
       // Check if the view is already open
