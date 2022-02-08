@@ -167,7 +167,10 @@ class IntervalHistogramView extends
       this.render();
     });
     this.linkedState.on('selectionChanged', () => {
-      const newPrimitive = this.linkedState.selection?.primitiveName;
+      let newPrimitive = this.linkedState.selection?.primitiveName;
+      if(Array.isArray(newPrimitive)) {
+        newPrimitive = this.linkedState.selection?.primitiveName[0];
+      }
       if (newPrimitive && newPrimitive !== this.currentPrimitive) {
         this.currentPrimitive = newPrimitive;
       }
