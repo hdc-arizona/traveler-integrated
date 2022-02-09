@@ -14,6 +14,11 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
     this.yScale = d3.scaleLinear();
   }
 
+  async setup () {
+    await super.setup(...arguments);
+    this.linkedState.off('selectionChanged' + '.' + this.clipPathId);
+  }
+
   get isLoading () {
     // Display the spinner + skip most of the draw call if we're still waiting
     // on data

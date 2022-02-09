@@ -139,6 +139,13 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
         });
       }
     });
+
+    this.glContainer.on('destroy', () => { this.handleDestroyEvent();});
+    this.linkedState.on('selectionChanged' + '.dep', () => { this.render(); });
+  }
+
+  handleDestroyEvent() {
+    this.linkedState.off('selectionChanged' + '.dep');
   }
 
   initKey () {

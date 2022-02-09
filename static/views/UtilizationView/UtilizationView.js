@@ -49,18 +49,11 @@ class UtilizationView extends
       name: 'selection',
       type: 'derivation',
       derive: async () => {
-        // Does the current selection have a way of getting selection-specific
-        // if(Array.isArray(this.linkedState.selection?.primitiveName)) {
-          // const nodeId = this.linkedState.selection?.primitiveDetails;
-          // if(!(nodeId in this.linkedState.cachedUtilizationData) || this.linkedState.cachedUtilizationData[nodeId] === null) {
-          //   this.linkedState.cachedUtilizationData[nodeId] = this.linkedState.selection?.getUtilization?.({ bins }) || null;
-          // }
-          // return this.linkedState.cachedUtilizationData[nodeId];
-        // } else {
-          return this.linkedState.selection?.getUtilization?.({ bins }) || null;
-        // }
-
-        // if not, don't show any selection-specific utilization
+          return this.linkedState.selection?.getUtilization?.({ bins: bins,
+            begin: this.linkedState.overviewDomain[0],
+            end: this.linkedState.overviewDomain[1],
+            isCombine: true
+          }) || null;
       }
     });
     // Initial render call to show the spinner if waiting for data takes a while
@@ -175,25 +168,7 @@ class UtilizationView extends
     this.d3el.select('.selectionUtilization')
       .style('display', selectionUtilization === null ? 'none' : null);
     if (selectionUtilization !== null) {
-      var histogram = {};
-      if(Array.isArray(this.linkedState.selection?.primitiveName)) {
-        const bins = Math.max(Math.ceil(this.chartBounds.width), 1);
-        histogram['data'] = new Array(bins).fill(0);
-        for (const [location, aggregatedTimes] of Object.entries(selectionUtilization.data)) {
-          for (let aggTime of aggregatedTimes) {
-            let snappedStartBin = Math.floor(this.xScale(aggTime.startTime)) - 1;
-            aggTime.util.forEach((d,j)=>{
-              histogram['data'][j + snappedStartBin] = histogram['data'][j + snappedStartBin] + d;
-            });
-            // for (let i = snappedStartBin, j = 0; i < snappedEndBin; i++, j++) {
-            //   histogram['data'][i] = histogram['data'][i] + aggTime.util[j];
-            // }
-          }
-        }
-      } else {
-        histogram = selectionUtilization;
-      }
-      this.drawPaths(this.d3el.select('.selectionUtilization'), histogram);
+      this.drawPaths(this.d3el.select('.selectionUtilization'), selectionUtilization);
     }
     // Update the brush
     this.drawBrush();
