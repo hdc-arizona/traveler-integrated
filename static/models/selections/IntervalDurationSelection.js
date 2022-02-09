@@ -20,6 +20,93 @@ class IntervalDurationSelection extends Selection {
    * https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/serve.py#L736
    */
 
+  /**
+   * Add selection-specific arguments to /getUtilizationForPrimitive API endpoint,
+   * and fetch the data
+   * TODO: this implementation may run slower for larger datasets. Find
+   */
+  async getUtilization (urlArgs) {
+    var results = {};
+
+    urlArgs.primitive = undefined;
+    if(Array.isArray(this.primitiveName)) {
+      urlArgs.primitives = this.primitiveName.join();
+    } else {
+      urlArgs.primitives = this.primitiveName;
+    }
+    urlArgs.nodeId = this.primitiveDetails;
+    const url = `/datasets/${window.controller.currentDatasetId}/getUtilizationForPrimitive?` +
+        Object.entries(urlArgs).map(([key, value]) => {
+          return `${key}=${encodeURIComponent(value)}`;
+        }).join('&');
+    const response = await window.fetch(url);
+    const json = await response.json();
+
+    if(urlArgs.isCombine === true) {
+      var binSize = (urlArgs.end - urlArgs.begin) / urlArgs.bins;
+      results['data'] = new Array(urlArgs.bins).fill(0);
+      for (const [location, aggregatedTimes] of Object.entries(json.data)) {
+        for (let aggTime of aggregatedTimes) {
+          let snappedStartBin = Math.floor(( aggTime.startTime - urlArgs.begin) / binSize) - 1;
+          aggTime.util.forEach((d,j)=>{
+            results['data'][j + snappedStartBin] = results['data'][j + snappedStartBin] + d;
+          });
+        }
+      }
+    } else {
+      results = json;
+    }
+    return results;
+  }
+
+  fetchPrimitiveHistogramData(){
+    if(!this.selectedPrimitiveHistogram) {
+      return;
+    }
+    window.clearTimeout(this._primitiveHistogramTimeout);
+    this._primitiveHistogramTimeout = window.setTimeout(async () => {
+      const currentPrimitive = this.selectedPrimitiveHistogram;
+      delete this.primitiveHistogram[currentPrimitive];
+      const durationBins = this.histogramResolution;
+      const label = encodeURIComponent(this.label);
+      const urls = [`/datasets/${label}/getUtilizationForPrimitive?bins=${this.histogramResolution}&duration_bins=${durationBins}&primitive=${currentPrimitive}`];
+      try {
+        [this.primitiveHistogram[currentPrimitive]] = await Promise.all(urls.map(url => d3.json(url)));
+      } catch (e) {
+        this.histogramError = e;
+        return;
+      }
+
+      // do the precalculation here
+      this.primitiveHistogram[currentPrimitive].aux = new Array(this.histogramResolution);
+      for(let i=0; i<this.histogramResolution; i++){
+        this.primitiveHistogram[currentPrimitive].aux[i] = new Array(durationBins);
+      }
+      for(let i=0; i<this.histogramResolution; i++){
+        for(let j=0; j<durationBins; j++){
+          var preValue = 0;
+          if(j>0) {
+            preValue = this.primitiveHistogram[currentPrimitive].aux[i][j-1];
+          }
+          this.primitiveHistogram[currentPrimitive].aux[i][j] =
+              this.primitiveHistogram[currentPrimitive].data[i][j] + preValue;
+        }
+      }
+
+      this.trigger('primitiveHistogramUpdated');
+    }, 100);
+  }
+
+
+
+
+
+
+
+
+
+
+
   get intervalDurationSpan () {
     return this._intervalDurationSpan;
   }

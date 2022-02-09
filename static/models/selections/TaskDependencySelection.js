@@ -9,7 +9,7 @@ class TaskDependencySelection extends Selection {
     }
 
     /**
-     * Add selection-specific arguments to /utilizationHistogram API endpoint,
+     * Add selection-specific arguments to /primitiveTraceForward API endpoint,
      * and fetch the data
      */
     async getUtilization (urlArgs) {

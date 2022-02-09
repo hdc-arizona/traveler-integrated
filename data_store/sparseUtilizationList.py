@@ -20,7 +20,7 @@ class SparseUtilizationList():
     def sortAtLoc(self, loc):
         self.locationDict[loc].sort(key=lambda x: x['index'])
 
-    def finalize(self, allLocations):
+    def finalize(self, allLocations, isCumulative=False):
         for loc in allLocations:
             if loc in self.locationDict:
                 self.sortAtLoc(loc)
@@ -42,6 +42,8 @@ class SparseUtilizationList():
                 locStruct['index'][i] = self.locationDict[loc][i]['index']
                 locStruct['counter'][i] = self.locationDict[loc][i]['counter']
                 locStruct['util'][i] = self.locationDict[loc][i]['util']
+                if isCumulative is True and i > 0:
+                    locStruct['util'][i] = locStruct['util'][i] + locStruct['util'][i-1]
             self.setCLocation(loc, locStruct)
 
     def calcCurrentUtil(self, index, prior):
