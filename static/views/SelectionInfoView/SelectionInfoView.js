@@ -21,6 +21,7 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
       if (this.linkedState.selection?.type === 'IntervalDurationSelection') {
         this.linkedState.selection.on('intervalDurationSpanChanged', () => { this.render(); });
       }
+      this.render();
     });
   }
 

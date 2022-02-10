@@ -376,12 +376,8 @@ async def connectIntervals(self, datasetId, log=logToConsole):
 
 async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # create allSuls obj
-    allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict()}
-    intervalHistograms = {}
-    # TODO: intervalHistograms is just attached to db[datasetId]['info'] for now
-    # (and the bars are calculated / draw client-side). If IntervalHistogramView
-    # gets too sluggish, this intervalHistograms object should probably be
-    # ported to a different, disk-serialized structure?
+    allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict(), 'intervalHistograms': dict()}
+    intervalHistograms = dict()
     preMetricValue = dict()
     allLocations = set()
 
@@ -401,6 +397,8 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
         if 'Primitive' in event:
             durationCounts = intervalHistograms[event['Primitive']] = intervalHistograms.get(event['Primitive'], dict())
             durationCounts[duration] = durationCounts.get(duration, 0) + 1
+            allDurationCounts = intervalHistograms['all_primitives'] = intervalHistograms.get('all_primitives', dict())
+            allDurationCounts[duration] = allDurationCounts.get(duration, 0) + 1
 
     # First pass through all the intervals
     count = 0
@@ -456,8 +454,40 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
         await log('.', end='')
     await log('')
 
+    # start processing interval histograms
+    dummyLocation = 1
+    count = 0
+    intervalDurationDomainDict = dict()
+    for primitive in intervalHistograms:
+        allSuls['intervalHistograms'][primitive] = SparseUtilizationList(False)
+        for ind, value in intervalHistograms[primitive].items():
+            allSuls['intervalHistograms'][primitive].setIntervalAtLocation({'index': int(ind), 'counter': 0, 'util': value}, dummyLocation)
+
+        allSuls['intervalHistograms'][primitive].sortAtLoc(dummyLocation)
+        length = len(allSuls['intervalHistograms'][primitive].locationDict[dummyLocation])
+        intervalDurationDomainDict[primitive] = [
+            allSuls['intervalHistograms'][primitive].locationDict[dummyLocation][0]['index'],
+            allSuls['intervalHistograms'][primitive].locationDict[dummyLocation][length-1]['index']
+        ]
+        count += 1
+        if count % 2500 == 0:
+            await log('.', end='')
+        if count % 100000 == 0:
+            await log('processed %i interval histograms' % count)
+
+    await log('')
+    await log('Finished processing %s interval histograms' % count)
+
+    # Second pass to finish each SparseUtilizationList for interval histograms
+    await log('Finalizing interval histograms')
+    flatSulList = list(allSuls['intervalHistograms'].values())
+    for sul in flatSulList:
+        sul.finalize([dummyLocation], True)
+        await log('.', end='')
+    await log('')
+
     self[datasetId]['sparseUtilizationList'] = allSuls
-    self[datasetId]['info']['intervalHistograms'] = intervalHistograms
+    self[datasetId]['info']['intervalDurationDomain'] = intervalDurationDomainDict
 
 
 async def buildDependencyTree(self, datasetId, log=logToConsole):

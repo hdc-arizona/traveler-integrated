@@ -5,6 +5,7 @@ import PrimitiveSelection from '../selections/PrimitiveSelection.js';
 import RenameModal from '../../views/RenameModal/RenameModal.js';
 import TreeView from "../../views/TreeView/TreeView.js";
 import DependencyTreeView from "../../views/DependencyTreeView/DependencyTreeView.js";
+import TaskDependencySelection from "../selections/TaskDependencySelection.js";
 
 const VIEW_STATUS = {
   UNAVAILABLE: 'UNAVAILABLE',
@@ -374,7 +375,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
    */
   selectPrimitives (primitiveName, primitiveDetails) {
     //online the first primitive details will be shown
-    this.selection = new PrimitiveSelection({
+    this.selection = new TaskDependencySelection({
       primitiveName,
       primitiveDetails
     });

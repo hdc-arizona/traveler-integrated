@@ -45,27 +45,35 @@ class UtilizationView extends
       type: 'json',
       url: `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}`
     });
+    this.render();
+    await Promise.all([totalPromise]);
+    this.render();
+  }
+
+  async updateResolutionForSelection () {
+    // Update our scale ranges (and bin count) based on how much space is available
+    const bounds = this.getBounds();
+    this.chartBounds = {
+      width: bounds.width - this.margin.left - this.margin.right,
+      height: bounds.height - this.margin.top - this.margin.bottom
+    };
+    const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
+
     const selectionPromise = this.updateResource({
       name: 'selection',
       type: 'derivation',
       derive: async () => {
-        // Does the current selection have a way of getting selection-specific
-        // if(Array.isArray(this.linkedState.selection?.primitiveName)) {
-          // const nodeId = this.linkedState.selection?.primitiveDetails;
-          // if(!(nodeId in this.linkedState.cachedUtilizationData) || this.linkedState.cachedUtilizationData[nodeId] === null) {
-          //   this.linkedState.cachedUtilizationData[nodeId] = this.linkedState.selection?.getUtilization?.({ bins }) || null;
-          // }
-          // return this.linkedState.cachedUtilizationData[nodeId];
-        // } else {
-          return this.linkedState.selection?.getUtilization?.({ bins }) || null;
-        // }
-
-        // if not, don't show any selection-specific utilization
+          return this.linkedState.selection?.getUtilization?.({ bins: bins,
+            begin: this.linkedState.overviewDomain[0],
+            end: this.linkedState.overviewDomain[1],
+            isCombine: true,
+            utilType: 'utilization'
+          }) || null;
       }
     });
     // Initial render call to show the spinner if waiting for data takes a while
     this.render();
-    await Promise.all([totalPromise, selectionPromise]);
+    await Promise.all([selectionPromise]);
     this.render();
   }
 
@@ -90,7 +98,10 @@ class UtilizationView extends
     // know how many bins to ask for
     this.updateResolution();
     // Update the resolution whenever the view is resized
-    this.on('resize', () => { this.updateResolution(); });
+    this.on('resize', () => {
+      this.updateResolution();
+      this.updateResolutionForSelection();
+    });
 
     // Apply the template + our margin
     this.d3el.html(this.getNamedResource('template'))
@@ -99,7 +110,14 @@ class UtilizationView extends
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
     // Ask for new data whenever the selection changes
-    this.linkedState.on('selectionChanged', () => { this.updateResolution(); });
+    this.linkedState.on('selectionChanged', () => {
+      if (this.linkedState.selection?.type === 'IntervalDurationSelection') {
+        this.linkedState.selection.on('intervalDurationSpanChanged', () => {
+          this.updateResolutionForSelection();
+        });
+      }
+      this.updateResolutionForSelection();
+    });
     // Update the brush immediately whenever any view changes it
     this.linkedState.on('detailDomainChangedSync', () => { this.drawBrush(); });
     // Update the brush immediately whenever any view changes it
@@ -175,25 +193,7 @@ class UtilizationView extends
     this.d3el.select('.selectionUtilization')
       .style('display', selectionUtilization === null ? 'none' : null);
     if (selectionUtilization !== null) {
-      var histogram = {};
-      if(Array.isArray(this.linkedState.selection?.primitiveName)) {
-        const bins = Math.max(Math.ceil(this.chartBounds.width), 1);
-        histogram['data'] = new Array(bins).fill(0);
-        for (const [location, aggregatedTimes] of Object.entries(selectionUtilization.data)) {
-          for (let aggTime of aggregatedTimes) {
-            let snappedStartBin = Math.floor(this.xScale(aggTime.startTime)) - 1;
-            aggTime.util.forEach((d,j)=>{
-              histogram['data'][j + snappedStartBin] = histogram['data'][j + snappedStartBin] + d;
-            });
-            // for (let i = snappedStartBin, j = 0; i < snappedEndBin; i++, j++) {
-            //   histogram['data'][i] = histogram['data'][i] + aggTime.util[j];
-            // }
-          }
-        }
-      } else {
-        histogram = selectionUtilization;
-      }
-      this.drawPaths(this.d3el.select('.selectionUtilization'), histogram);
+      this.drawPaths(this.d3el.select('.selectionUtilization'), selectionUtilization);
     }
     // Update the brush
     this.drawBrush();

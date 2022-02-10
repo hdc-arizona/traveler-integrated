@@ -13,32 +13,15 @@ class PrimitiveSelection extends Selection {
    * and fetch the data
    */
   async getUtilization (urlArgs) {
-    var utilization = new Array(urlArgs.bins).fill(0);
     var results = {};
-
-    if(Array.isArray(this.primitiveName)) {
-      urlArgs.primitive = undefined;
-      urlArgs.primitives = this.primitiveName.join();
-      urlArgs.nodeId = this.primitiveDetails;
-      const url = `/datasets/${window.controller.currentDatasetId}/primitives/primitiveTraceForward?` +
-          Object.entries(urlArgs).map(([key, value]) => {
-            return `${key}=${encodeURIComponent(value)}`;
-          }).join('&');
-      const response = await window.fetch(url);
-      const json = await response.json();
-      results = json;
-    } else if(!Array.isArray(this.primitiveName)) {
-      urlArgs.primitive = this.primitiveName;
-      const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
-          Object.entries(urlArgs).map(([key, value]) => {
-            return `${key}=${encodeURIComponent(value)}`;
-          }).join('&');
-      const response = await window.fetch(url);
-      const json = await response.json();
-      results = json;
-    } else {
-      results['data'] = utilization;
-    }
+    urlArgs.primitive = this.primitiveName;
+    const url = `/datasets/${window.controller.currentDatasetId}/utilizationHistogram?` +
+        Object.entries(urlArgs).map(([key, value]) => {
+          return `${key}=${encodeURIComponent(value)}`;
+        }).join('&');
+    const response = await window.fetch(url);
+    const json = await response.json();
+    results = json;
     return results;
   }
 

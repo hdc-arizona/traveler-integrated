@@ -16,7 +16,6 @@ const LinkedMixin = function (superclass) {
       this.datasetId = options.glState.datasetId;
 
       this.linkedState.on('load', () => { this.render(); });
-      this.linkedState.on('selectionChanged', () => { this.render(); });
     }
 
     get linkedState () {
