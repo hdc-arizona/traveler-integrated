@@ -182,7 +182,7 @@ class FunctionalBoxPlotView extends ZoomableTimelineView { // abstracts a lot of
       const fetchedData = this.getNamedResource('data');
       if(fetchedData === null || fetchedData.data === undefined) return;
       const binSize = (fetchedData.metadata.end - fetchedData.metadata.begin) / fetchedData.metadata.bins;
-      const cBin = Math.trunc((this.linkedState.cursorPosition - this.__chartShape.spilloverXScale.domain()[0]) / binSize);
+      const cBin = Math.trunc((this.linkedState.cursorPosition - fetchedData.metadata.begin) / binSize);
       this.updateFuncInfoText(fetchedData.data.min[cBin],
           fetchedData.data.max[cBin],
           fetchedData.data.average[cBin],
