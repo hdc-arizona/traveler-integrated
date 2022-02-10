@@ -196,6 +196,29 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     lastChartShape.locations.some((loc, i) => chartShape.locations[i] !== loc);
   }
 
+  async updateSelectionPromise () {
+    const chartShape = this.getChartShape();
+    const domain = chartShape.spilloverXScale.domain();
+    const locations = chartShape.locations.join(',');
+
+    const selectionPromise = this.updateResource({
+      name: 'selectionUtilization',
+      type: 'derivation',
+      derive: async () => {
+        // Does the current selection have a way of getting selection-specific
+        // utilization data?
+        return this.linkedState.selection?.getUtilization?.({
+          bins: chartShape.bins,
+          begin: domain[0],
+          end: domain[1],
+          locations,
+          utilType: 'gantt'
+        }) || null; // if not, don't show any selection-specific utilization
+      }
+    });
+    return Promise.all([selectionPromise]);
+  }
+
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
 

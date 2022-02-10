@@ -24,7 +24,7 @@ class IntervalHistogramView extends
     this.xScale = d3.scaleLog();
     this.yScale = d3.scaleSymlog();
 
-    this.currentPrimitive = '';
+    this.currentPrimitive = 'all_primitives';
   }
 
   get informativeMessage () {
@@ -133,7 +133,7 @@ class IntervalHistogramView extends
       if (newPrimitive && newPrimitive !== this.currentPrimitive) {
         this.currentPrimitive = newPrimitive;
       }
-      this.render();
+      this.updateResolution();
     });
   }
 
@@ -143,14 +143,14 @@ class IntervalHistogramView extends
       // Still loading...
       return;
     }
-    primitiveList = ['', null].concat(Object.keys(primitiveList));
+    primitiveList = ['all_primitives', null].concat(Object.keys(primitiveList));
     let options = this.primitiveMenu.selectAll('option')
       .data(primitiveList, d => d);
     options.exit().remove();
     const optionsEnter = options.enter().append('option');
     options = options.merge(optionsEnter);
 
-    options.text(d => d === '' ? 'All primitives' : d === null ? '----' : d)
+    options.text(d => d === 'all_primitives' ? 'All primitives' : d === null ? '----' : d)
       .attr('value', d => d)
       .property('disabled', d => d === null);
 

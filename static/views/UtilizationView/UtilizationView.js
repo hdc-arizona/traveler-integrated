@@ -45,6 +45,20 @@ class UtilizationView extends
       type: 'json',
       url: `/datasets/${this.datasetId}/utilizationHistogram?bins=${bins}`
     });
+    this.render();
+    await Promise.all([totalPromise]);
+    this.render();
+  }
+
+  async updateResolutionForSelection () {
+    // Update our scale ranges (and bin count) based on how much space is available
+    const bounds = this.getBounds();
+    this.chartBounds = {
+      width: bounds.width - this.margin.left - this.margin.right,
+      height: bounds.height - this.margin.top - this.margin.bottom
+    };
+    const bins = Math.max(Math.ceil(this.chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
+
     const selectionPromise = this.updateResource({
       name: 'selection',
       type: 'derivation',
@@ -59,7 +73,7 @@ class UtilizationView extends
     });
     // Initial render call to show the spinner if waiting for data takes a while
     this.render();
-    await Promise.all([totalPromise, selectionPromise]);
+    await Promise.all([selectionPromise]);
     this.render();
   }
 
@@ -84,7 +98,10 @@ class UtilizationView extends
     // know how many bins to ask for
     this.updateResolution();
     // Update the resolution whenever the view is resized
-    this.on('resize', () => { this.updateResolution(); });
+    this.on('resize', () => {
+      this.updateResolution();
+      this.updateResolutionForSelection();
+    });
 
     // Apply the template + our margin
     this.d3el.html(this.getNamedResource('template'))
@@ -93,7 +110,14 @@ class UtilizationView extends
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
     // Ask for new data whenever the selection changes
-    this.linkedState.on('selectionChanged', () => { this.updateResolution(); });
+    this.linkedState.on('selectionChanged', () => {
+      if (this.linkedState.selection?.type === 'IntervalDurationSelection') {
+        this.linkedState.selection.on('intervalDurationSpanChanged', () => {
+          this.updateResolutionForSelection();
+        });
+      }
+      this.updateResolutionForSelection();
+    });
     // Update the brush immediately whenever any view changes it
     this.linkedState.on('detailDomainChangedSync', () => { this.drawBrush(); });
     // Update the brush immediately whenever any view changes it

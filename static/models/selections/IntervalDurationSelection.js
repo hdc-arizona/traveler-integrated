@@ -12,22 +12,12 @@ class IntervalDurationSelection extends Selection {
   }
 
   /**
-   * TODO: implement the getUtilization function here to show utilization in
-   * both UtilizationView and highligheted bars in GanttView for a brushed
-   * region in IntervalHistogramView. This will probably require adding
-   * arguments to api/metrics.py's get_utilization_histogram endpoint to accept
-   * this.intervalDurationSpan. I *think* sparseUtilizationList had something
-   * that could do this, but I never quite figured out how it worked; I think
-   * the durationBegin / durationEnd parameters here could be relevant:
-   * https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/serve.py#L736
-   */
-
-  /**
    * Add selection-specific arguments to /getUtilizationForPrimitive API endpoint,
    * and fetch the data
    * TODO: this implementation may run slower for larger datasets. Find
    */
   async getUtilization (urlArgs) {
+    // get utilization for the gantt view only
     if(urlArgs.utilType === 'gantt') {
       urlArgs.enter = this.intervalDurationSpan[0];
       urlArgs.leave = this.intervalDurationSpan[1];
@@ -41,6 +31,7 @@ class IntervalDurationSelection extends Selection {
       return this.getPrimitiveHistogramForGantt(json, urlArgs);
     }
 
+    // get utilization for the utilization view only
     if(!(this.primitiveName in this.primitiveHistogram)) {
       urlArgs.primitive = this.primitiveName;
       urlArgs.duration_bins = this.durationBins;

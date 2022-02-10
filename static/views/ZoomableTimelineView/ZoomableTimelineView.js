@@ -72,10 +72,22 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     this.linkedState.on('detailDomainChanged' + '.' + this.clipPathId, () => {
       this.updateDataIfNeeded();
     });
-
+    var __self = this;
     // Also ask for new data when the selection changes
     this.linkedState.on('selectionChanged' + '.' + this.clipPathId, () => {
       this.updateDataIfNeeded();
+      if (this.linkedState.selection?.type === 'IntervalDurationSelection') {
+        this.linkedState.selection.on('intervalDurationSpanChanged', () => {
+          if(!__self._lastDurationSpan ||
+            (__self._lastDurationSpan[0] !== __self.linkedState.selection.intervalDurationSpan[0] ||
+                __self._lastDurationSpan[1] !== __self.linkedState.selection.intervalDurationSpan[1])
+            ) {
+            __self._lastDurationSpan = __self.linkedState.selection.intervalDurationSpan;
+            __self.updateSelectionPromise();
+            __self.render();
+          }
+        });
+      }
     });
 
     // Set up local zoom and pan interactions
@@ -215,7 +227,9 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
 
     // As part of the full render (that could have been triggered from anywhere,
     // start the process of requesting fresh data if the viewport is out of date)
-    this.updateDataIfNeeded(this._renderedChartShape);
+    if (this.linkedState.selection?.type !== 'IntervalDurationSelection') {
+      this.updateDataIfNeeded(this._renderedChartShape);
+    }
   }
 
   drawCanvas (chartShape) {
@@ -230,6 +244,10 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     // To be overridden by subclasses when other considerations could indicate a
     // need to refresh (e.g. has the GanttView been vertically scrolled?)
     return false;
+  }
+
+  async updateSelectionPromise () {
+    // do nothing
   }
 
   async updateData (chartShape) {
