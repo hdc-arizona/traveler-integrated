@@ -378,10 +378,6 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # create allSuls obj
     allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict(), 'intervalHistograms': dict()}
     intervalHistograms = dict()
-    # TODO: intervalHistograms is just attached to db[datasetId]['info'] for now
-    # (and the bars are calculated / draw client-side). If IntervalHistogramView
-    # gets too sluggish, this intervalHistograms object should probably be
-    # ported to a different, disk-serialized structure?
     preMetricValue = dict()
     allLocations = set()
 
@@ -401,6 +397,8 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
         if 'Primitive' in event:
             durationCounts = intervalHistograms[event['Primitive']] = intervalHistograms.get(event['Primitive'], dict())
             durationCounts[duration] = durationCounts.get(duration, 0) + 1
+            allDurationCounts = intervalHistograms['all_primitives'] = intervalHistograms.get('all_primitives', dict())
+            allDurationCounts[duration] = allDurationCounts.get(duration, 0) + 1
 
     # First pass through all the intervals
     count = 0
@@ -482,9 +480,9 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
 
     # Second pass to finish each SparseUtilizationList for interval histograms
     await log('Finalizing interval histograms')
-    flatSulList = list(allSuls['primitives'].values())
+    flatSulList = list(allSuls['intervalHistograms'].values())
     for sul in flatSulList:
-        sul.finalize(dummyLocation)
+        sul.finalize([dummyLocation], True)
         await log('.', end='')
     await log('')
 

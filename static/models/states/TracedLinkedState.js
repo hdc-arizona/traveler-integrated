@@ -16,6 +16,7 @@ class TracedLinkedState extends LinkedState {
     this._detailDomain = this.overviewDomain && Array.from(this.overviewDomain);
     this._verticalDomain = [0, this.info.locationNames.length - 1];// this should hold the index of the location names
     this._cursorPosition = null;
+    this._intervalHistogramSelecion = null;
   }
 
   /**
@@ -295,12 +296,29 @@ class TracedLinkedState extends LinkedState {
   /**
    * Select an interval duration (i.e. a brush in IntervalHistogramView)
    */
-  async selectIntervalDuration (intervalDurationSpan, durationLimit, primitiveName) {
-    this.selection = new IntervalDurationSelection({
-      intervalDurationSpan,
-      durationLimit,
-      primitiveName
-    });
+  async selectIntervalDuration (intervalDurationSpan, durationDomain, durationBins, primitiveName) {
+    if(this._intervalHistogramSelecion === null) {
+      this._intervalHistogramSelecion = new IntervalDurationSelection({
+        intervalDurationSpan,
+        durationDomain,
+        durationBins,
+        primitiveName
+      });
+    } else {
+      this.intervalHistogramSelection.intervalDurationSpan = intervalDurationSpan;
+      this.intervalHistogramSelection.durationDomain = durationDomain;
+      this.intervalHistogramSelection.durationBins = durationBins;
+      this.intervalHistogramSelection.primitiveName = primitiveName;
+    }
+    this.selection = this.intervalHistogramSelection;
+  }
+
+  get intervalHistogramSelection () {
+    return this._intervalHistogramSelecion;
+  }
+
+  set intervalHistogramSelection (histogramSelection) {
+    this._intervalHistogramSelecion = histogramSelection;
   }
 }
 TracedLinkedState.MIN_BRUSH_SIZE = MIN_BRUSH_SIZE;

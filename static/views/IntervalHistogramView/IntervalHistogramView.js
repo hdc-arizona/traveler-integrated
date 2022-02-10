@@ -9,7 +9,8 @@ class IntervalHistogramView extends
   constructor (options) {
     options.resources = (options.resources || []).concat(...[
       { type: 'less', url: 'views/IntervalHistogramView/style.less' },
-      { type: 'text', url: 'views/IntervalHistogramView/template.svg', name: 'template' }
+      { type: 'text', url: 'views/IntervalHistogramView/template.svg', name: 'template' },
+      { type: 'placeholder', value: null, name: 'total' },
     ]);
     super(options);
 
@@ -23,22 +24,49 @@ class IntervalHistogramView extends
     this.xScale = d3.scaleLog();
     this.yScale = d3.scaleSymlog();
 
-    this.currentPrimitive = null;
+    this.currentPrimitive = '';
   }
 
   get informativeMessage () {
-    // If we've picked a primitive that has no interval data, show a message to
-    // reduce confusion
-    if (this.currentPrimitive) {
-      const nBins = Object.keys(this.linkedState?.info?.intervalHistograms?.[this.currentPrimitive] || {}).length;
-      return nBins === 0 ? `No interval data for primitive:<br/>${this.currentPrimitive}` : null;
-    } else {
-      return null;
+    return 0;
+    // // If we've picked a primitive that has no interval data, show a message to
+    // // reduce confusion
+    // if (this.currentPrimitive) {
+    //   const nBins = Object.keys(this.linkedState?.info?.intervalHistograms?.[this.currentPrimitive] || {}).length;
+    //   return nBins === 0 ? `No interval data for primitive:<br/>${this.currentPrimitive}` : null;
+    // } else {
+    //   return null;
+    // }
+  }
+
+  async updateResolution () {
+    // Update our scale ranges (and bin count) based on how much space is available
+    const chartBounds = this.getChartBounds();
+    this.xScale.range([0, chartBounds.width]);
+    this.yScale.range([chartBounds.height, 0]);
+    const bins = Math.max(Math.ceil(chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
+
+    let cp = this.currentPrimitive;
+    if(this.currentPrimitive !== "") {
+      cp = '&primitive=' + this.currentPrimitive;
     }
+    const totalPromise = this.updateResource({
+      name: 'total',
+      type: 'json',
+      url: `/datasets/${this.datasetId}/intervalHistograms?bins=${bins}${cp}`
+    });
+    // Initial render call to show the spinner if waiting for data takes a while
+    this.render();
+    await Promise.all([totalPromise]);
+    this.render();
   }
 
   async setup () {
     await super.setup(...arguments);
+
+    this.updateResolution();
+    // Update the resolution whenever the view is resized
+    this.on('resize', () => { this.updateResolution(); });
 
     // Apply our css namespace, our template, and our margin
     this.glEl.classed('IntervalHistogramView', true);
@@ -66,20 +94,17 @@ class IntervalHistogramView extends
 
     // How much space do we have to work with?
     const chartBounds = this.getChartBounds();
-    this.xScale.range([0, chartBounds.width]);
-    this.yScale.range([chartBounds.height, 0]);
-
-    // Get the list of bars to draw, and update our scale domains before drawing
-    // anything
-    const allBars = this.combineHistograms();
+    const histogram = this.getNamedResource('total');
+    this.yScale.domain([0, d3.max(histogram.data)]);
+    this.xScale.domain([histogram.metadata.begin, histogram.metadata.end]);
 
     // Update the (transparent) background rect that captures drag events
     this.d3el.select('.background rect')
       .attr('width', this.xScale.range()[1] - this.xScale.range()[0])
       .attr('height', this.yScale.range()[0] - this.yScale.range()[1]);
 
-    this.drawAxes(chartBounds);
-    this.drawBars(chartBounds, allBars);
+    this.drawAxes(chartBounds, histogram);
+    this.drawBars(chartBounds, histogram);
     this.drawBrush(chartBounds);
     this.drawPrimitiveMenu();
   }
@@ -92,79 +117,13 @@ class IntervalHistogramView extends
     };
   }
 
-  combineHistograms () {
-    // TODO: this function makes this view a bit slow for larger datasets. It
-    // might be worth putting this in a web worker or converting allBars to a
-    // uki resource, and moving this code server-side behind an API endpoint?
-    // If the latter, see the comment at the end of data_store/otf2_functions.py
-    // about moving the intervalHistograms dict
-    const selectedInterval = this.linkedState.selection?.intervalDetails;
-    const selectedPrimitive = this.linkedState.selection?.primitiveName;
-    const intervalDurationSpan = this.linkedState.selection?.intervalDurationSpan || null;
-    const allBars = [];
-    let maxCount = 0;
-    let minDuration = Infinity;
-    let maxDuration = 0;
-
-    // Add a dict of counts to our list:
-    const helper = (primitive, durationCounts) => {
-      for (let [duration, count] of Object.entries(durationCounts)) {
-        duration = parseInt(duration);
-        count = parseInt(count);
-        minDuration = Math.min(minDuration, duration);
-        maxDuration = Math.max(maxDuration, duration);
-        maxCount = Math.max(maxCount, count);
-        let selected = this.linkedState.selection && !selectedInterval;
-        if (selectedPrimitive) {
-          selected = selected && selectedPrimitive === primitive;
-        }
-        if (intervalDurationSpan) {
-          selected = selected && duration >= intervalDurationSpan[0] && duration <= intervalDurationSpan[1];
-        }
-        // Standard bars for when there's an IntervalDurationSelection or
-        // PrimitiveSelection
-        allBars.push({
-          primitive,
-          duration,
-          count,
-          selected
-        });
-      }
-    };
-
-    if (this.currentPrimitive) {
-      // Just show the current primitive's intervals
-      helper(this.currentPrimitive, this.linkedState.info.intervalHistograms[this.currentPrimitive]);
-    } else {
-      // Show all intervals
-      for (const [primitive, durationCounts] of Object.entries(this.linkedState.info.intervalHistograms)) {
-        helper(primitive, durationCounts);
-      }
-    }
-
-    // Add an extra small bar when there's an IntervalSelection
-    if (selectedInterval) {
-      allBars.push({
-        primitive: selectedInterval.Primitive,
-        duration: selectedInterval.leave.Timestamp - selectedInterval.enter.Timestamp,
-        count: 1,
-        selected: true
-      });
-    }
-
-    // Update our scale domains
-    this.xScale.domain([minDuration, maxDuration]).nice();
-    this.yScale.domain([0, maxCount]);
-    return allBars;
-  }
-
   setupPrimitiveMenu () {
     // Add a select menu after the SVG element for picking / switching primitives
     this.primitiveMenu = this.glEl.insert('select', 'svg + *');
 
     this.primitiveMenu.on('change', event => {
       this.currentPrimitive = event.target.value;
-      this.render();
+      this.updateResolution();
     });
     this.linkedState.on('selectionChanged', () => {
       let newPrimitive = this.linkedState.selection?.primitiveName;
@@ -198,7 +157,12 @@ class IntervalHistogramView extends
     this.primitiveMenu.node().value = this.currentPrimitive || '';
   }
 
-  drawAxes (chartBounds) {
+  setYDomain(maxMin) {
+    var yOffset = (maxMin['max'] - maxMin['min']) / 10;
+    this.yScale.domain([maxMin['min'], maxMin['max']]).nice();
+  }
+
+  drawAxes (chartBounds, histogram) {
     // Update the x axis
     this.d3el.select('.xAxis')
       .attr('transform', `translate(0, ${chartBounds.height})`)
@@ -211,25 +175,33 @@ class IntervalHistogramView extends
 
     // Update the y axis
     const axisGenerator = d3.axisLeft(this.yScale);
-    // Fractional ticks don't make sense if we're showing integer counts;
-    // prevent showing extra ticks when the number is small
-    const maxCount = this.yScale.domain()[1];
-    if (maxCount <= 10) {
-      axisGenerator.ticks(maxCount);
+    var maxY = Number.MIN_VALUE;
+    var minY = Number.MAX_VALUE;
+
+    for (var i = 0; i < histogram.data.length; i++) {
+      var d = histogram.data[i];
+      if(i>0) {
+        d = d - histogram.data[i-1];
+      }
+      maxY = Math.max(maxY, d);
+      minY = Math.min(minY, d);
     }
-    const yAxis = this.d3el.select('.yAxis')
-      .call(axisGenerator);
-    // Prevent overlapping tick labels
-    cleanupAxis(yAxis);
+    this.setYDomain({'max':maxY, 'min':minY});
+    // Update the y axis
+    this.d3el.select('.yAxis')
+        .call(d3.axisLeft(this.yScale));
 
     // Position the y label
     this.d3el.select('.yAxisLabel')
       .attr('transform', `translate(${-1.5 * this.emSize},${chartBounds.height / 2}) rotate(-90)`);
   }
 
-  drawBars (chartBounds, allBars) {
+  drawBars (chartBounds, histogram) {
+    if(!histogram) {
+      return;
+    }
     let bars = this.d3el.select('.bars')
-      .selectAll('.bar').data(allBars);
+      .selectAll('.bar').data(histogram.data);
     bars.exit().remove();
     const barsEnter = bars.enter().append('g')
       .classed('bar', true);
@@ -248,22 +220,35 @@ class IntervalHistogramView extends
     barsEnter.append('line');
     bars.classed('selected', d => d.selected)
       .select('line')
-      .attr('x1', d => this.xScale(d.duration))
-      .attr('x2', d => this.xScale(d.duration))
-      .attr('y1', d => this.yScale(d.count))
-      .attr('y2', d => this.yScale(0));
-
-    bars.on('mouseenter', function (event, d) {
-      uki.showTooltip({
-        content: `Primitive: ${d.primitive}`,
-        target: d3.select(this),
-        anchor: { x: 1, y: -1 }
+      .attr('x1', (d, i) => {
+        if(i>0) {
+          return i-1;
+        }
+        return i;
+      })
+      .attr('x2', (d, i) => i)
+      .attr('y1', this.yScale(0))
+      .attr('y2', (d, i) => {
+        if(i>0) {
+          return this.yScale(d - histogram.data[i-1]);
+        }
+        return this.yScale(d);
       });
-    }).on('mouseleave', () => {
-      uki.hideTooltip();
-    }).on('click', (event, d) => {
-      this.linkedState.selectPrimitive(d.primitive);
-    });
+
+    // const __self = this;
+    // bars.on('mouseenter', function (event, d) {
+    //   const i = __self.xScale.invert(event.x);
+    //   const cd = d - histogram.data[i-1];
+    //   uki.showTooltip({
+    //     content: `Count: ${cd}`,
+    //     target: d3.select(this),
+    //     anchor: { x: 1, y: -1 }
+    //   });
+    // }).on('mouseleave', () => {
+    //   uki.hideTooltip();
+    // }).on('click', (event, d) => {
+    //   this.linkedState.selectPrimitive(d.primitive);
+    // });
   }
 
   setupBrush () {
@@ -333,9 +318,11 @@ class IntervalHistogramView extends
             this.linkedState.selection?.primitiveName !== this.currentPrimitive) {
           // With the user starting to drag, create the selection and update this
           // view when the brushed domain changes
+          const chartBounds = this.getChartBounds();
           this.linkedState.selectIntervalDuration(
             [this._dragState.start, this._dragState.start + 1],
             this.xScale.domain(),
+            Math.max(Math.ceil(chartBounds.width), 1), // this is the bin number
             this.currentPrimitive);
           this.linkedState.selection.on('intervalDurationSpanChanged', () => { this.render(); });
         }

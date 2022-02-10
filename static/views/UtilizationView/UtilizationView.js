@@ -52,7 +52,8 @@ class UtilizationView extends
           return this.linkedState.selection?.getUtilization?.({ bins: bins,
             begin: this.linkedState.overviewDomain[0],
             end: this.linkedState.overviewDomain[1],
-            isCombine: true
+            isCombine: true,
+            utilType: 'utilization'
           }) || null;
       }
     });

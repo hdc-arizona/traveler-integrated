@@ -220,7 +220,8 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
           begin: domain[0],
           end: domain[1],
           locations,
-          dLocations
+          dLocations,
+          utilType: 'gantt'
         }) || null; // if not, don't show any selection-specific utilization
       }
     });

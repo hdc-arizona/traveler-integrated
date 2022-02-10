@@ -102,6 +102,10 @@ class SparseUtilizationList():
         stdArray = np.std(array, axis=0)
         return {"min": minArray.tolist(), "max": maxArray.tolist(), "average": avgArray.tolist(), "std": stdArray.tolist()}
 
+    # Calculates histogram for interval duration
+    def calcIntervalHistogram(self, bins=100, begin=None, end=None):
+        return self.calcUtilizationForLocation(bins, begin, end, 1, False)
+
     # Calculates utilization for one location in a Gantt chart
     # Location designates a particular CPU or Thread and denotes the y-axis on the Gantt Chart
     def calcUtilizationForLocation(self, bins=100, begin=None, end=None, Location=None, isInterval=True):

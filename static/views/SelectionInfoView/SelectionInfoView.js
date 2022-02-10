@@ -17,11 +17,12 @@ class SelectionInfoView extends LinkedMixin(uki.ui.GLView) {
     this.d3el.html(this.getNamedResource('template'))
       .classed('SelectionInfoView', true);
 
-    this.linkedState.on('selectionChanged', () => {
-      if (this.linkedState.selection?.type === 'IntervalDurationSelection') {
-        this.linkedState.selection.on('intervalDurationSpanChanged', () => { this.render(); });
-      }
-    });
+    this.linkedState.on('selectionChanged', () => { this.render(); });
+    // if (this.linkedState.selection?.type === 'IntervalDurationSelection') {
+      this.linkedState.selection?.on('intervalDurationSpanChanged', () => {
+        this.render();
+      });
+    // }
   }
 
   async draw () {
