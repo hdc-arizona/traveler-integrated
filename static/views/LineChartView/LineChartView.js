@@ -38,14 +38,6 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
     }
   }
 
-  drawCanvas (chartShape) {
-    // TODO: Need to adapt the original drawing code from
-    // https://github.com/hdc-arizona/traveler-integrated/blob/eea880b6dfede946e8a82e96e32465135c07b0f0/static/views/ProcMetricView/ProcMetricView.js
-    // (yes, that's ProcMetricView, it's really the more standard line chart)
-    // to use this.getNamedResource('data') instead (the data should be in the
-    // same format)
-  }
-
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     return this.updateResource({
@@ -75,12 +67,6 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
 
       for (var i=fetchedData.length-1; i>=0; i--) {
         let tmp = fetchedData[i]['Value'];
-        let div = fetchedData[i]['Timestamp'];
-        if(i>0) {
-          tmp = tmp - fetchedData[i-1]['Value'];
-          div = div - fetchedData[i-1]['Timestamp'];
-        }
-        tmp = tmp / div;
         if (tmp < minY) minY = tmp;
         if (tmp > maxY) maxY = tmp;
       }
@@ -100,67 +86,49 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
     const zeroCutter = Math.pow(10, Math.floor(Math.log10(middle)));
     // Update the y axis
     this.d3el.select('.yAxis')
-        .call(d3.axisLeft(this.yScale).tickFormat(x => x / zeroCutter));
+        .call(d3.axisLeft(this.yScale).tickFormat(x => {
+          const l = x / zeroCutter;
+          return `${l.toFixed(1)}`;
+        }));
 
     let unit = '';
-    if(zeroCutter > 1000000000){
-      unit = '(G)';
-    } else if(zeroCutter > 1000000){
-      unit = '(M)';
-    } else if(zeroCutter > 1000) {
-      unit = '(K)';
+    if(Math.log10(zeroCutter) !== 0) {
+      unit = ' (e' + Math.log10(zeroCutter).toFixed(0) + ')';
     }
     // Set the y label
     this.d3el.select('.yAxisLabel')
-        .text(this.metric.substring(this.metric.lastIndexOf('/')+1) + unit);
+        .text(this.metric.substring(this.metric.lastIndexOf(':')+1) + unit);
   }
 
   drawCanvas (chartShape) {
+    const fetchedData = this.getNamedResource('data');
+    if(fetchedData === null || fetchedData.length === 0) return;
+
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
     const canvas = this.d3el.select('canvas');
     const context = canvas.node().getContext('2d');
-    const fetchedData = this.getNamedResource('data');
-    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    const __self = this;
+    var chartShape = this.getChartShape();
+    var line = d3.line()
+        .x(function(d, i) {
+          return (chartShape.spilloverXScale(d['Timestamp']) - chartShape.leftOffset);
+        })
+        .y(function(d, i) {
+          let tmp = fetchedData[i]['Value'];
+          return __self.yScale(tmp);
+        })
+        .context(context);
 
-    if(fetchedData !== null) {
-      var processedData = [];
-      fetchedData.forEach((d, i) => {
-        if(i>0){
-          var el1 = {};
-          el1['Timestamp'] = d['Timestamp'];
-          el1['Value'] = fetchedData[i-1]['Value'];
-          var div = fetchedData[i-1]['Timestamp'];
-          if(i>1) {
-            el1['Value'] = el1['Value'] - fetchedData[i-2]['Value'];
-            div = div - fetchedData[i-2]['Timestamp'];
-          }
-          el1['Value'] = el1['Value'] / div;
-          processedData.push(el1);
-        }
-        var el = {};
-        el['Timestamp'] = d['Timestamp'];
-        el['Value'] = d['Value'];
-        div = d['Timestamp'];
-        if(i>0) {
-          el['Value'] = el['Value'] - fetchedData[i-1]['Value'];
-          div = div - fetchedData[i-1]['Timestamp'];
-        }
-        el['Value'] = el['Value'] / div;
-        processedData.push(el);
-      });
+    this.drawLine(context, line, fetchedData, theme['--inverted-shadow-color'], 1.5);
+    this.__chartShape = chartShape;
+  }
 
-
-      const __self = this;
-      var line = d3.line()
-          .x(function(d) { return (chartShape.spilloverXScale(d['Timestamp']) - chartShape.leftOffset); })
-          .y(function(d, i) { return __self.yScale(d['Value']); })
-          .context(context);
-      context.beginPath();
-      // line(fetchedData);
-      line(processedData);
-      context.lineWidth = 1.5;
-      context.strokeStyle = theme['--text-color-softer'];
-      context.stroke();
-    }
+  drawLine(context, line, data, tColor, lWidth) {
+    context.beginPath();
+    line(data);
+    context.lineWidth = lWidth;
+    context.strokeStyle = tColor;
+    context.stroke();
   }
 }
 
