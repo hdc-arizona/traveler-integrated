@@ -21,8 +21,10 @@ class IntervalHistogramView extends
       left: 40
     };
 
-    this.xScale = d3.scaleLog();
+    this.xScale = d3.scaleLinear();
     this.yScale = d3.scaleSymlog();
+    this.binScale = d3.scaleLinear();
+    this.binScale.domain([0, 1]);
 
     this.currentPrimitive = 'all_primitives';
   }
@@ -44,7 +46,8 @@ class IntervalHistogramView extends
     const chartBounds = this.getChartBounds();
     this.xScale.range([0, chartBounds.width]);
     this.yScale.range([chartBounds.height, 0]);
-    const bins = Math.max(Math.ceil(chartBounds.width), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
+    this.binScale.domain([0, Math.max(Math.ceil(chartBounds.width/3), 1)]);
+    const bins = Math.max(Math.ceil(chartBounds.width/3), 1); // we want one bin per pixel, and clamp to 1 to prevent zero-bin / negative queries
 
     let cp = this.currentPrimitive;
     if(this.currentPrimitive !== "") {
@@ -97,7 +100,7 @@ class IntervalHistogramView extends
     const histogram = this.getNamedResource('total');
     this.yScale.domain([0, d3.max(histogram.data)]);
     this.xScale.domain([histogram.metadata.begin, histogram.metadata.end]);
-
+    this.binScale.range([histogram.metadata.begin, histogram.metadata.end]);
     // Update the (transparent) background rect that captures drag events
     this.d3el.select('.background rect')
       .attr('width', this.xScale.range()[1] - this.xScale.range()[0])
@@ -200,6 +203,7 @@ class IntervalHistogramView extends
     if(!histogram) {
       return;
     }
+    const theme = globalThis.controller.getNamedResource('theme').cssVariables;
     let bars = this.d3el.select('.bars')
       .selectAll('.bar').data(histogram.data);
     bars.exit().remove();
@@ -217,38 +221,44 @@ class IntervalHistogramView extends
       }
     });
 
-    barsEnter.append('line');
+    const __self = this;
+    barsEnter.append('rect');
     bars.classed('selected', d => d.selected)
-      .select('line')
-      .attr('x1', (d, i) => {
-        if(i>0) {
-          return i-1;
-        }
-        return i;
+      .select('rect')
+      .attr("fill", theme['--disabled-color'])
+      .attr("stroke", theme['--text-color-softer'])
+      .attr('x', (d, i) => {
+        return __self.xScale(__self.binScale(i));
       })
-      .attr('x2', (d, i) => i)
-      .attr('y1', this.yScale(0))
-      .attr('y2', (d, i) => {
+      .attr('width', (d, i) => __self.xScale(__self.binScale(2))-__self.xScale(__self.binScale(1)))
+      .attr('y', (d, i) => {
         if(i>0) {
           return this.yScale(d - histogram.data[i-1]);
         }
         return this.yScale(d);
+      })
+      .attr('height', (d, i) => {
+        if(i>0) {
+          return this.yScale(0) - this.yScale(d - histogram.data[i-1]);
+        }
+        return this.yScale(0) - this.yScale(d);
       });
-
-    // const __self = this;
-    // bars.on('mouseenter', function (event, d) {
-    //   const i = __self.xScale.invert(event.x);
-    //   const cd = d - histogram.data[i-1];
-    //   uki.showTooltip({
-    //     content: `Count: ${cd}`,
-    //     target: d3.select(this),
-    //     anchor: { x: 1, y: -1 }
-    //   });
-    // }).on('mouseleave', () => {
-    //   uki.hideTooltip();
-    // }).on('click', (event, d) => {
-    //   this.linkedState.selectPrimitive(d.primitive);
-    // });
+    this.getChartBounds()
+    bars.on('mouseenter', function (event, d) {
+      const isD = (element) => element == d;
+      let ind = histogram.data.findIndex(isD);
+      let sub = 0;
+      if(ind > 0) {
+        sub = histogram.data[ind - 1];
+      }
+      uki.showTooltip({
+        content: `Count: ${d-sub}`,
+        target: d3.select(this),
+        anchor: { x: 1, y: -1 }
+      });
+    }).on('mouseleave', () => {
+      uki.hideTooltip();
+    });
   }
 
   setupBrush () {
@@ -322,7 +332,7 @@ class IntervalHistogramView extends
           this.linkedState.selectIntervalDuration(
             [this._dragState.start, this._dragState.start + 1],
             this.xScale.domain(),
-            Math.max(Math.ceil(chartBounds.width), 1), // this is the bin number
+            Math.max(Math.ceil(chartBounds.width/3), 1), // this is the bin number
             this.currentPrimitive);
           this.linkedState.selection.on('intervalDurationSpanChanged', () => { this.render(); });
         }
