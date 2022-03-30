@@ -182,7 +182,7 @@ class SparseUtilizationList():
                         startIndex = self.locationDict[location][location_struct_index[location]-1]['index']
                     else:
                         startIndex = 0
-                    if locStruct['primitive'] == primitive and locStruct['counter'] == 0:
+                    if (locStruct['primitive'] == primitive or primitive == 'all_primitives') and locStruct['counter'] == 0:
                         if startIndex < criticalPts:
                             intervalChunkStart = max(preCriticalPts, startIndex)
                             intervalChunkEnd = min(criticalPts, locStruct['index'])
