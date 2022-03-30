@@ -119,6 +119,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
     this.horizontalPadding = 40; // px separation between nodes
     this.mainGlyphRadius = this.nodeHeight / 2;
     this.expanderRadius = 3 * this.mainGlyphRadius / 4;
+    this.maxTotalUtil = 0;
 
     this.glEl.classed('DependencyTreeView', true);
     this.d3el.html(this.getNamedResource('template'));
@@ -142,6 +143,27 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
 
     this.glContainer.on('destroy', () => { this.handleDestroyEvent();});
     this.linkedState.on('selectionChanged' + '.dep', () => { this.render(); });
+
+    var __self = this;
+    function toggleAll(d) {
+      if(d.data['totalUtil'] > __self.maxTotalUtil){
+        __self.maxTotalUtil = d.data['totalUtil'];
+      }
+      if (d.children) {
+        d.children.forEach(toggleAll);
+        if(d.depth >= 5) {
+          if (d.children) {
+            d._children = d.children;
+            d.children = null;
+          } else {
+            d.children = d._children;
+            d._children = null;
+          }
+        }
+      }
+    }
+    this.tree.children.forEach(toggleAll);
+
   }
 
   handleDestroyEvent() {
@@ -277,7 +299,7 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
   }
 
   findColorShadeForNode(d) {
-    let totalF = (this.linkedState.overviewDomain[1] - this.linkedState.overviewDomain[0]) * this.linkedState.info.locationNames.length;
+    let totalF = this.maxTotalUtil;
     let count = d.data.totalUtil;
     let totalBound = 50;
     let per = (totalBound - ((count / totalF) * totalBound));
