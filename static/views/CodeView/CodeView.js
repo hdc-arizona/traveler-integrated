@@ -65,7 +65,6 @@ class CodeView extends LinkedMixin(uki.ui.GLView) {
           let sCL = customizedLabel.substring(0, customizedLabel.lastIndexOf('$'));
           const ln = sCL.substring(sCL.lastIndexOf('$')+1);
           const cha = customizedLabel.substring(customizedLabel.lastIndexOf('$')+1);
-          console.log(ln, cha);
           __self.codeMirror.setCursor({
             line: ln-1,
             ch: cha
