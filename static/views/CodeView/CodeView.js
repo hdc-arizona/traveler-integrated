@@ -64,7 +64,7 @@ class CodeView extends LinkedMixin(uki.ui.GLView) {
         if(this.linkedState.selection.intervalDetails?.Primitive) {
           customizedLabel = this.linkedState.selection.intervalDetails.Primitive
         }
-        if (customizedLabel.includes('$')) {
+        if (customizedLabel?.includes('$')) {
           let sCL = customizedLabel.substring(0, customizedLabel.lastIndexOf('$'));
           const ln = sCL.substring(sCL.lastIndexOf('$')+1);
           const cha = customizedLabel.substring(customizedLabel.lastIndexOf('$')+1);
