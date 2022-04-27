@@ -138,7 +138,11 @@ class AggregatedGanttView extends ZoomableTimelineView { // abstracts a lot of c
   async updateData (chartShape) {
     const domain = chartShape.spilloverXScale.domain();
     // Make the list of locations a URL-friendly comma-separated list
-    const selectedNodeId = this.linkedState.selection?.primitiveDetails;
+    let selectedNodeId = undefined;
+    if (this.linkedState.selection?.type === 'TaskDependencySelection') {
+      selectedNodeId = this.linkedState.selection?.primitiveDetails;
+    }
+
     const dLocations = this.linkedState.visibleAggGanttLocations?.join(',');
     const aggregatedIntervalsPromise = selectedNodeId
         ? this.updateResource({
