@@ -54,6 +54,7 @@ class MenuView extends uki.View {
         this.expanded = !this.expanded;
       }
     });
+    //Function enables to switch between folder mode and tag mode
     this.viewModeButton = new uki.ui.ButtonView({
       d3el: this.d3el.select('.viewMode.button'),
       onclick: () => {
@@ -80,7 +81,7 @@ class MenuView extends uki.View {
     this.toggleExpandButton.img = this.expanded ? 'img/collapse_left.png' : 'img/collapse_right.png';
     this.toggleExpandButton.label = this.expanded ? 'Collapse' : null;
     this.toggleExpandButton.tooltip = this.expanded ? null : { content: 'Expand' };
-
+    //necessary UI changes of the tagging and folder system 
     this.viewModeButton.img = this.folderMode ? 'img/tag.svg' : 'img/folder.svg';
     this.viewModeButton.label = this.folderMode ? 'Sort by tag' : 'Sort by folder';
     this.viewModeButton.tooltip = { content: this.folderMode ? 'Sort by tag' : 'Sort by folder' };
@@ -92,13 +93,13 @@ class MenuView extends uki.View {
       .style('display', this.expanded && !this.folderMode ? null : 'none');
     this.d3el.select('.datasetList')
       .classed('enableClickThrough', !this.folderMode); // prevent datasetList from stealing pointer events in tag mode
-
+    //if 'sort by folder' is selected, it will enable the folder mode and 'sort by tag' will enable the tag mode(!this.folderMode)
     if (this.folderMode) {
       this._tempDatasetList = this.computeFolderedDatasetList();
       if (!this.expanded) {
         this._tempDatasetList = this._tempDatasetList.filter(d => !d.folder);
       }
-    } else {
+    } else if(!this.folderMode) {
       this._tempDatasetList = this.computeTaggedDatasetList();
       this._tempTagList = this.computeTagList();
     }
@@ -108,7 +109,7 @@ class MenuView extends uki.View {
     if (this.expanded) {
       if (this.folderMode) {
         this.drawFolderUnderlay();
-      } else {
+      } else if(!this.folderMode) {
         this.drawTagUnderlay();
       }
     }
@@ -138,7 +139,7 @@ class MenuView extends uki.View {
 
     datasetsEnter.append('div').classed('folderStuff', true);
     datasets.select('.folderStuff')
-      .style('display', this.expanded && this.folderMode ? null : 'none');
+      .style('display', this.expanded ? null : 'none');
     this.drawFolderStuff(datasetsEnter, datasets);
 
     datasetsEnter.append('div').classed('button', true);
@@ -485,17 +486,18 @@ class MenuView extends uki.View {
 
     tagHeadersEnter.append('div').classed('label', true);
     tagHeaders.select('.label').text(d => d === null ? 'Add tag' : d);
-
     tagHeaders.order()
       .classed('tagAdder', d => d === null)
       .classed('filtered', d => this.filteredTags[d])
       .on('click', async (event, d) => {
         if (d === null) {
+          
           // Add the tag to ALL datasets at first
           const newTag = await uki.ui.prompt('New tag', undefined, value => {
             return !!value && window.controller.datasetList.every(d => d.info.tags[value] === undefined);
           });
           if (newTag !== null) {
+          
             await window.fetch(`/tags/${encodeURIComponent(newTag)}`, {
               method: 'POST'
             });
@@ -508,6 +510,7 @@ class MenuView extends uki.View {
         }
         this.render();
       });
+
 
     const headerBounds = this.d3el.select('.tagHeader')
       .node().getBoundingClientRect();
