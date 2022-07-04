@@ -33,8 +33,10 @@
     position: relative;
   }
 
+//Tag Header style section
+
   .tagHeaderWrapper {
-    width: 100%;
+    width: 50%;
     min-height: 3em;
     padding-top: 5em;
     overflow-y: hidden;
@@ -57,7 +59,7 @@
     .tagHeader {
       display: flex;
       width: fit-content;
-      padding-left: 2em;
+      padding-left: 1em;
       padding-bottom: 1em;
       padding-right: calc(var(--collapsed-menu-width) - 3em);
 
@@ -132,16 +134,20 @@
       }
     }
   }
+  
+// Lines and circles shows the relationship between parent folder and its datasets.
+// This section handles lines and circle styling of folder and tag section.
 
   .underlay {
     position: absolute;
-    max-width: calc(100% - var(--collapsed-menu-width) + 3em);
+    max-width: 50%;
     overflow: hidden;
     svg {
       position: relative;
 
       .lines path {
-        stroke: var(--background-color-softer);
+        stroke: var(--shadow-color);
+        stroke-width: 1.5;
         fill: none;
       }
       .circles circle {
