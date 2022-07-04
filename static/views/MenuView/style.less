@@ -188,7 +188,34 @@
         display: flex;
         pointer-events: all;
         .opener {
-          display: none;
+          display: flex;
+          cursor: pointer;
+          height: 0.75em;
+          line-height: 0.75em;
+          width: 0.75em;
+          position: relative;
+          top: 0.3em;
+          padding-top: 0.1em;
+          left: -0.5em;
+          border: 1px solid var(--background-color-softer);
+          background-color: var(--background-color-richer);
+          text-align: center;
+        }
+        .icon {
+          width: 1em;
+          margin-right: 0.5em;
+          filter: url(#recolorImageTo--text-color-softer);
+          cursor: grab;
+        }
+        .label {
+          margin-right: 0.5em;
+        }
+      }
+      .tagStuff {
+        display: flex;
+        pointer-events: all;
+        .opener {
+          display: flex;
           cursor: pointer;
           height: 0.75em;
           line-height: 0.75em;
