@@ -33,8 +33,10 @@
     position: relative;
   }
 
+//Tag Header style section
+
   .tagHeaderWrapper {
-    width: 100%;
+    width: 50%;
     min-height: 3em;
     padding-top: 5em;
     overflow-y: hidden;
@@ -57,7 +59,7 @@
     .tagHeader {
       display: flex;
       width: fit-content;
-      padding-left: 2em;
+      padding-left: 1em;
       padding-bottom: 1em;
       padding-right: calc(var(--collapsed-menu-width) - 3em);
 
@@ -132,16 +134,20 @@
       }
     }
   }
+  
+// Lines and circles shows the relationship between parent folder and its datasets.
+// This section handles lines and circle styling of folder and tag section.
 
   .underlay {
     position: absolute;
-    max-width: calc(100% - var(--collapsed-menu-width) + 3em);
+    max-width: 50%;
     overflow: hidden;
     svg {
       position: relative;
 
       .lines path {
-        stroke: var(--background-color-softer);
+        stroke: var(--shadow-color);
+        stroke-width: 1.5;
         fill: none;
       }
       .circles circle {
@@ -182,7 +188,34 @@
         display: flex;
         pointer-events: all;
         .opener {
-          display: none;
+          display: flex;
+          cursor: pointer;
+          height: 0.75em;
+          line-height: 0.75em;
+          width: 0.75em;
+          position: relative;
+          top: 0.3em;
+          padding-top: 0.1em;
+          left: -0.5em;
+          border: 1px solid var(--background-color-softer);
+          background-color: var(--background-color-richer);
+          text-align: center;
+        }
+        .icon {
+          width: 1em;
+          margin-right: 0.5em;
+          filter: url(#recolorImageTo--text-color-softer);
+          cursor: grab;
+        }
+        .label {
+          margin-right: 0.5em;
+        }
+      }
+      .tagStuff {
+        display: flex;
+        pointer-events: all;
+        .opener {
+          display: flex;
           cursor: pointer;
           height: 0.75em;
           line-height: 0.75em;
