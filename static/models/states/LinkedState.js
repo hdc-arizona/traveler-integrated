@@ -3,6 +3,7 @@
 import PrimitiveSelection from '../selections/PrimitiveSelection.js';
 
 import RenameModal from '../../views/RenameModal/RenameModal.js';
+import ChangeColorModal from '../../views/ChangeColorModal/ChangeColorModal.js';
 import TreeView from "../../views/TreeView/TreeView.js";
 import DependencyTreeView from "../../views/DependencyTreeView/DependencyTreeView.js";
 import TaskDependencySelection from "../selections/TaskDependencySelection.js";
@@ -224,6 +225,12 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
         label: 'Rename / Manage Tags...',
         onclick: () => {
           uki.ui.showModal(new RenameModal({ dataset: this }));
+        }
+      },  // Changes the dataset color according to user's choice
+      {
+        label: 'Change Dataset Color', 
+        onclick: () => {
+          uki.ui.showModal(new ChangeColorModal({ dataset: this }));
         }
       },
       {
