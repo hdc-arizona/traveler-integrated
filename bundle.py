@@ -8,7 +8,7 @@ from data_store import DataStore, logToConsole
 parser = argparse.ArgumentParser( \
     description=('Bundle data directly from phylanx stdout, individual tree / '
                  'performance / graph files, OTF2 traces, and/or source code files'))
-parser.add_argument('-l', '--label', dest='label', type=str, default='Untitled dataset', \
+parser.add_argument('-l', '--label', dest='label', type=str, default='Untitled dataset', 
     help=('Label for the bundled dataset (default: "Untitled dataset"). Providing a '
           'label that already exists in the database will bundle with/overwrite '
           'any previous data. If globbing multiple inputs, this should be a '
@@ -43,6 +43,10 @@ parser.add_argument('-s', '--debug', dest='debug', action='store_true',
 parser.add_argument('-a', '--tags', dest='tags', type=str,
                     help=('Tags to be attached to the dataset (when bundling multiple '
                           'datasets, the same tags are attached to all datasets bundled '
+                          'at the same time). Separate tags with commas.'))
+parser.add_argument('-z', '--colors', dest='colors', type=str, default='Red', 
+    help=('Colors to be attached to the dataset (when bundling multiple '
+                          'datasets, the same color are attached to all datasets bundled '
                           'at the same time). Separate tags with commas.'))
 parser.add_argument('-f', '--folder', dest='folder', type=str,
                     help=('Folder or path name that will be prefixed to the label of all '
@@ -129,11 +133,15 @@ async def main():
 
             # Assign its name
             db.rename(datasetId, label)
+            
+            db.colorName(datasetId, args['colors'])
 
             # Assign any tags
             if args['tags'] is not None:
                 tags = {t : True for t in args['tags'].split(',')}
                 db.addTags(datasetId, tags)
+
+          
 
             # Handle performance files
             if 'performance' in paths:
