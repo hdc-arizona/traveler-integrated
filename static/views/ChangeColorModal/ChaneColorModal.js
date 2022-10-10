@@ -47,6 +47,7 @@ class ChangeColorModal extends uki.ui.ModalView {
       await this.dataset
         .setLabelAndTags(newLabel, this._tagsToAdd, this._tagsToRemove);
     }
+    
     get color(){
       return newTag;
     }

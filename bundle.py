@@ -133,6 +133,8 @@ async def main():
 
             # Assign its name
             db.rename(datasetId, label)
+            
+            # Assign its colors
             db.colorName(datasetId, args['colors'])
 
             # Assign any tags
