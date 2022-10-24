@@ -33,8 +33,9 @@ class ChangeColorModal extends uki.ui.ModalView {
         d3el: this.modalContentEl.select('.addColor.button'),
         onclick: () => {
           const newColor = colorNameInput.node().value;
-          console.log(newColor) //this is working
+          console.log(newColor); //this is working
           this._colorsToAdd[newColor] = true; 
+          console.log(this._colorsToAdd);
           this.render();
         }
       });
