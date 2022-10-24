@@ -33,7 +33,7 @@ class ChangeColorModal extends uki.ui.ModalView {
         d3el: this.modalContentEl.select('.addColor.button'),
         onclick: () => {
           const newColor = colorNameInput.node().value;
-          console.log(newColor)
+          console.log(newColor) //this is working
           this._colorsToAdd.concat(newColor);
           this.render();
         }
@@ -41,15 +41,13 @@ class ChangeColorModal extends uki.ui.ModalView {
   
     }
   
+    //Confirms the addition of the color
     async confirmAction () {
       const newLabel = this.modalContentEl
         .select('#datasetLabel').property('value');
       await this.dataset
         .setLabelAndTags(newLabel, this._tagsToAdd, this._tagsToRemove);
-    }
-    
-    get color(){
-      return newTag;
+        //.setColors(newLabel, this._colorsToAdd, this._colorsToRemove); TODO <- Implement this
     }
   
     validateForm () {
