@@ -12,7 +12,7 @@ class ChangeColorModal extends uki.ui.ModalView {
       super(options);
   
       this.dataset = options.dataset;
-      this._colorsToAdd= " ";
+      this._colorsToAdd= {};
     }
   
     async setup () {
@@ -26,7 +26,7 @@ class ChangeColorModal extends uki.ui.ModalView {
         .on('change keyup', () => { this.render(); });
   
       const colorNameInput = this.modalContentEl.select('.colorpicker')
-        .on('change keyup', () => { this.render(); });
+        .on('change keyup', () => { this.render(); }); //re-render color if changed
   
       //Connect the "Change Dataset Color" frontend to backend
       this.addColorButton = new uki.ui.ButtonView({
@@ -34,7 +34,7 @@ class ChangeColorModal extends uki.ui.ModalView {
         onclick: () => {
           const newColor = colorNameInput.node().value;
           console.log(newColor) //this is working
-          this._colorsToAdd.concat(newColor);
+          this._colorsToAdd[newColor] = true; 
           this.render();
         }
       });
@@ -47,7 +47,7 @@ class ChangeColorModal extends uki.ui.ModalView {
         .select('#datasetLabel').property('value');
       await this.dataset
         .setLabelAndTags(newLabel, this._tagsToAdd, this._tagsToRemove);
-        //.setColors(newLabel, this._colorsToAdd, this._colorsToRemove); TODO <- Implement this
+        //.setColors(newLabel, this._colorsToAdd); TODO <- Implement this
     }
   
     validateForm () {
