@@ -359,6 +359,32 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     await window.controller.refreshDatasets();
   }
 
+   /**
+   * Construct a URL for updating a dataset's color
+   */
+    getUpdateColorUrl (newLabel = null, colorsToAdd = {}, colorsToRemove = {}) {
+      newLabel = newLabel?.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
+      newLabel = encodeURIComponent(newLabel || this.info.label);
+      const colorList = encodeURIComponent(
+        Object.keys(this.info.colors)
+          .filter(d => !colorsToRemove[d])
+          .concat(Object.keys(colorsToAdd))
+          .join(','));
+      return `/datasets/${this.info.datasetId}/info?label=${newLabel}&tags=${colorList}`;
+    }
+  
+    /**
+     * Update a dataset's color in the database
+     */
+    async setColors (newLabel = null, colorsToAdd = {}, colorsToRemove = {}) {
+      console.log(colorsToAdd);
+      const url = this.getUpdateColorUrl(newLabel, colorsToAdd, colorsToRemove);
+      await window.fetch(url, {
+        method: 'PUT'
+      });
+      await window.controller.refreshDatasets();
+    }
+
   /**
    * Look up a primitive by name
    */

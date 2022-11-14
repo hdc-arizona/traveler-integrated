@@ -134,10 +134,11 @@ async def main():
             # Assign its name
             db.rename(datasetId, label)
             
-            # Assign its colors
+            # Assign any colors
             if args['colors'] is not None:
                 colors = {t : True for t in args['colors'].split(',')}
-                db.addTags(datasetId, colors)
+                db.addColors(datasetId, colors)
+                logToConsole(colors) # logs whatever was just passed into 'setColors'
 
             # Assign any tags
             if args['tags'] is not None:

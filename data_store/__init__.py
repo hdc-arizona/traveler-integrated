@@ -117,12 +117,15 @@ class DataStore:
             newLabel = defaultInfo['label']
         self[datasetId]['info']['label'] = newLabel
         
-    def colorName(self, datasetId, newColor):
-        # Remove any leading or trailing slashes or spaces
-        newColor = newColor.strip('/ ')
-        if len(newColor) == 0:
-            newColor = defaultInfo['colors']
-        self[datasetId]['info']['colors'] = newColor
+    # appends set of colors to existing colors
+    def addColors(self, datasetId, colors):
+        existingColors = self[datasetId]['info']['colors']
+        existingColors.update(colors)
+        self[datasetId]['info']['colors'] = existingColors
+    
+    # overrides existing colors with new set of colors
+    def setColors(self, datasetId, colors):
+        self[datasetId]['info']['colors'] = colors
 
     def addTags(self, datasetId, tags):
         existingTags = self[datasetId]['info']['tags']
