@@ -36,8 +36,8 @@ class ChangeColorModal extends uki.ui.ModalView {
         onclick: () => {
           const newColor = colorNameInput.node().value;
           console.log(newColor); //this is working
-          this._colorsToAdd[newColor] = true; 
-          console.log(this._colorsToAdd);
+          this.changeCss(newColor);
+          this._colorsToAdd[newColor] = true; //change this to not be an array, just 1 value
           this.render();
         }
       });
@@ -46,10 +46,10 @@ class ChangeColorModal extends uki.ui.ModalView {
   
     //Confirms the addition of the color
     async confirmAction () {
+      //this.changeCss(this._colorsToAdd.length);
       const newLabel = this.modalContentEl
         .select('#datasetLabel').property('value');
       await this.dataset
-        //.setLabelAndTags(newLabel, this._tagsToAdd, this._tagsToRemove);
         .setColors(newLabel, this._colorsToAdd, this._colorsToRemove);
     }
   
@@ -62,6 +62,16 @@ class ChangeColorModal extends uki.ui.ModalView {
     displayValidationErrors () {
       this.modalContentEl.select('#datasetLabel')
         .classed('error', true);
+    }
+
+    //makes a css file using the given color as the selection color
+    changeCss(color){
+      var page = document.body.style;
+      page.cssText = 
+      "--selection-color: " + color + ";" + "\n"
+      + "--selection-border-color: " + color + ";";
+      //page.setAttribute("style", "--selection-color: " + color); <- previous way of settings color
+      console.log("NEW COLOR:" + color);
     }
   }
   export default ChangeColorModal;
