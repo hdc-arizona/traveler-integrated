@@ -15,7 +15,7 @@ requiredPickleDicts = ['trees']
 defaultInfo = {
     'sourceFiles': [],
     'tags': {},
-    'colors': 'Red',
+    'color': '#e6ab02',
     'label': 'Untitled dataset'
 }
 
@@ -116,16 +116,10 @@ class DataStore:
         if len(newLabel) == 0:
             newLabel = defaultInfo['label']
         self[datasetId]['info']['label'] = newLabel
-        
-    # appends set of colors to existing colors
-    def addColors(self, datasetId, colors):
-        existingColors = self[datasetId]['info']['colors']
-        existingColors.update(colors)
-        self[datasetId]['info']['colors'] = existingColors
     
-    # overrides existing colors with new set of colors
-    def setColors(self, datasetId, colors):
-        self[datasetId]['info']['colors'] = colors
+    # overrides existing color with new color
+    def recolor(self, datasetId, color):
+        self[datasetId]['info']['color'] = color
 
     def addTags(self, datasetId, tags):
         existingTags = self[datasetId]['info']['tags']

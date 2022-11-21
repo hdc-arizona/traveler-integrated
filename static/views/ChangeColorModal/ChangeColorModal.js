@@ -12,8 +12,7 @@ class ChangeColorModal extends uki.ui.ModalView {
       super(options);
   
       this.dataset = options.dataset;
-      this._colorsToAdd= {};
-      this._colorsToRemove = {};
+      var colorToSet = null;
     }
   
     async setup () {
@@ -27,32 +26,18 @@ class ChangeColorModal extends uki.ui.ModalView {
         .on('change keyup', () => { this.render(); });
   
       const colorNameInput = this.modalContentEl.select('.colorpicker')
-        .on('change keyup', () => { this.render(); }); //re-render color if changed
-  
-      
-      //Connect the "Change Dataset Color" frontend to backend
-      this.addColorButton = new uki.ui.ButtonView({
-        d3el: this.modalContentEl.select('.addColor.button'),
-        onclick: () => {
-          const newColor = colorNameInput.node().value;
-          console.log(newColor); //this is working
-          this.changeCss(newColor);
-          this._colorsToAdd[newColor] = true; //change this to not be an array, just 1 value
-          this.render();
-        }
-      });
-  
+        .on('change keyup', () => { this.render(); }); //re-render color if changed  
     }
   
     //Confirms the addition of the color
     async confirmAction () {
-      //this.changeCss(this._colorsToAdd.length);
-      const newLabel = this.modalContentEl
-        .select('#datasetLabel').property('value');
+      if(this.modalContentEl.select('.colorpicker').node().value != "#e6ab02") //TODO: replace e6 with real current color
+        this.colorToSet = this.modalContentEl.select('.colorpicker').node().value;
+      this.changeCss(this.colorToSet);
       await this.dataset
-        .setColors(newLabel, this._colorsToAdd, this._colorsToRemove);
+        .setColor(this.colorToSet);
     }
-  
+
     validateForm () {
       const newLabel = this.modalContentEl.select('#datasetLabel')
         .property('value');
@@ -64,14 +49,16 @@ class ChangeColorModal extends uki.ui.ModalView {
         .classed('error', true);
     }
 
-    //makes a css file using the given color as the selection color
+    //updates the css file to update the view using the given color as the base
     changeCss(color){
-      var page = document.body.style;
-      page.cssText = 
-      "--selection-color: " + color + ";" + "\n"
-      + "--selection-border-color: " + color + ";";
-      //page.setAttribute("style", "--selection-color: " + color); <- previous way of settings color
-      console.log("NEW COLOR:" + color);
+      if(color != null)
+      {
+        var page = document.body.style;
+        page.cssText = 
+        "--selection-color: " + color + ";" + "\n"
+        + "--selection-border-color: " + color + ";" + "\n"
+        + "--selection-color: " + color + ";" + "\n";
+      }  
     }
   }
   export default ChangeColorModal;
