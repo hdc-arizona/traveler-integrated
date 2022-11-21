@@ -56,8 +56,7 @@ class ChangeColorModal extends uki.ui.ModalView {
         var page = document.body.style;
         page.cssText = 
         "--selection-color: " + color + ";" + "\n"
-        + "--selection-border-color: " + color + ";" + "\n"
-        + "--selection-color: " + color + ";" + "\n";
+        + "--selection-border-color: " + color + ";" + "\n";
       }  
     }
   }
