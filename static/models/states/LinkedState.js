@@ -359,26 +359,26 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
     await window.controller.refreshDatasets();
   }
 
-   /**
-   * Construct a URL for updating a dataset's color
-   */
-    getUpdateColorUrl (newColor = null) {
-      newColor = newColor?.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
-      newColor = encodeURIComponent(newColor || this.info.color);
-      return `/datasets/${this.info.datasetId}/info?color=${newColor}`;
-    }
+  /**
+  * Construct a URL for updating a dataset's color
+  */
+  getUpdateColorUrl (newColor = null) {
+    newColor = newColor?.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
+    newColor = encodeURIComponent(newColor || this.info.color);
+    return `/datasets/${this.info.datasetId}/info?color=${newColor}`;
+  }
   
-    /**
-     * Update a dataset's color in the database
-     */
-    async setColor (newColor = null) {
-      console.log(newColor);
-      const url = this.getUpdateColorUrl(newColor);
-      await window.fetch(url, {
-        method: 'PUT'
-      });
-      await window.controller.refreshDatasets();
-    }
+  /**
+  * Update a dataset's color in the database
+  */
+  async setColor (newColor = null) {
+    console.log("new color:" + newColor);
+    const url = this.getUpdateColorUrl(newColor);
+    await window.fetch(url, {
+      method: 'PUT'
+    });
+    await window.controller.refreshDatasets();
+  }
 
   /**
    * Look up a primitive by name
