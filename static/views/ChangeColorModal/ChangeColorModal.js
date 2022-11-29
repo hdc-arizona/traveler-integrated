@@ -73,16 +73,18 @@ class ChangeColorModal extends uki.ui.ModalView {
         red+=diff, green+=diff, blue+=diff;
         console.log("red: " + red + ",green: " + green + ",blue: " + blue);
         var border_color = "rgb(" + red + "," + green + "," + blue + ")";
-        //changes the color of the selection and border directly
-        var theme = globalThis.controller.getNamedResource('theme').cssVariables;
-        theme["--selection-color"] = color;
-        theme["--slection-border-color"] = border_color;
+
         //changes the color of the slection and border via html
         var page = document.body.style;
         page.cssText = 
         "--selection-color: " + color + ";" + "\n"
-        + "--selection-border-color: " + color + ";";
+        + "--selection-border-color: " + border_color + ";";
         //+ "--disabled-color: " + color + ";" + "\n";
+
+        //changes the color of the selection and border directly
+        var theme = globalThis.controller.getNamedResource('theme').cssVariables;
+        theme["--selection-color"] = color;
+        theme["--slection-border-color"] = border_color;
       }  
     }
   }
