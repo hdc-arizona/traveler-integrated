@@ -58,19 +58,19 @@ class ChangeColorModal extends uki.ui.ModalView {
         var green = parseInt(color.substring(3,5), 16);
         var blue = parseInt(color.substring(5,7), 16);
 
-        var diff = 55;
+        var background_color_difference = 55;
 
         //decreases from max value if maxed out so colors can be darkened for border
-        if(red>=(255 - diff))
-          red-= diff;
-        if(green>=(255 - diff))
-          green-= diff;
-        if(blue>=(255 - diff))
-          blue-= diff;
+        if(red>=(255 - background_color_difference))
+          red-= background_color_difference;
+        if(green>=(255 - background_color_difference))
+          green-= background_color_difference;
+        if(blue>=(255 - background_color_difference))
+          blue-= background_color_difference;
         
         console.log("red: " + red + ",green: " + green + ",blue: " + blue);
         var color = "rgb(" + red + "," + green + "," + blue + ")";
-        red+=diff, green+=diff, blue+=diff;
+        red+=background_color_difference, green+=background_color_difference, blue+=background_color_difference;
         console.log("red: " + red + ",green: " + green + ",blue: " + blue);
         var border_color = "rgb(" + red + "," + green + "," + blue + ")";
 
@@ -84,7 +84,7 @@ class ChangeColorModal extends uki.ui.ModalView {
         //changes the color of the selection and border directly
         var theme = globalThis.controller.getNamedResource('theme').cssVariables;
         theme["--selection-color"] = color;
-        theme["--slection-border-color"] = border_color;
+        theme["--selection-border-color"] = border_color;
       }  
     }
   }

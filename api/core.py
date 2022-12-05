@@ -231,10 +231,12 @@ async def add_cpp(datasetId: str, file: UploadFile = File(...)):
 
 
 @router.put('/datasets/{datasetId}/info')
-async def update_info(datasetId: str, label: Optional[str] = None, tags: Optional[str] = None):
+async def update_info(datasetId: str, label: Optional[str] = None, color: Optional[str] = None, tags: Optional[str] = None):
     datasetId = validateDataset(datasetId)
     if label is not None:
         db.rename(datasetId, label)
+    if color is not None:
+        db.recolor(datasetId, color)
     if tags is not None:
         if not tags:
             db.setTags(datasetId, {})
