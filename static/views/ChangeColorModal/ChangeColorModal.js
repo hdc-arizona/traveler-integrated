@@ -33,7 +33,6 @@ class ChangeColorModal extends uki.ui.ModalView {
     async confirmAction () {
       if(this.modalContentEl.select('.colorpicker').node().value != "#e6ab02") //TODO: replace e6 with real current color
         this.colorToSet = this.modalContentEl.select('.colorpicker').node().value;
-      this.changeCss(this.colorToSet);
       await this.dataset
         .setColor(this.colorToSet);
     }
@@ -49,43 +48,5 @@ class ChangeColorModal extends uki.ui.ModalView {
         .classed('error', true);
     }
 
-    //updates the css file to update the view using the given color as the base
-    changeCss(color){
-      if(color != null && color.length == 7)
-      {
-        //converts hex to rgb
-        var red = parseInt(color.substring(1,3), 16);
-        var green = parseInt(color.substring(3,5), 16);
-        var blue = parseInt(color.substring(5,7), 16);
-
-        var background_color_difference = 55;
-
-        //decreases from max value if maxed out so colors can be darkened for border
-        if(red>=(255 - background_color_difference))
-          red-= background_color_difference;
-        if(green>=(255 - background_color_difference))
-          green-= background_color_difference;
-        if(blue>=(255 - background_color_difference))
-          blue-= background_color_difference;
-        
-        console.log("red: " + red + ",green: " + green + ",blue: " + blue);
-        var color = "rgb(" + red + "," + green + "," + blue + ")";
-        red+=background_color_difference, green+=background_color_difference, blue+=background_color_difference;
-        console.log("red: " + red + ",green: " + green + ",blue: " + blue);
-        var border_color = "rgb(" + red + "," + green + "," + blue + ")";
-
-        //changes the color of the slection and border via html
-        var page = document.body.style;
-        page.cssText = 
-        "--selection-color: " + color + ";" + "\n"
-        + "--selection-border-color: " + border_color + ";";
-        //+ "--disabled-color: " + color + ";" + "\n";
-
-        //changes the color of the selection and border directly
-        var theme = globalThis.controller.getNamedResource('theme').cssVariables;
-        theme["--selection-color"] = color;
-        theme["--selection-border-color"] = border_color;
-      }  
-    }
   }
   export default ChangeColorModal;
