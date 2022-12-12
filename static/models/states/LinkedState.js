@@ -365,7 +365,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   getUpdateColorUrl (newColor = null) {
     newColor = newColor?.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
     newColor = encodeURIComponent(newColor || this.info.color);
-    return `/datasets/${this.info.datasetId}/info?color=${newColor}`;
+    return `/datasets/${this.info.datasetId}/info?color=${newColor}`; //returns the URL for the put command
   }
   
   /**

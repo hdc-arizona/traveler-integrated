@@ -119,13 +119,12 @@ class DataStore:
     
     # overrides existing color with new color
     def recolor(self, datasetId, color):
-        print(datasetId, "+", color)
         # Remove any leading or trailing slashes or spaces
         color = color.strip('/ ')
         if len(color) == 0:
             color = defaultInfo['color']
-        self[datasetId]['info']['color'] = color
-        print("updated color: ",self[datasetId]['info']['color'])
+        #updates color in dataset
+        self[datasetId]['info']['color'] = color 
 
     def addTags(self, datasetId, tags):
         existingTags = self[datasetId]['info']['tags']

@@ -114,48 +114,13 @@ class MenuView extends uki.View {
       }
     }
 
-    //loads in custom DB color from database
-    console.log("dataset id: " + window.controller.currentDatasetId);
+    //pulls color from currently selected datset (since there's no way to pull which of the datasets is selected otherwise)
     for (const dataset of window.controller.datasetList) {
-      if(dataset.info.datasetId === window.controller.currentDatasetId)
-      {
-        var color = dataset.info.color;
-
-        //converts hex to rgb
-        var red = parseInt(color.substring(1,3), 16);
-        var green = parseInt(color.substring(3,5), 16);
-        var blue = parseInt(color.substring(5,7), 16);
-
-        //difference between the border and the main color
-        var border_rgb_difference = 55;
-
-        //decreases from max value for rgb if maxed out so colors can be darkened for border
-        if(red>=(255 - border_rgb_difference))
-          red-= border_rgb_difference;
-        if(green>=(255 - border_rgb_difference))
-          green-= border_rgb_difference;
-        if(blue>=(255 - border_rgb_difference))
-          blue-= border_rgb_difference;
-        
-        //updates color and border_color based on border_rgb_difference
-        color = "rgb(" + red + "," + green + "," + blue + ")";
-        red+=border_rgb_difference, green+=border_rgb_difference, blue+=border_rgb_difference;
-        var border_color = "rgb(" + red + "," + green + "," + blue + ")";
-
-        //changes the color of the slection and border via html (for utilization view)
-        var page = document.body.style;
-        page.cssText = 
-        "--selection-color: " + color + ";" + "\n"
-        + "--selection-border-color: " + border_color + ";";
-        //+ "--disabled-color: " + color + ";" + "\n";
-
-        //changes the color of the selection and border directly (for general colors)
-        var theme = globalThis.controller.getNamedResource('theme').cssVariables;
-        theme["--selection-color"] = color;
-        theme["--selection-border-color"] = border_color;
+      if(dataset.info.datasetId === window.controller.currentDatasetId) {
+        //changes the displays to the selected color
+        this.displayColor(dataset.info.color); 
         break;
       }
-        
     }
   }
 
@@ -854,6 +819,46 @@ class MenuView extends uki.View {
         }
       ]
     });
+  }
+
+  //sets the colors being displayed based on the color passed in
+  displayColor (color) {
+    //if color isn't set to value, isn't length of 7, or doesn't follow the color hex regex, set value to default
+    if(color == null || color.length != 7 || !/^#[0-9A-F]{6}$/i.test(color)) 
+      color = "#e6ab02"; //default yellow color
+      
+    //converts hex to rgb
+    var red = parseInt(color.substring(1,3), 16);
+    var green = parseInt(color.substring(3,5), 16);
+    var blue = parseInt(color.substring(5,7), 16);
+
+    //difference between the border and the main color
+    var border_rgb_difference = 55;
+
+    //decreases from max value for rgb if maxed out so colors can be darkened for border
+    if(red>=(255 - border_rgb_difference))
+      red-= border_rgb_difference;
+    if(green>=(255 - border_rgb_difference))
+      green-= border_rgb_difference;
+    if(blue>=(255 - border_rgb_difference))
+      blue-= border_rgb_difference;
+    
+    //updates color and border_color based on border_rgb_difference
+    color = "rgb(" + red + "," + green + "," + blue + ")";
+    red+=border_rgb_difference, green+=border_rgb_difference, blue+=border_rgb_difference;
+    var border_color = "rgb(" + red + "," + green + "," + blue + ")";
+
+    //changes the color of the slection and border via html (for utilization view)
+    var page = document.body.style;
+    page.cssText = 
+    "--selection-color: " + color + ";" + "\n"
+    + "--selection-border-color: " + border_color + ";";
+    //+ "--disabled-color: " + color + ";" + "\n";
+
+    //changes the color of the selection and border directly (for general colors)
+    var theme = globalThis.controller.getNamedResource('theme').cssVariables;
+    theme["--selection-color"] = color;
+    theme["--selection-border-color"] = border_color;
   }
 }
 
