@@ -46,8 +46,7 @@ parser.add_argument('-a', '--tags', dest='tags', type=str,
                           'at the same time). Separate tags with commas.'))
 parser.add_argument('-z', '--color', dest='color', type=str, default='#e6ab02', 
                     help=('Color to be attached to the dataset.'
-                          '(When bundling, same color is used for all datasets)'
-                          'Seperate color with commas.'))
+                          'Different color stored per dataset.'))
 parser.add_argument('-f', '--folder', dest='folder', type=str,
                     help=('Folder or path name that will be prefixed to the label of all '
                           'data bundled by this command; usually this is a good idea when '
@@ -134,7 +133,7 @@ async def main():
             # Assign its name
             db.rename(datasetId, label)
             
-            # Assign color (TODO: figured this out later)
+            # Assign color (TODO: figure out how to get proper color)
             db.recolor(datasetId, "#e6ab02")
 
             # Assign any tags

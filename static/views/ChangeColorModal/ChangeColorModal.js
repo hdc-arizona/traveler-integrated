@@ -15,34 +15,42 @@ class ChangeColorModal extends uki.ui.ModalView {
       var colorToSet = null;
     }
   
+    //setups up color change menu elements
     async setup () {
       await super.setup(...arguments);
   
       this.d3el.classed('ChangeColorModal', true);
-  
+
       this.modalContentEl.html(this.getNamedResource('content'))
         .select('#datasetLabel')
         .property('value', this.dataset.info.label)
         .on('change keyup', () => { this.render(); });
   
-      const colorNameInput = this.modalContentEl.select('.colorpicker')
-        .on('change keyup', () => { this.render(); }); //re-render color if changed  
+      //sets up color picker
+      this.modalContentEl.select('.colorpicker')
+        .on('change keyup', () => { this.render(); }) //re-render color if changed  
+        .node().value = this.dataset.info.color; //sets color selected to current database color
     }
   
-    //Confirms the addition of the color
+    //Confirms the addition of the color when OK is pressed
     async confirmAction () {
-      if(this.modalContentEl.select('.colorpicker').node().value != "#e6ab02") //TODO: replace e6 with real current color
+      console.log(this.dataset.info.color);
+      //sets new color if new color was selected 
+      if(this.modalContentEl.select('.colorpicker').node().value != this.dataset.info.color)
         this.colorToSet = this.modalContentEl.select('.colorpicker').node().value;
+      //actually changes color in database
       await this.dataset
         .setColor(this.colorToSet);
     }
 
+    //validates this form
     validateForm () {
       const newLabel = this.modalContentEl.select('#datasetLabel')
         .property('value');
       return newLabel.length === 0 ? ['#datasetLabel'] : null;
     }
   
+    //displays any validation errors
     displayValidationErrors () {
       this.modalContentEl.select('#datasetLabel')
         .classed('error', true);

@@ -114,12 +114,11 @@ class MenuView extends uki.View {
       }
     }
 
-    //loads in custom DB color
+    //loads in custom DB color from database
     console.log("dataset id: " + window.controller.currentDatasetId);
     for (const dataset of window.controller.datasetList) {
       if(dataset.info.datasetId === window.controller.currentDatasetId)
       {
-        console.log("REACH")
         var color = dataset.info.color;
 
         //converts hex to rgb
@@ -127,33 +126,34 @@ class MenuView extends uki.View {
         var green = parseInt(color.substring(3,5), 16);
         var blue = parseInt(color.substring(5,7), 16);
 
-        var background_color_difference = 55;
+        //difference between the border and the main color
+        var border_rgb_difference = 55;
 
-        //decreases from max value if maxed out so colors can be darkened for border
-        if(red>=(255 - background_color_difference))
-          red-= background_color_difference;
-        if(green>=(255 - background_color_difference))
-          green-= background_color_difference;
-        if(blue>=(255 - background_color_difference))
-          blue-= background_color_difference;
+        //decreases from max value for rgb if maxed out so colors can be darkened for border
+        if(red>=(255 - border_rgb_difference))
+          red-= border_rgb_difference;
+        if(green>=(255 - border_rgb_difference))
+          green-= border_rgb_difference;
+        if(blue>=(255 - border_rgb_difference))
+          blue-= border_rgb_difference;
         
-        console.log("red: " + red + ",green: " + green + ",blue: " + blue);
+        //updates color and border_color based on border_rgb_difference
         color = "rgb(" + red + "," + green + "," + blue + ")";
-        red+=background_color_difference, green+=background_color_difference, blue+=background_color_difference;
-        console.log("red: " + red + ",green: " + green + ",blue: " + blue);
+        red+=border_rgb_difference, green+=border_rgb_difference, blue+=border_rgb_difference;
         var border_color = "rgb(" + red + "," + green + "," + blue + ")";
 
-        //changes the color of the slection and border via html
+        //changes the color of the slection and border via html (for utilization view)
         var page = document.body.style;
         page.cssText = 
         "--selection-color: " + color + ";" + "\n"
         + "--selection-border-color: " + border_color + ";";
         //+ "--disabled-color: " + color + ";" + "\n";
 
-        //changes the color of the selection and border directly
+        //changes the color of the selection and border directly (for general colors)
         var theme = globalThis.controller.getNamedResource('theme').cssVariables;
         theme["--selection-color"] = color;
         theme["--selection-border-color"] = border_color;
+        break;
       }
         
     }
