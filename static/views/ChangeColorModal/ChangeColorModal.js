@@ -34,7 +34,6 @@ class ChangeColorModal extends uki.ui.ModalView {
   
     //Confirms the addition of the color when OK is pressed
     async confirmAction () {
-      console.log(this.dataset.info.color);
       //sets new color if new color was selected 
       if(this.modalContentEl.select('.colorpicker').node().value != this.dataset.info.color)
         this.colorToSet = this.modalContentEl.select('.colorpicker').node().value;

@@ -372,7 +372,6 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   * Update a dataset's color in the database
   */
   async setColor (newColor = null) {
-    console.log("new color:" + newColor);
     const url = this.getUpdateColorUrl(newColor);
     await window.fetch(url, {
       method: 'PUT'
