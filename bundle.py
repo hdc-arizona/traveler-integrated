@@ -116,7 +116,7 @@ async def main():
     else:
         raise Exception('Too many capturing groups in the --label argument')
 
-    for color, label, paths in inputs.items():
+    for label, paths in inputs.items():
         if 'input' in paths and ('tree' in paths or 'performance' in paths or 'graph' in paths):
             raise Exception('Don\'t use --input with --tree, --performance, or --graph for the same --label: %s' % label)
         try:
@@ -134,7 +134,7 @@ async def main():
             db.rename(datasetId, label)
             
             # Assign color
-            db.recolor(datasetId, color)
+            db.recolor(datasetId, "#e6ab02")
 
             # Assign any tags
             if args['tags'] is not None:
