@@ -238,4 +238,4 @@ S. R. Brandt, B. Hasheminezhad, N. Wu, S. A. Sakin, A. R. Bigelow, K. E. Isaacs,
 
 ## Acknowledgements
 
-This work was supported by the United States Department of Defense through DTIC Contract FA8075-14-D-0002-0007, the National Science Foundation under NSF [III-1656958](https://www.nsf.gov/awardsearch/showAward?AWD_ID=1656958), and the Department of Energy under DE-SC0022044.
+This work has been supported by the United States Department of Defense through DTIC Contract FA8075-14-D-0002-0007, the National Science Foundation under NSF [III-1656958](https://www.nsf.gov/awardsearch/showAward?AWD_ID=1656958), and the Department of Energy under DE-SC0022044.
