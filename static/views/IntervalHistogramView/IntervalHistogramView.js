@@ -82,6 +82,10 @@ class IntervalHistogramView extends
 
     // Prep local interactive callbacks for updating the brush
     this.setupBrush();
+
+    // this.currentPrimitive.on('change', event => {
+    //   console.log('current primitive changed form the interval histogram view');
+    // });
   }
 
   async draw () {
@@ -126,7 +130,8 @@ class IntervalHistogramView extends
 
     this.primitiveMenu.on('change', event => {
       this.currentPrimitive = event.target.value;
-      this.updateResolution();
+      this.linkedState.selectPrimitive(this.currentPrimitive);
+      // this.updateResolution();
     });
     this.linkedState.on('selectionChanged', () => {
       let newPrimitive = this.linkedState.selection?.primitiveName;

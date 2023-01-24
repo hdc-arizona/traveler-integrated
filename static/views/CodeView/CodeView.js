@@ -54,11 +54,28 @@ class CodeView extends LinkedMixin(uki.ui.GLView) {
     // display on top of it
     this.overlayShadowEl.classed('CodeOverlay', true);
 
-    // TODO: linked highlighting
-    /* this.codeMirror.setCursor({
-      line: details.line,
-      ch: details.char
-    }); */
+    let __self = this;
+    this.linkedState.on('selectionChanged', () => {
+      if(this.linkedState?.selection) {
+        let customizedLabel = this.linkedState.selection.label;
+        if(Array.isArray(customizedLabel)) {
+          customizedLabel = this.linkedState.selection.label[0];
+        }
+        if(this.linkedState.selection.intervalDetails?.Primitive) {
+          customizedLabel = this.linkedState.selection.intervalDetails.Primitive
+        }
+        if (customizedLabel?.includes('$')) {
+          let sCL = customizedLabel.substring(0, customizedLabel.lastIndexOf('$'));
+          const ln = sCL.substring(sCL.lastIndexOf('$')+1);
+          const cha = customizedLabel.substring(customizedLabel.lastIndexOf('$')+1);
+          __self.codeMirror.setCursor({
+            line: ln-1,
+            ch: cha
+          });
+          __self.codeMirror.refresh();
+        }
+      }
+    });
   }
 
   async draw () {
