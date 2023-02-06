@@ -853,7 +853,6 @@ class MenuView extends uki.View {
     page.cssText = 
     "--selection-color: " + color + ";" + "\n"
     + "--selection-border-color: " + border_color + ";";
-    //+ "--disabled-color: " + color + ";" + "\n";
 
     //changes the color of the selection and border directly (for general colors)
     var theme = globalThis.controller.getNamedResource('theme').cssVariables;
