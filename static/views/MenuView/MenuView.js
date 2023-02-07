@@ -832,7 +832,7 @@ class MenuView extends uki.View {
     var green = parseInt(color.substring(3,5), 16);
     var blue = parseInt(color.substring(5,7), 16);
 
-    //difference between the border and the main color (arbitrarily set)
+    //difference between the border and the main color (arbitrarily set value, could be anything)
     var border_rgb_diff = 55;
 
     //updates color values based on rgb diff
@@ -862,7 +862,7 @@ class MenuView extends uki.View {
     if(blue >= (255 - rgb_diff)) 
       blue-= rgb_diff;
 
-    //returns the value of color to the proper values
+    //returns the proper rgb values for a color variable
     return "rgb(" + red + "," + green + "," + blue + ")";
   }
 
@@ -877,7 +877,7 @@ class MenuView extends uki.View {
     if((blue + rgb_diff) < 255) 
       blue+= rgb_diff;
 
-    //returns the value of color to the proper values
+    //returns the proper rgb values for a color variable
     return "rgb(" + red + "," + green + "," + blue + ")";
   }
 }
