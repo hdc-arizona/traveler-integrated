@@ -3,6 +3,7 @@
 import PrimitiveSelection from '../selections/PrimitiveSelection.js';
 
 import RenameModal from '../../views/RenameModal/RenameModal.js';
+import ChangeColorModal from '../../views/ChangeColorModal/ChangeColorModal.js';
 import TreeView from "../../views/TreeView/TreeView.js";
 import DependencyTreeView from "../../views/DependencyTreeView/DependencyTreeView.js";
 import TaskDependencySelection from "../selections/TaskDependencySelection.js";
@@ -225,6 +226,12 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
         onclick: () => {
           uki.ui.showModal(new RenameModal({ dataset: this }));
         }
+      }, // Changes the dataset color according to user's choice
+      {
+        label: 'Change Dataset Color', 
+        onclick: () => {
+          uki.ui.showModal(new ChangeColorModal({ dataset: this }));
+        }
       },
       {
         label: 'Delete',
@@ -346,6 +353,26 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
    */
   async setLabelAndTags (newLabel = null, tagsToAdd = {}, tagsToRemove = {}) {
     const url = this.getUpdateUrl(newLabel, tagsToAdd, tagsToRemove);
+    await window.fetch(url, {
+      method: 'PUT'
+    });
+    await window.controller.refreshDatasets();
+  }
+
+  /**
+  * Construct a URL for updating a dataset's color
+  */
+  getUpdateColorUrl (newColor = null) {
+    newColor = newColor?.replace(/^\/*|\/*$/g, ''); // remove any leading or trailing slashes
+    newColor = encodeURIComponent(newColor || this.info.color);
+    return `/datasets/${this.info.datasetId}/info?color=${newColor}`; //returns the URL for the put command
+  }
+  
+  /**
+  * Update a dataset's color in the database
+  */
+  async setColor (newColor = null) {
+    const url = this.getUpdateColorUrl(newColor);
     await window.fetch(url, {
       method: 'PUT'
     });

@@ -350,7 +350,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
         const sUtil = selectionUtilization?.locations?.[location]?.[binNo];
         // Which border to draw (if any)?
         if (sUtil > 0) {
-          ctx.fillStyle = theme['--selection-border-color'];
+          ctx.fillStyle = theme['--selection-border-color']; //border color
           ctx.fillRect(binNo, y0, 1, bandwidth);
         } else if (tUtil > 0) {
           ctx.fillStyle = theme['--text-color-softer'];
@@ -359,7 +359,7 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
 
         // Which fill to draw (if any)?
         if (sUtil >= 1) {
-          ctx.fillStyle = theme['--selection-color'];
+          ctx.fillStyle = theme['--selection-color']; //main color
           ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
         } else if (tUtil >= 1) {
           ctx.fillStyle = theme['--disabled-color'];
