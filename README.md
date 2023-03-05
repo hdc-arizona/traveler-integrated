@@ -229,6 +229,9 @@ I haven't tested this thoroughly. Likely hiccups:
 
 ## Related Papers
 
+S. A. Sakin, A. Bigelow, R. Tohid, C. Scully-Allison, C. Scheidegger, S. R. Brandt, C. Taylor, K. A. Huck, H. Kaiser, and K. E. Isaacs. [Traveler: Navigating Task Parallel Traces for Performance Analysis](https://arxiv.org/pdf/2208.00109.pdf). IEEE Transactions on Visualization and Computer Graphics, Proceedings of IEEE VIS 2022. 29(1):788-797, 2023.
+
+
 K. Williams, A. Bigelow, and K. Isaacs. [Visualizing a Moving Target: A Design Study on Task Parallel Programs in the Presence of Evolving Data and Concerns](https://arxiv.org/abs/1905.13135v4). IEEE Transactions on Visualization and Computer Graphics, Proceedings of InfoVis '19. 26(1):1118-1128, 2020.
 
 
