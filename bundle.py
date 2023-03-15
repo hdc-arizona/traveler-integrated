@@ -134,7 +134,8 @@ async def main():
             db.rename(datasetId, label)
             
             # Assign color
-            db.recolor(datasetId, "#e6ab02")
+            if db[datasetId]['info']['color'] is not None:
+                db.recolor(datasetId, db[datasetId]['info']['color'])
 
             # Assign any tags
             if args['tags'] is not None:

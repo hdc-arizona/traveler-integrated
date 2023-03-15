@@ -832,33 +832,53 @@ class MenuView extends uki.View {
     var green = parseInt(color.substring(3,5), 16);
     var blue = parseInt(color.substring(5,7), 16);
 
-    //difference between the border and the main color
-    var border_rgb_difference = 55;
+    //difference between the border and the main color (arbitrarily set value, could be anything)
+    var border_rgb_diff = 55;
 
-    //decreases from max value for rgb if maxed out so colors can be darkened for border
-    if(red>=(255 - border_rgb_difference))
-      red-= border_rgb_difference;
-    if(green>=(255 - border_rgb_difference))
-      green-= border_rgb_difference;
-    if(blue>=(255 - border_rgb_difference))
-      blue-= border_rgb_difference;
-    
-    //updates color and border_color based on border_rgb_difference
-    color = "rgb(" + red + "," + green + "," + blue + ")";
-    red+=border_rgb_difference, green+=border_rgb_difference, blue+=border_rgb_difference;
-    var border_color = "rgb(" + red + "," + green + "," + blue + ")";
-
+    //updates color values based on rgb diff
+    var main_color = this.setMainColor(red, blue, green, border_rgb_diff);
+    var border_color = this.setBorderColor(red, blue, green, border_rgb_diff);
+  
     //changes the color of the slection and border via html (for utilization view)
     var page = document.body.style;
     page.cssText = 
-    "--selection-color: " + color + ";" + "\n"
+    "--selection-color: " + main_color + ";" + "\n"
     + "--selection-border-color: " + border_color + ";";
-    //+ "--disabled-color: " + color + ";" + "\n";
 
     //changes the color of the selection and border directly (for general colors)
     var theme = globalThis.controller.getNamedResource('theme').cssVariables;
-    theme["--selection-color"] = color;
+    theme["--selection-color"] = main_color;
     theme["--selection-border-color"] = border_color;
+  }
+
+  //returns a color rgb value differentiated by rgb_diff if rgb values were too high
+  setMainColor(red, blue, green, rgb_diff)
+  {
+    //decreases from max value for rgb if maxed out so colors can be darkened for border
+    if(red >= (255 - rgb_diff)) 
+      red-= rgb_diff;
+    if(green >= (255 - rgb_diff)) 
+      green-= rgb_diff;
+    if(blue >= (255 - rgb_diff)) 
+      blue-= rgb_diff;
+
+    //returns the proper rgb values for a color variable
+    return "rgb(" + red + "," + green + "," + blue + ")";
+  }
+
+  //returns the border color based on rgb_diff
+  setBorderColor(red, blue, green, rgb_diff)
+  {
+    //decreases from max value for rgb if maxed out so colors can be darkened for border
+    if((red + rgb_diff) < 255) 
+      red+= rgb_diff;
+    if((green + rgb_diff) < 255) 
+      green+= rgb_diff;
+    if((blue + rgb_diff) < 255) 
+      blue+= rgb_diff;
+
+    //returns the proper rgb values for a color variable
+    return "rgb(" + red + "," + green + "," + blue + ")";
   }
 }
 
