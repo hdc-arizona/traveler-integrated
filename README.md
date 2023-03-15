@@ -15,12 +15,32 @@ If you plan to bundle otf2 traces,
 [otf2](https://www.vi-hps.org/projects/score-p/) needs to be installed and its
 binaries need to be in your `PATH`
 
+Download the latest otf2 tarball from [here](https://perftools.pages.jsc.fz-juelich.de/cicd/otf2/). Unzip it, go inside the directory and run the following
+
+```bash
+./configure
+make
+make install
+export PATH="$(dirname "$(which otf2-print)"):$PATH"
+```
+_It's recommended to update the $PATH variable through `~/.bashrc` file to make the change persistent across terminal sessions._
+
 ### Python dependencies
 ```bash
 python3 -m venv env
 source env/bin/activate
 pip3 install -r requirements.txt
 ```
+
+If the requirements' installation get stuck in installing `intervaltree`, modify the last line of `requirements.txt` file as follows
+```diff
+- git+https://github.com/alex-r-bigelow/intervaltree@master
++ git+git://github.com/alex-r-bigelow/intervaltree@master
+```
+
+
+
+_It's recommended to do a restart after installing the python dependencies to make the requirements' installation persistent._
 
 ### Building C dependencies
 You will most likely need to build a C dependency for your specific
