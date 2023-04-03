@@ -104,8 +104,9 @@ async def processRawTrace(self, datasetId, file, log):
             metricType = metricLineMatch.group(3)
             # Usually group(4) is just a number, but sometimes we can get input
             # like "DOUBLE <2>; 1234.0000"... we want the last number
-            value = float(re.findall('[0-9.]+', metricLineMatch.group(4))[-1])
-
+            # convert string to numeric, make sure exponential numbers are handled
+            value = float(re.findall('[0-9.Ee+]+', metricLineMatch.group(4))[-1])
+            
             if metricType.startswith('PAPI'):
                 if currentEvent is None:
                     skippedMetricsForMissingPrior += 1
