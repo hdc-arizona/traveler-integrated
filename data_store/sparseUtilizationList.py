@@ -12,6 +12,8 @@ class SparseUtilizationList():
         self.isUpdateCounter = isUpdate
 
     def getCLocation(self, loc):
+        if not loc in self.cLocationDict:
+            return []
         return self.cLocationDict[loc]
 
     def setCLocation(self, loc, val):
@@ -124,6 +126,8 @@ class SparseUtilizationList():
 
         # searches
         histogram = np.empty_like(criticalPts, dtype=object)
+        if not Location in self.locationDict:
+            return []
         location = self.locationDict[Location]
         length = len(location)
         histogram_length = len(histogram)
