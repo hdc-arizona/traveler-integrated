@@ -260,6 +260,7 @@ async def combineIntervals(self, datasetId, log):
             # TODO: this seems to be triggered by recent distributed runs;
             # probably not a big deal as they're usually shudown_action events?
             await log('')
+            lastEvent = lastEventStack[-1]
             await log('\nWARNING: omitting trailing ENTER event (%s)' % lastEvent['Primitive'])
 
     # Clean up temporary lists
